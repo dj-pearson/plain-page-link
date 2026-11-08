@@ -6101,3 +6101,74 @@ Other findings:
 - [mobile] [mobile] US-511 is still open: src/hooks/useOfflineStorage.ts, src/lib/offline-storage.ts and the idb dependency have no importers. It is a clean deletion slice for the next mobile round.
 - [mobile] [mobile] The crawler and human HTML still carry index.html's apple-touch-icon /Icon.png (index.html:87). Only iOS Safari reads it, and useProfileManifest swaps it to the agent's photo after a HEAD check. Doing that on the server would need the avatar lookup the human path deliberately avoids.
 - [mobile] [mobile] The lint-staged pre-commit hook created a backup entry in the git stash, which all worktrees share (stash 416db6b) and which other worktrees can see.
+
+---
+
+## Continuous improvement loop — round 15 — 2026-11-08 (US-570 to US-579 done)
+
+Ten lanes; nine approved outright, security needed one fix-up (bare .select() after writes on listings). Closed US-342, US-369, US-405, US-486, US-505, US-509, US-564, US-565, US-568, US-569; date-vendor slice of US-490.
+One merge conflict: the prerendered-index test fixture (profile theme-color + mobile apple title); combined both.
+Final: tsc clean (app + node config), 3004 unit tests pass (from 2941), verify:migrations OK (88 files, none new), vite build OK, eslint 562 warnings.
+
+- US-570 [listings] US-570: Double-clicking "Add Listing" created two listings, both counted against the plan, and closing during the save hid the error
+- US-571 [leads] Step two of a lead form no longer overwrites the visitor's step-one message
+- US-572 [profile] The installed PWA's browser chrome and the page disagreed on the theme colour
+- US-573 [uiux] Team owners can't hand several leads to a teammate at once (bulk assign on the Leads list)
+- US-574 [performance] The dashboard Overview and the lead detail dialog downloaded the date-fns vendor chunk (6.2 KB gzip) just to format a few dates
+- US-575 [security] The dashboard and the public listings block fetched whole listing rows with select('*')
+- US-576 [enterprise] Queued data exports held a whole account in memory, so the largest accounts could crash the export job
+- US-577 [marketing] Unused marketing modules still held false price, plan and rating claims that one import would publish as JSON-LD (US-369)
+- US-578 [seo] US-578: Give a listing page one JSON-LD model in the crawler HTML and the SPA (closes US-568)
+- US-579 [mobile] A buyer who saved an agent's page to the iPhone home screen could get an icon labelled "AgentBio" when the app's code loaded slowly or failed (US-569)
+
+Owner actions:
+- US-571: Redeploy the submit-lead edge function (the functions.agentbio.net Coolify app, which serves supabase/functions/ via edge-functions-server.ts) so step-two messages stop overwriting step one's. No migration and no secrets.
+- US-572: Deploy Cloudflare Pages (frontend: index.html and SEOHead). No migration, edge function or secret is needed.
+- US-574: Deploy Cloudflare Pages (frontend only; no migration, no edge function, no secret).
+- US-576: Redeploy the edge functions (functions.agentbio.net Coolify app, root Dockerfile) so scheduled-maintenance picks up the new _shared/gdpr-export*.ts. No migration and no new secrets.
+- US-577: None: this deletes unrendered code and derives an existing string. The comparison pages and the JSON-LD stay the same, so no migration, edge function or secret is involved. A normal Cloudflare Pages deploy picks it up.
+- US-578: Redeploy Cloudflare Pages: the crawler HTML (functions/_lib/social-meta.ts, profile-route.ts) changed alongside the SPA. No migration, no function deploy, no secrets.
+
+Opened:
+- US-580 [uiux] Bulk status change: report selected leads owned by another agent
+- US-581 [performance] Take date-fns off the Clients route
+- US-582 [performance] Take date-fns off the OpenHouses route
+- US-583 [enterprise] Data export: stream the queued export's upload to storage instead of buffering the whole file
+- US-584 [enterprise] Data export: use the page-at-a-time writer for the immediate GET download
+- US-585 [marketing] Extend the dead-export guard to the other marketing-claim modules
+- US-586 [seo] Add makesOffer to the SPA profile JSON-LD
+
+Other findings:
+- [listings] src/components/modals/AddListingModal.tsx: the step-indicator buttons (around line 300) still let the agent move between steps while a save is running. This is harmless because the submitted data is already captured, but they could be disabled to be consistent.
+- [listings] src/pages/dashboard/Listings.tsx:202 handleAddListing: if a photo upload succeeds and the insert then fails (for example a plan_limit check_violation), the uploaded photos stay in the bucket with no row pointing at them. EditListingModal got cleanup for this in US-461/US-512; the add path has none.
+- [leads] US-463 (delete the LegacyLead/LeadFormType/LeadStatus/LeadPriority/ContactMethod types in src/types/lead.ts) is still open and could be done in one small session next.
+- [leads] US-418 is linked to this change. When step two adds a message, the agent is still not emailed about it (the notify-lead call in submit-lead/index.ts happens before issueEnrichToken). This still needs the owner's decision.
+- [leads] submit-lead/index.ts logs with console.warn/console.error. This is Deno edge code, where logger from src/lib does not apply, so it was left as is.
+- [profile] US-283's remaining AC: ProfileCompletionWidget should count is_published, logo and service areas. It is still open and could be its own slice.
+- [profile] The lint-staged pre-commit hook again wrote a backup entry (e89eb5f) to the git stash, which all worktrees share.
+- [profile] US-544 (a fuller custom-CSS preview with real link, testimonial and listing markup) is still open.
+- [uiux] src/pages/dashboard/Leads.tsx: bulk status update and bulk delete report the selection size, not what the server changed. Leads assigned to the viewer by another owner are skipped silently (useLeads.ts:295-308 has no select('id')).
+- [uiux] src/pages/dashboard/Leads.tsx:503 has an existing eslint no-useless-assignment warning (`let truncated = false` in handleExportLeads).
+- [uiux] The lint-staged pre-commit hook again wrote a backup entry (7b941a3) into the git stash, which all worktrees share.
+- [uiux] US-420 (block a second team, or add a team switcher) and US-546 (a member's unfiltered chips undercount) are still open. US-420 needs an owner decision. US-546 needs a new lead_stats parameter in a migration.
+- [performance] src/pages/public/OpenHouseSignIn.tsx:15 and src/components/profile/UpcomingOpenHouses.tsx:15 import date-fns on public visitor pages: the open-house kiosk and the agent's public profile. dateFormat.ts could replace format there too, which would help visitors more than dashboard users. scripts/check-route-weight.mjs, not this check, covers public routes.
+- [performance] src/components/mobile/MobileListingCard.tsx:17, QuickStatusDashboard.tsx:383 and StaleContentAlert.tsx:195 still use formatDistanceToNow. They are reached only from src/pages/QuickActionsDashboard.tsx, not from any budgeted dashboard route.
+- [performance] The lint-staged pre-commit hook again wrote a backup into the shared git stash ('Backed up original state in git stash (1e6e85f)'), as earlier rounds noted.
+- [performance] PlanUsageCard.tsx:63 has an existing react/no-unescaped-entities warning (won't), unchanged by this commit.
+- [security] Other select('*') reads of listings outside US-342's two files were not checked in this pass. From the grep, sample-data-service.ts:197 uses a bare .select() after an insert, which asks for '*'. If listings ever gets column grants, that call would need a named list too (OWNER_LISTING_COLUMNS could be reused).
+- [security] src/components/pageBuilder/blocks/ListingsBlock.tsx:74 orders by created_at only, ignoring sort_order. The dashboard and usePublicProfile order by sort_order, created_at, id (US-107/US-253), so the block can show listings in a different order than the agent arranged. This is the profile/listings lane.
+- [security] src/components/pageBuilder/blocks/ListingsBlock.tsx:118 formatAddress renders ', null' when state is null. This is the profile lane.
+- [security] US-444 (Make.com x-api-key claim on generate-article) and US-423 (legacy MFA removal) are still blocked on owner decisions, as their notes say. US-527 (CSV import failure reasons) is open and sliceable but is listings UX more than security.
+- [enterprise] [enterprise] US-467 (agent-chosen quiet hours) still needs the product decision recorded in prd.json, so I did not take it.
+- [enterprise] [enterprise] US-528: src/components/settings/TimeZoneSetting.tsx still tells agents '7am unless you change it', which is wrong if an operator sets DIGEST_LOCAL_HOUR (already noted last round).
+- [enterprise] [enterprise] supabase/functions/_shared/gdpr-export-queue.test.ts:244 (resend tests) fails a strict type check (vi.mocked(store.sendEmail).mock on a union type). It passes under vitest because supabase/functions is outside the repo tsc include, so nothing type-checks the edge-function tests.
+- [enterprise] [enterprise] The lint-staged pre-commit hook again wrote a backup entry (b26e550) into the git stash that all worktrees share.
+- [marketing] The pre-commit lint-staged hook again wrote a backup entry (c2a5eb2) into the git stash that all worktrees share.
+- [marketing] US-507 is still open: competitor feature cells in ForRealEstateAgents.tsx, VsBeacons.tsx and VsLater.tsx are string literals, not COMPETITORS data.
+- [marketing] US-447's craft-floor HTML half (gradient header and border-left callouts in send-listing-generator-email, send-scheduled-listing-emails and send-bio-analyzer-email) can be done without the owner. Only the postal address needs the owner to supply it.
+- [seo] The crawler's #home address has no postalCode, because LISTING_COLUMNS (functions/_lib/profile-route.ts:52) does not select zip_code. The SPA includes it. Adding zip_code there would make the two #home nodes match exactly.
+- [seo] US-530 (named AI-bot groups in public/robots.txt do not inherit Disallow: /api/), US-509 (unused FAQ sets in src/lib/faq-schema.ts) and US-370 (unused PageSEO/SchemaMarkup components) are still open small seo slices.
+- [seo] The lint-staged pre-commit hook again wrote a backup entry into the git stash that all worktrees share (192f4b8).
+- [mobile] index.html:86 still has the comment '<!-- The home-screen label iOS offers... -->'. On agent pages it now sits above nothing. It is harmless and I left it alone.
+- [mobile] functions/_tests/fixtures/prerendered-index.html was captured before US-436/US-481 and may be stale in other ways, for example the apple-touch-icon and manifest shortcuts. Regenerating it from a real prerender would keep the route tests honest.
+- [mobile] CLAUDE.md (Key Files and Mobile & PWA sections) still lists src/lib/sync-manager.ts and src/lib/offline-storage.ts. sync-manager was removed in US-494, and offline-storage is dead code (US-511).

@@ -5318,8 +5318,8 @@
         "Existing tests pass; a test asserts the column list"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Not looked at in this round. (follow-up from US-330)"
+      "passes": true,
+      "notes": "Not looked at in this round. (follow-up from US-330) DONE in round 15 as US-575."
     },
     {
       "id": "US-331",
@@ -5764,8 +5764,8 @@
         "Anything kept is rendered and covered by features-claims/marketing-claims"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-355)"
+      "passes": true,
+      "notes": " (follow-up from US-355) DONE in round 15 as US-577."
     },
     {
       "id": "US-356",
@@ -6308,8 +6308,8 @@
         "The document's content and meta.counts are unchanged for the subject"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-397)"
+      "passes": true,
+      "notes": " (follow-up from US-397) DONE in round 15 as US-576."
     },
     {
       "id": "US-398",
@@ -7512,8 +7512,8 @@
         "A test or check holds them together"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-474)"
+      "passes": true,
+      "notes": " (follow-up from US-474) DONE in round 15 as US-572."
     },
     {
       "id": "US-487",
@@ -7597,7 +7597,7 @@
       "acceptanceCriteria": ["Detail chunk closure measured before/after", "No behaviour change"],
       "priority": 2,
       "passes": false,
-      "notes": " (follow-up from US-476)"
+      "notes": " (follow-up from US-476) date-vendor slice done in round 15 as US-574."
     },
     {
       "id": "US-477",
@@ -7822,8 +7822,8 @@
         "A refused row is reported, and the other rows still update"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-497)"
+      "passes": true,
+      "notes": " (follow-up from US-497) DONE in round 15 as US-573."
     },
     {
       "id": "US-498",
@@ -7958,8 +7958,8 @@
         "tsc and the full vitest suite pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Left out of US-502 to keep the change about the structured-data entity and offer expiry. (follow-up from US-502)"
+      "passes": true,
+      "notes": "Left out of US-502 to keep the change about the structured-data entity and offer expiry. (follow-up from US-502) DONE in round 15 as US-577."
     },
     {
       "id": "US-510",
@@ -8668,8 +8668,8 @@
         "A test covers the double submit"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": " (follow-up from US-554)"
+      "passes": true,
+      "notes": " (follow-up from US-554) DONE in round 15 as US-570."
     },
     {
       "id": "US-555",
@@ -8698,8 +8698,8 @@
         "Unit test in lead-enrichment.test.ts covers it"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Recorded at progress.txt:5923; still present. (follow-up from US-555)"
+      "passes": true,
+      "notes": "Recorded at progress.txt:5923; still present. (follow-up from US-555) DONE in round 15 as US-571."
     },
     {
       "id": "US-556",
@@ -8858,8 +8858,8 @@
         "A test holds the two together"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-562)"
+      "passes": true,
+      "notes": " (follow-up from US-562) DONE in round 15 as US-578."
     },
     {
       "id": "US-563",
@@ -8890,8 +8890,271 @@
         "useProfileManifest copes with the meta already being absent"
       ],
       "priority": 2,
+      "passes": true,
+      "notes": "Low impact: Safari reads the meta when Add to Home Screen is tapped, and by then React has usually run. (follow-up from US-563) DONE in round 15 as US-579."
+    },
+    {
+      "id": "US-570",
+      "lane": "listings",
+      "round": 15,
+      "title": "US-570: Double-clicking \"Add Listing\" created two listings, both counted against the plan, and closing during the save hid the error",
+      "description": "This delivers US-564, the listings lane's priority-1 story. AddListingModal now ignores any submit while a save is running. The submit button is disabled and reads \"Saving…\", Cancel/Back is disabled, and Escape, the X and clicking outside do nothing until the save finishes. If the save fails, the error stays on screen and the agent can submit again.",
+      "acceptanceCriteria": [
+        "The submit button is disabled and reads 'Saving…' while saving",
+        "A second submit while saving (same tick or later, by click or form submit) does not call onSave",
+        "Cancel/Back, Escape and the X are blocked while saving",
+        "A failed save's error stays visible and the button works again so the agent can retry",
+        "Tests cover the double submit, close attempts during the save, and closing after a successful save"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The bug was in src/components/modals/AddListingModal.tsx. The final button (`<Button type=\"submit\">Add Listing</Button>`, old line ~715) was never disabled. The form was `onSubmit={handleSubmit(onSubmit)}`, and handleSubmit lets a second submit through. The Dialog's `onOpenChange={handleClose}` closed the modal even while a save was running. The page's handleAddListing (src/pages/dashboard/Listings.tsx:202) uploads photos and then inserts, so each extra submit made another listing and another set of uploads.\n\nThe fix follows the pattern EditListingModal.tsx already uses (US-554). A `savingRef` (useRef) is the guard because it is set synchronously, so two submits in the same tick cannot both pass. React state was not enough on its own for that. A `saving` state copies it for rendering. Changes:\n- onSubmit returns early if a save is already running, sets the guard, and clears it in `finally`.\n- The form's onSubmit wrapper also checks the guard before handleSubmit, so validation does not run again.\n- The form has `aria-busy` while saving.\n- handleClose returns early while saving. It covers Cancel, Escape, the X and outside clicks.\n- Cancel/Back and the submit button are disabled while saving, and the submit button reads 'Saving…'.\n- The onSave prop type is now `void | Promise<void>`, since the modal already awaited it.\n\nNew test file: src/components/modals/AddListingModal.test.tsx, 3 tests. It fills all six steps, then:\n1. Submits twice in one act(), then twice more while saving. onSave is called once and the button is disabled with 'Saving…'.\n2. During the save, Back is disabled, and Escape and the Close button do not call onOpenChange(false). A rejected save shows the error in role=alert, the dialog stays open and a retry calls onSave again.\n3. A successful save closes the dialog.\nWith the component change reverted, tests 1 and 2 fail.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output.\n- `npx vitest run src/components/modals/AddListingModal.test.tsx`: 3 passed. Without the fix, 2 of the 3 fail.\n- `npx vitest run` (full suite): Test Files 302 passed (302); Tests 2944 passed, 1 skipped (2945).\n- `npx eslint` on both changed files: 0 errors, 2 warnings, both react/no-unescaped-entities on the existing 'Ready to publish! Review and click \"Add Listing\"' text. They were there before this change, so nothing new.\n- No migration, so verify:migrations is not needed.\n- The pre-commit hook (lint-staged eslint --fix and prettier) ran cleanly.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-571",
+      "lane": "leads",
+      "round": 15,
+      "title": "Step two of a lead form no longer overwrites the visitor's step-one message",
+      "description": "Fixes US-565. When a visitor sent a message in step two of a two-step lead form (the 'enrich' action), submit-lead overwrote leads.message with it. Whatever they wrote in step one was lost, and that is often the text the agent had just been emailed. A step-two message is now added after the step-one message, using the same separator and length cap as the repeat-enquiry merge from US-513. A message that repeats one already stored writes nothing. Qualifier columns and the form_data merge work as before.",
+      "acceptanceCriteria": [
+        "A step-two message is appended to the step-one message, never replaces it",
+        "If step two sends no message, or repeats one already stored, leads.message is not written at all",
+        "Qualifier columns and the form_data merge are unchanged",
+        "Unit tests in lead-enrichment.test.ts cover appending, an empty step one, no message or a repeated one, and the qualifiers"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The cause was in supabase/functions/submit-lead/index.ts, in the enrich branch (about lines 160-187). It spread `...enrichment.columns` into the update, and buildEnrichment's TEXT_COLUMNS (supabase/functions/_shared/lead-enrichment.ts:31-36) include `message`.\n\nWhat changed:\n(1) supabase/functions/_shared/lead-repeat.ts: the message-append logic inside mergeRepeatEnquiry is moved out into an exported `appendVisitorMessage(earlier, incoming) -> {message, isNew}`. mergeRepeatEnquiry now calls it and behaves the same; its 11 existing tests still pass.\n(2) supabase/functions/_shared/lead-enrichment.ts: new pure `enrichmentUpdate(target: {message, form_data}, enrichment)`. It takes `message` out of the qualifier columns, appends it through appendVisitorMessage, writes `message` only when it is new, and merges form_data as before.\n(3) submit-lead/index.ts: the enrich lookup now also selects `message` (`select('id, message, form_data')`), and the update spreads `enrichmentUpdate(target, enrichment)` in place of the inline columns and form_data.\n\nNo migration, no schema change, no change to the frontend contract (src/lib/leadSubmission.ts enrichLead is unchanged). lint-staged ran eslint --fix and prettier during the commit, and tsc and the tests were re-run on the committed tree.\n\nVERIFIED: npx tsc --noEmit: pass (run again after commit).\nnpx vitest run supabase/functions/_shared/lead-enrichment.test.ts supabase/functions/_shared/lead-repeat.test.ts: 2 files, 18 tests passed (4 are new for US-565).\nFull npx vitest run: 301 files passed, 2945 tests passed, 1 skipped, exit 0.\nnpx eslint on the 4 changed files: 0 errors and 4 warnings, all 'File ignored because of a matching ignore pattern' (supabase/functions is outside the eslint config), so no new lint warnings. deno is not installed, so deno check was not run.\nverify:migrations was not needed (no migration).\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the submit-lead edge function (the functions.agentbio.net Coolify app, which serves supabase/functions/ via edge-functions-server.ts) so step-two messages stop overwriting step one's. No migration and no secrets."
+    },
+    {
+      "id": "US-572",
+      "lane": "profile",
+      "round": 15,
+      "title": "The installed PWA's browser chrome and the page disagreed on the theme colour",
+      "description": "Closes US-486, an open profile-lane slice of US-283. public/manifest.json:9 and functions/_lib/profile-manifest.ts:92 (the per-agent manifest) set theme_color to #2563eb. index.html:82, SEO_CONFIG.themeColor (src/config/seo.config.ts:46) and a hardcoded meta in SEOHead (src/components/SEOHead.tsx:171) set it to #0ea5e9. So the title bar of an installed PWA was one colour from the manifest and another from the HTML. All of them now use #2563eb, which also matches the fallback of the 'modern' preset and public/offline.html. SEOHead now reads SEO_CONFIG.themeColor, and a new test holds every place to the same value.",
+      "acceptanceCriteria": [
+        "manifest.json theme_color and the index.html theme-color meta are identical (#2563eb)",
+        "SEO_CONFIG.themeColor, SEOHead's meta and the per-agent manifest use the same value",
+        "src/config/theme-color.test.ts holds index.html (exactly one meta), public/manifest.json, buildProfileManifest and SEOHead to SEO_CONFIG.themeColor"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Changes:\n- index.html:82: the theme-color meta changes from #0ea5e9 to #2563eb.\n- src/config/seo.config.ts: themeColor is now '#2563eb', with a comment explaining why the places must agree.\n- src/components/SEOHead.tsx:4,171: imports SEO_CONFIG and renders content={SEO_CONFIG.themeColor} instead of the hardcoded #0ea5e9. Helmet adds this tag to every SPA page and to the prerendered HTML.\n- functions/_lib/profile-manifest.ts:92: a comment pointing to the test. The literal stays, so the Pages Function does not import src config.\n- functions/_tests/fixtures/prerendered-index.html: the fixture's Helmet theme-color is updated to match.\n- New file src/config/theme-color.test.ts (5 tests): checks the value is hex, index.html has exactly one meta equal to the brand value, public/manifest.json matches, buildProfileManifest().theme_color matches, and SEOHead uses SEO_CONFIG with no hex literal.\nOption considered and not taken: tinting each agent's page chrome with their primary colour. That belongs to the mobile lane's profile-manifest work and needs a decision. This change only removes the disagreement.\n\nVERIFIED: - npx tsc --noEmit: exit 0, no output.\n- npx vitest run src/config/theme-color.test.ts functions src/components/SEOHead src/lib/structured-data-graph.test.tsx: 53 files, 710 tests passed.\n- Full npx vitest run: 302 files passed; 2946 tests passed, 1 skipped.\n- npx eslint on the changed files: 0 errors and 0 warnings in the src files. The only output is the pre-existing \"File ignored because no matching configuration\" notice for functions/_lib/profile-manifest.ts, because functions/ is outside the eslint config.\n- lint-staged (eslint --fix, prettier) ran cleanly on commit.\n- No migration was added, so verify:migrations does not apply.\n\nREVIEW: approve\n\nOWNER ACTIONS: Deploy Cloudflare Pages (frontend: index.html and SEOHead). No migration, edge function or secret is needed."
+    },
+    {
+      "id": "US-573",
+      "lane": "uiux",
+      "round": 15,
+      "title": "Team owners can't hand several leads to a teammate at once (bulk assign on the Leads list)",
+      "description": "Closes US-505. Team owners now get an \"Assign to…\" select in the Leads bulk action bar, with Unassigned, Me and each accepted teammate. It updates all the selected leads in one request. The request is scoped by user_id and goes through the same guard_lead_assignee trigger the detail dialog uses. Leads in the selection that another agent owns, and rows the server did not change, are reported in the toast rather than skipped silently.",
+      "acceptanceCriteria": [
+        "A team owner can assign or unassign the selected leads in one action from the bulk action bar (Unassigned, Me, accepted teammates)",
+        "A selected lead owned by another agent is reported in a 'Some leads were not reassigned' toast, and the owner's own leads still update",
+        "Ids that the server did not return as updated (deleted in the meantime, or not the viewer's) are counted and reported",
+        "A guard_lead_assignee refusal (23514 / lead_assignee_not_teammate) says the person is no longer on the team, changes no lead, and refetches the roster",
+        "Solo agents do not see the control"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "I picked US-505 because it is an open uiux story that needs no owner decision. US-420 still needs the owner to choose between one team per user and a team switcher. US-546 needs a lead_stats flag (a migration) and a separate review of the analytics side.\n\nChanges:\n- src/lib/leadAssignee.ts: two new pure functions.\n  - planBulkAssign splits the selection into three groups: ids to send (the viewer's own leads whose assignee changes, plus any id no longer loaded, which the server decides), the count owned by another agent, and the count already held by the chosen person.\n  - summarizeBulkAssign builds the toast title and text, and a partial flag.\n- src/hooks/useLeads.ts: new bulkAssign mutation. It runs `update({assigned_to}).in('id', ids).eq('user_id', user.id).select('id')` and returns the ids that changed. It clears the same caches as the other mutations (leads, analytics-leads, conversion-funnel, lead-stats). The guard is enforced by the existing trigger from migration 20261108000497, so no migration is needed.\n- src/pages/dashboard/Leads.tsx:\n  - New handleBulkAssign, placed before handleBulkDelete.\n  - The bulk bar shows an \"Assign to…\" Radix Select only when the viewer owns a team. It remounts after each use so the same choice can be made again.\n  - The \"nobody\" option uses the value '__unassigned', because a Radix Select item cannot hold an empty string.\n  - Refusal handling uses isNotTeammateError and refetches the roster.\n\nWhy a single statement is safe: the guard's verdict depends only on the lead's owner and the new assignee. Every row sent belongs to the viewer, so the rows either all pass or all fail. The only way part of a selection can fail is a lead owned by someone else, and those are reported.\n\nTests:\n- 5 new unit tests in src/lib/leadAssignee.test.ts.\n- 3 new page tests in src/pages/dashboard/Leads.assignee.test.tsx: assigning to a teammate (checks the update, in('id') and eq('user_id') calls and the toast text), a mixed-ownership selection being reported, and the control being hidden from solo agents.\n\nVERIFIED: - `npx tsc --noEmit`: clean.\n- `npx vitest run src/lib/leadAssignee.test.ts src/pages/dashboard/Leads.assignee.test.tsx src/pages/dashboard/Leads.test.tsx src/hooks/useLeads.test.ts`: 4 files, 52 tests passed.\n- Full `npx vitest run`: 301 files passed; 2949 tests passed, 1 skipped.\n- `npx eslint` on the 5 changed files: 0 errors and 1 warning. The warning is no-useless-assignment at Leads.tsx:503 (`let truncated = false`) in handleExportLeads, which this change does not touch, so it adds no new warnings.\n- No migration was added, so verify:migrations was not needed.\n- The lint-staged pre-commit hook (eslint --fix, prettier) passed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-580",
+      "lane": "uiux",
+      "round": 15,
+      "title": "Bulk status change: report selected leads owned by another agent",
+      "description": "handleBulkStatusUpdate (src/pages/dashboard/Leads.tsx, around line 395) and useLeads.bulkUpdateStatus (src/hooks/useLeads.ts:290-303) filter by eq('user_id', me) without select('id'). A team member who selects leads another owner assigned to them sees 'Updated N lead(s)' even though those rows were skipped. Return the updated ids and report the rest, the way bulk assign now does. Bulk delete (useLeads.ts:305-312) has the same gap.",
+      "acceptanceCriteria": [
+        "The status toast counts only rows the server actually updated",
+        "Rows that were skipped are reported"
+      ],
+      "priority": 2,
       "passes": false,
-      "notes": "Low impact: Safari reads the meta when Add to Home Screen is tapped, and by then React has usually run. (follow-up from US-563)"
+      "notes": " (follow-up from US-573)"
+    },
+    {
+      "id": "US-574",
+      "lane": "performance",
+      "round": 15,
+      "title": "The dashboard Overview and the lead detail dialog downloaded the date-fns vendor chunk (6.2 KB gzip) just to format a few dates",
+      "description": "US-574 (first slice of US-490, and extends US-421/US-558). The Overview is the first screen after sign-in. Before this change, its route and the first open of the lead detail dialog both pulled in date-vendor (6.2 KB gzip). The only reasons were date-fns format, formatDistanceToNow and isPast calls in five components. These calls now use a small formatter with no dependencies that gives the same output as date-fns, plus the existing relativeTime port. The dashboard weight check now blocks date-vendor on every dashboard route except Clients and OpenHouses.",
+      "acceptanceCriteria": [
+        "Overview route no longer statically reaches date-vendor; KB gzip beyond entry+layout 38.3 -> 33.3",
+        "LeadDetailModal first open (beyond Leads) no longer reaches date-vendor; 27.5 -> 21.9",
+        "Rendered text is unchanged: formatDate matches date-fns format across 2000 dates x 7 patterns, in UTC and America/Los_Angeles; formatDistanceToNowWithSuffix uses the US-558 port already tested against date-fns",
+        "check-dashboard-weight bans date-vendor on dashboard routes; only Clients and OpenHouses are allowed it, and a test pins that list",
+        "Budgets lowered: Overview 42 -> 38, LeadDetailModal 30 -> 25"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Measurement: I built with BUILD_MANIFEST=true and ran scripts/check-dashboard-weight.mjs --update before and after the change. I used a scratch breakdown script (scratchpad br.mjs, built on the script's own weighBeyond) to list the chunks each route reaches. Before the change, date-vendor-*.js (6.2 KB) appeared both in Overview's closure and in LeadDetailModal's closure beyond Leads. I found the cause with a grep of date-fns imports:\n- src/components/dashboard/ComingUp.tsx:14\n- src/components/dashboard/DueFollowUps.tsx:14\n- src/components/dashboard/PlanUsageCard.tsx:9\n- src/components/leads/LeadDetailModal.tsx:60\n- src/components/leads/LeadViewedListings.tsx:1\n\nChanges:\n- New src/lib/dateFormat.ts with `formatDate(date, pattern)` and `isPast`. formatDate supports the tokens yyyy, EEE, MMM, dd, d, hh, h, mm and a in en-US. Any other letter throws RangeError, so it never prints wrong output silently. An invalid date also throws RangeError, as date-fns does.\n- src/lib/relativeTime.ts gets `formatDistanceToNowWithSuffix(date)`, which wraps the US-558 formatDistanceWithSuffix.\n- The five components above now use these. The patterns in use are 'EEE, MMM d · h:mm a', 'h:mm a', 'EEE, MMM d', 'MMM d' and 'MMM d, h:mm a'.\n- scripts/check-dashboard-weight.mjs:\n  - adds a 'date-vendor' entry to ROUTE_MUST_NOT_INCLUDE, with allow set to [Clients, OpenHouses];\n  - lowers the Overview budget to 38 and the LeadDetailModal budget to 25;\n  - adds a measurement note to the header comment.\n- src/dashboard-weight.test.ts:\n  - a source guard that the five components and dateFormat.ts do not import date-fns;\n  - a test that pins the date-vendor allow list.\n\nAfter the change, only Clients and OpenHouses still reach date-vendor. I checked every route in DASHBOARD_ROUTES with the scratch script.\n\nVERIFIED: - Before: `BUILD_MANIFEST=true npx vite build`, then `node scripts/check-dashboard-weight.mjs --update`: Overview 38.3, LeadDetailModal 27.5, all 19 routes within budget.\n- After: the same build and check: Overview 33.3, LeadDetailModal 21.9, everything else unchanged (Analytics 36.8 -> 36.9, Listings 32.4 -> 32.5, both rounding noise). Result: \"[dashboard-weight] OK — 19 dashboard chunks within budget\" with the new budgets and the date-vendor ban.\n- `npx tsc --noEmit`: exit 0, no output.\n- `npx vitest run src/lib/dateFormat.test.ts src/lib/relativeTime.test.ts src/components/dashboard src/components/leads src/pages/dashboard/Overview.test.tsx`: 14 files, 79 tests passed.\n- `TZ=America/Los_Angeles npx vitest run src/lib/dateFormat.test.ts`: 7 passed.\n- `npx vitest run src/dashboard-weight.test.ts`: 14 passed.\n- Full `npx vitest run`: 302 files passed; 2950 tests passed, 1 skipped.\n- `npx eslint` on all 10 changed files: 0 errors and 1 warning. The warning is react/no-unescaped-entities at PlanUsageCard.tsx:63, and the same line on HEAD has it, so it is not new.\n\nREVIEW: approve\n\nOWNER ACTIONS: Deploy Cloudflare Pages (frontend only; no migration, no edge function, no secret)."
+    },
+    {
+      "id": "US-581",
+      "lane": "performance",
+      "round": 15,
+      "title": "Take date-fns off the Clients route",
+      "description": "Clients still reaches date-vendor (6.2 KB gzip) through src/pages/dashboard/Clients.tsx:3 (formatDistanceToNow) and src/components/clients/ContactDetail.tsx:3 (format, formatDistanceToNow). Move both to src/lib/dateFormat.ts and relativeTime.ts, then remove Clients from ROUTE_MUST_NOT_INCLUDE['date-vendor'].allow.",
+      "acceptanceCriteria": [
+        "Clients closure beyond layout has no date-vendor",
+        "Clients removed from the date-vendor allow list and its budget lowered",
+        "Any new format token is added to dateFormat.ts with a date-fns parity test"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Check the patterns ContactDetail uses; if it needs MMMM or yyyy-style tokens, add them to dateFormat.ts with the same parity test. (follow-up from US-574)"
+    },
+    {
+      "id": "US-582",
+      "lane": "performance",
+      "round": 15,
+      "title": "Take date-fns off the OpenHouses route",
+      "description": "OpenHouses reaches date-vendor through src/pages/dashboard/OpenHouses.tsx:11 (format, isSameYear), src/components/openHouses/OpenHouseFormDialog.tsx:13 (format, isSaturday, nextSaturday) and OpenHouseVisitorsDialog.tsx:11. Port these, or keep date-fns inside the dialogs if they already load on open, then remove OpenHouses from the allow list.",
+      "acceptanceCriteria": [
+        "OpenHouses closure beyond layout has no date-vendor",
+        "OpenHouses removed from the date-vendor allow list"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-574)"
+    },
+    {
+      "id": "US-575",
+      "lane": "security",
+      "round": 15,
+      "title": "The dashboard and the public listings block fetched whole listing rows with select('*')",
+      "description": "Closes US-342. useListings (the dashboard Listings page) and the page-builder ListingsBlock (on the public profile, read by visitors with the anon key) both read `listings` with select('*'). Two problems with that. If `listings` ever gets column-level grants (profiles got them in US-073 and leads in US-254), a `*` read gets refused and the Listings page goes blank. And as things stand, every column added to the table is sent to the browser automatically, including to visitors. Both reads now ask for named columns: the dashboard takes the columns its Listing type carries, and the public block takes only the 11 columns its cards show.",
+      "acceptanceCriteria": [
+        "No select('*') on listings in useListings.ts or ListingsBlock.tsx",
+        "A test asserts each column list (real columns only, no wildcard, no duplicates; the block list is exactly what the cards render)",
+        "Runtime tests assert useListings passes OWNER_LISTING_COLUMNS and ListingsBlock passes LISTINGS_BLOCK_COLUMNS to .select()",
+        "Existing tests pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "New file src/lib/listingColumns.ts holds OWNER_LISTING_COLUMNS (the 35 columns in the dashboard's Listing type), LISTINGS_BLOCK_COLUMNS (id, address, city, state, price, status, bedrooms, bathrooms, square_feet, photos, image) and the ListingsBlockRow Pick type. Both lists are literal strings, so supabase-js infers the row type from them.\n\n- src/hooks/useListings.ts:79 now calls .select(OWNER_LISTING_COLUMNS) instead of select('*'). The existing `.map((row): Listing => ...)` turns a missing column into a compile error. I checked this: with 'highlights' removed from the list, tsc fails with TS2322 at useListings.ts:94.\n- src/components/pageBuilder/blocks/ListingsBlock.tsx:74 now calls .select(LISTINGS_BLOCK_COLUMNS). The block's Listing type is narrowed from the full Row to ListingsBlockRow. Its status and featured filters stay in the WHERE clause.\n\nTests:\n- New src/lib/listingColumns.test.ts parses the listings Row in types.ts and checks that every listed column exists. It also pins the block list exactly and source-guards both files against select('*') and a bare select().\n- ListingsBlock.test.tsx and useListings.test.ts gained assertions that the right constant reaches .select().\n\nNo migration, no edge function change, no behaviour change for the agent.\n\nVERIFIED: - npx tsc --noEmit: exit 0. Negative check: removing 'highlights' from OWNER_LISTING_COLUMNS made tsc fail as expected, and I restored the file afterwards.\n- npx vitest run src/lib/listingColumns.test.ts src/components/pageBuilder src/hooks/useListings.test.ts src/pages/dashboard/Listings src/listing-delete-guard.test.ts: 12 files, 100 tests passed. The final three-file targeted run gave 31 passed.\n- npx eslint on all 6 changed files: no output, so no warnings. The pre-commit lint-staged eslint --fix and prettier also passed. Prettier only re-wrapped lines in listingColumns.test.ts.\n- Full npx vitest run: Test Files 302 passed (302); Tests 2949 passed, 1 skipped (2950).\n\nREVIEW: fix_required; fix-up: Both review findings were real, and both are fixed.\n\n1. In src/hooks/useListings.ts, addListing and updateListing both ended in a bare `.select().single()`, which PostgREST reads as `*`. Both now end in `.select(OWNER_LISTING_COLUMNS).single()`. I used the named column list in updateListing too, rather than `.select('id')`, so the mutations still return the same row shape as before; that is safer for any caller that reads the result of mutateAsync.\n\n2. The guard in src/lib/listingColumns.test.ts only caught `.from('listings')` followed directly by `.select()`, so the two calls above got through. I added a check that fails on any `.select()` or `.select('*')` in the listed files (useListings.ts and ListingsBlock.tsx), using the pattern `/\\.select\\(\\s*(['\"]\\*['\"])?\\s*\\)/`. The two existing checks are kept.\n\nThe commit is c637377 \"US-575: address review\" in the worktree /home/user/plain-page-link/.claude/worktrees/wf_c2e9bf9e-a7f-6. The branch loop/r15-security points at it. Nothing was pushed, and prd.json and progress.txt were not touched."
+    },
+    {
+      "id": "US-576",
+      "lane": "enterprise",
+      "round": 15,
+      "title": "Queued data exports held a whole account in memory, so the largest accounts could crash the export job",
+      "description": "First slice of US-405. The hourly scheduled-maintenance export job now writes each queued GDPR export one page at a time, instead of loading every section, a decrypted copy, and the full JSON string at once.",
+      "acceptanceCriteria": [
+        "The queued export job reads one page of one section at a time and never has two reads in flight (test: peak in-flight reads = 1)",
+        "The written file is byte-identical to JSON.stringify(buildExportDocument(...), null, 2), truncated sections included (tests)",
+        "A section that cannot be read still fails the whole export with ExportIncompleteError naming every failed section, in SECTIONS order, and the request is retried",
+        "The audit entry for a queued export also records the truncated sections",
+        "Every SECTIONS key appears exactly once in the written layout (test)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Problem: supabase/functions/_shared/gdpr-export-queue.ts buildAndDeliver (before) called store.collect, which runs collectSections (gdpr-export.ts). That reads all 27 sections concurrently into memory, up to MAX_ROWS_PER_SECTION = 100,000 rows each. It then called buildExportDocument, which makes a decrypted copy of leads and contacts, and then JSON.stringify(document, null, 2). All three were in memory at the same time.\n\nChange:\n- gdpr-export.ts: new forEachPage hands each page to a callback and keeps none of them; readAllRows now uses it. decryptPiiRows and exportUser were extracted so both writers share them. New DOCUMENT_LAYOUT describes the document in buildExportDocument's key order, plus a ROW_TRANSFORMS table (decrypt leads and contacts, mask login fingerprints). writeExportDocument(reader, subject, decrypt, now, pageSize, maxRows) returns { chunks, counts, truncated }. Each page is serialised with JSON.stringify(row, null, 2) re-indented, so the output matches the pretty-printed in-memory document byte for byte. Peak memory is now the serialised file plus one page.\n- gdpr-export-queue.ts: ExportQueueStore.collect became `reader: ExportReader`, and upload(path, chunks: string[]) builds a single Blob from the chunks. buildAndDeliver uses writeExportDocument, and the audit records `truncated`. supabaseExportQueueStore passes supabaseExportReader(supabase). scheduled-maintenance/index.ts did not need changes.\n- Sections are now read one after another rather than concurrently. The job is a background run that nobody waits on, so the extra time is acceptable.\n- The GET immediate-download path in gdpr-export/index.ts is unchanged and still uses collectSections and buildExportDocument.\n\nTests:\n- gdpr-export.test.ts: 5 new tests covering byte identity, byte identity with truncation, at most one read in flight, failures naming every section, and layout coverage.\n- gdpr-export-queue.test.ts: moved to a table-backed fake reader. Also asserts counts and truncated in the audit entry.\n\nCommit hook note: the lint-staged pre-commit hook again wrote a backup into the shared git stash (b26e550), as in earlier rounds.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx vitest run supabase/functions/_shared/gdpr-export.test.ts supabase/functions/_shared/gdpr-export-queue.test.ts supabase/functions/gdpr-export: 3 files, 42 tests passed. Re-run after prettier reformatted the files in the pre-commit hook: same result.\nFull npx vitest run: 301 files passed; 2946 tests passed, 1 skipped.\nnpx eslint on the 4 changed files: they are covered by an eslint ignore pattern (supabase/functions), so they add no warnings to the CI total.\nExtra check: the repo tsc does not include supabase/functions, so I ran strict tsc with a scratch tsconfig that maps the esm.sh import to node_modules. It reported no errors in the changed code. The remaining errors were missing Deno, node and process types, plus one existing mock typing error in the resend tests at gdpr-export-queue.test.ts:244, which this change did not touch.\nNo migration was added, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the edge functions (functions.agentbio.net Coolify app, root Dockerfile) so scheduled-maintenance picks up the new _shared/gdpr-export*.ts. No migration and no new secrets."
+    },
+    {
+      "id": "US-583",
+      "lane": "enterprise",
+      "round": 15,
+      "title": "Data export: stream the queued export's upload to storage instead of buffering the whole file",
+      "description": "writeExportDocument already produces the file as ordered chunks, but upload() still puts all of them into one Blob, so peak memory is still the full serialised file. Upload through a ReadableStream body (with duplex 'half') or Storage's TUS resumable upload so each chunk is sent and then dropped. First confirm the self-hosted storage behind Kong accepts a chunked or streamed body.",
+      "acceptanceCriteria": [
+        "Peak memory no longer grows with the export's size (only one chunk or page is held)",
+        "The file is still byte-identical to the current output",
+        "An upload failure still releases the request for retry"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "US-405 slice 2. Turn writeExportDocument into an async generator, or give it an onChunk sink, and keep the current return shape for the tests. (follow-up from US-576)"
+    },
+    {
+      "id": "US-584",
+      "lane": "enterprise",
+      "round": 15,
+      "title": "Data export: use the page-at-a-time writer for the immediate GET download",
+      "description": "gdpr-export/index.ts GET still calls collectSections and buildExportDocument and builds the whole document in memory. Either stream the response body from writeExportDocument, or send large accounts to the queue. Streaming has a catch: once headers are sent, a section failure can no longer return a 503 JSON error.",
+      "acceptanceCriteria": [
+        "The GET export does not hold every section in memory",
+        "A section that fails to read is never delivered as a document that looks complete"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-576)"
+    },
+    {
+      "id": "US-577",
+      "lane": "marketing",
+      "round": 15,
+      "title": "Unused marketing modules still held false price, plan and rating claims that one import would publish as JSON-LD (US-369)",
+      "description": "Finishes US-369. I deleted every marketing-claim export that nothing imports, and added a guard test that fails if a claim module gets a dead export again. I also fixed a drift bug: the \"verified on\" date shown on the comparison pages was a second hand-typed copy of COMPETITORS_VERIFIED_ON.",
+      "acceptanceCriteria": [
+        "No unused export carries a price, rating or plan claim: src/lib/geo.ts is deleted; PAGE_SEO_TEMPLATES, PRICING_TIERS, COMPARISON_DATA and SEO_STARTING_PRICE are gone from seo.config.ts; HOMEPAGE_FAQS, PRICING_FAQS, COMPARISON_FAQS, FeatureFAQKey and the unrendered FEATURE_FAQS sets are gone from faq-schema.ts",
+        "What is left is rendered: FEATURE_FAQS.leadCapture and .analytics, which features-claims.test.ts already scans",
+        "src/dead-claim-exports.test.ts fails when a value export of seo.config.ts, faq-schema.ts, competitors.ts, marketing-claims.ts or planCardCopy.ts has no non-test user, when a FEATURE_FAQS key is not rendered by a page, or if src/lib/geo.ts comes back",
+        "COMPETITORS_VERIFIED_LABEL is derived from COMPETITORS_VERIFIED_ON and still reads '8 September 2026'"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence before the change (HEAD 5d97e19):\n- src/lib/geo.ts (315 lines) had no importer anywhere in src, functions or scripts. GEO_FAQS still said \"Paid plans start at $39/month with unlimited listings\", and line 203 said leads can be exported to your CRM.\n- src/config/seo.config.ts had four exports nobody imported: PAGE_SEO_TEMPLATES (from line 97), PRICING_TIERS (from line 247, with hard-coded prices and per-tier feature lists, and no Starter plan), COMPARISON_DATA (from line 310, giving AgentBio a rating of '4.8' and competitors invented ratings), and SEO_STARTING_PRICE, which only COMPARISON_DATA used.\n- src/lib/faq-schema.ts: HOMEPAGE_FAQS (line 178), PRICING_FAQS (line 212, \"Traditional real estate websites cost $3,000-$15,000\"), COMPARISON_FAQS (line 235), FeatureFAQKey (line 278), and the FEATURE_FAQS keys propertyListings, testimonials and calendarBooking were not used anywhere. Only Analytics.tsx and LeadCapture.tsx import FEATURE_FAQS, and they read .analytics and .leadCapture. The helpers planPrice, FREE_PLAN, FIRST_PAID_PRICE, LISTING_ALLOWANCE and DISCLOSURES and the PRICING_PLANS import became unused and were removed.\n\nChanges:\n- Deleted the dead code above, with a short comment in each module saying why it went and naming the guard.\n- New src/dead-claim-exports.test.ts. It takes every `export const|let|function|class` in the claim modules and treats it as live if a non-test file under src, functions or scripts mentions it, or if another export of the same module uses it (comments do not count). It also checks that every FEATURE_FAQS key appears as FEATURE_FAQS.<key> under src/pages, that src/lib/geo.ts stays deleted, and runs self-checks on the detector.\n- The first run of that guard found COMPETITORS_VERIFIED_ON referenced only in a comment. The page label was a separate literal, so following the file's own note (\"change VERIFIED_ON\") would have left every comparison page showing the old date. src/config/competitors.ts now derives COMPETITORS_VERIFIED_LABEL from it with toLocaleDateString('en-GB', UTC). A test pins the result as '8 September 2026'.\n\nOverlap: seo-lane story US-509 asks for the same faq-schema.ts deletions. If the seo lane also takes it this round, the integrator should expect overlapping hunks in faq-schema.ts. Keep this version, because the guard test depends on it, and US-509 can then be marked passing.\n\nVERIFIED: - npx tsc --noEmit: exit 0, no output.\n- npx vitest run src/dead-claim-exports.test.ts: 9 passed.\n- npx vitest run on src/dead-claim-exports.test.ts, src/comparison-claims.test.ts, src/features-claims.test.ts, src/marketing-claims.test.ts, src/landing-claims.test.ts, src/social-profiles.test.ts and src/config: 14 files, 146 tests passed.\n- npx eslint on the four changed .ts files: no output (0 warnings, 0 errors).\n- Full npx vitest run: 302 files passed; 2950 tests passed, 1 skipped.\n- The lint-staged pre-commit hook (eslint --fix, prettier) passed.\n- No migration, so verify:migrations does not apply.\n\nREVIEW: approve\n\nOWNER ACTIONS: None: this deletes unrendered code and derives an existing string. The comparison pages and the JSON-LD stay the same, so no migration, edge function or secret is involved. A normal Cloudflare Pages deploy picks it up."
+    },
+    {
+      "id": "US-585",
+      "lane": "marketing",
+      "round": 15,
+      "title": "Extend the dead-export guard to the other marketing-claim modules",
+      "description": "src/dead-claim-exports.test.ts covers seo.config, faq-schema, competitors, marketing-claims and planCardCopy. Add src/config/pricing-plans.ts and src/lib/seo.ts, deleting or justifying anything the guard flags.",
+      "acceptanceCriteria": [
+        "pricing-plans.ts and seo.ts are in CLAIM_MODULES and the guard passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-577)"
+    },
+    {
+      "id": "US-578",
+      "lane": "seo",
+      "round": 15,
+      "title": "US-578: Give a listing page one JSON-LD model in the crawler HTML and the SPA (closes US-568)",
+      "description": "The crawler HTML (functions/_lib/social-meta.ts buildListingTags) declared `<listing url>#listing` as a SingleFamilyResidence. ListingPage.tsx declared the same @id as a RealEstateListing. Anything merging nodes by @id saw one node with two conflicting types. Separately, the SPA node put address, numberOfBedrooms and floorSize on a RealEstateListing. RealEstateListing is a WebPage subtype, so those properties are invalid there. The crawler also used numberOfRooms to mean bedrooms.\n\nBoth renderings now build their graph from one alias-free module, src/lib/listingJsonLd.ts:\n- `#listing` is a RealEstateListing. It holds the name, url, description, photos and the Offer (price, USD, InStock or SoldOut), and points to `#home` as its mainEntity.\n- `#home` is the property itself. Its type comes from listings.property_type: single_family maps to SingleFamilyResidence, condo to Apartment, townhouse to House, land and commercial to Place, and anything else to Accommodation. It holds the PostalAddress, numberOfBedrooms, numberOfBathroomsTotal (a whole number, so 2.5 baths becomes 3) and floorSize.\n\nThe agent page's makesOffer itemOffered now has an explicit '@type': 'RealEstateListing'.",
+      "acceptanceCriteria": [
+        "Crawler and SPA both declare <listing url>#listing as RealEstateListing, built by listingJsonLdNodes",
+        "Address, rooms and floor size sit on a separate #home node typed from property_type, which the listing names as its mainEntity",
+        "makesOffer itemOffered carries '@type': 'RealEstateListing' with the same @id",
+        "A sold listing's offer is SoldOut in both places, through listingAvailability",
+        "The unused realEstateListingSchema is removed"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- New src/lib/listingJsonLd.ts. It exports listingJsonLdNodes, listingReference, residenceType, listingAvailability, listingNodeId and homeNodeId. It has no '@/' imports, so the Pages Functions bundle can import it the same way it already imports src/lib/listingStatus.\n- functions/_lib/social-meta.ts:\n  - buildListingTags now emits {'@context', '@graph': [listing, home]}. Images come from the photos gallery, falling back to the single image field, made absolute, at most 10.\n  - listingOffers now uses listingReference and listingAvailability.\n  - ListingMeta gains optional property_type and status.\n- functions/_lib/profile-route.ts:52: LISTING_COLUMNS now includes property_type. listings has no column-level grants and the SPA already reads property_type as anon (usePublicProfile.ts:353), so this does not widen access.\n- src/pages/public/ListingPage.tsx (around line 172) now builds the same nodes and also passes zip_code as postalCode. The node name is \"address, city\" in both renderings.\n- src/lib/structured-data.ts: removed realEstateListingSchema and ListingInput, which had no other importers, along with their two tests.\n\nTests:\n- New src/lib/listingJsonLd.test.ts, 7 tests.\n- New cross-rendering test in functions/_lib/social-meta.test.ts: the #listing node's @id and @type match the agent's makesOffer itemOffered.\n- Updated the SingleFamilyResidence assertions in social-meta.test.ts and functions/_tests/username-route.test.ts.\n\nVERIFIED: - `npx tsc --noEmit`: passed with no errors, including after the last edit.\n- `npx vitest run src/lib/listingJsonLd.test.ts src/lib/structured-data.test.ts functions/ src/pages/public`: 1 failure on the first run, in a social-meta test that read jsonLd['@id']. I updated it to read graph[0]['@id']. On re-run, functions/_lib/social-meta.test.ts passed 33/33. I did not re-run the full targeted command; the full suite below covers it.\n- Full `npx vitest run`: 302 files passed; 2946 tests passed, 1 skipped.\n- `npx eslint` on the changed files: no warnings on the src files. The 4 functions/ files are outside the eslint config (\"File ignored\"), so they add nothing to the warning count.\n- prettier --check passed.\n- The lint-staged pre-commit hook ran eslint --fix and prettier and passed.\n- No migration.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages: the crawler HTML (functions/_lib/social-meta.ts, profile-route.ts) changed alongside the SPA. No migration, no function deploy, no secrets."
+    },
+    {
+      "id": "US-586",
+      "lane": "seo",
+      "round": 15,
+      "title": "Add makesOffer to the SPA profile JSON-LD",
+      "description": "FullProfilePage.tsx:228-300 names no listings. Only the crawler output has makesOffer. Now that the type question is settled, build the same offers with listingReference/listingAvailability so both renderings of /:username carry the same graph.",
+      "acceptanceCriteria": [
+        "The SPA RealEstateAgent node has makesOffer with itemOffered typed RealEstateListing at <listing url>#listing",
+        "Hidden listings are excluded by the same selectListingForPage rule"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-578)"
+    },
+    {
+      "id": "US-579",
+      "lane": "mobile",
+      "round": 15,
+      "title": "A buyer who saved an agent's page to the iPhone home screen could get an icon labelled \"AgentBio\" when the app's code loaded slowly or failed (US-569)",
+      "description": "Implements open mobile story US-569 under the reserved id US-579. index.html carries <meta name=\"apple-mobile-web-app-title\" content=\"AgentBio\"> (index.html:87). Safari uses that meta ahead of anything else to label a home-screen icon. Until now only useProfileManifest removed it from agent pages, and it does that only after React runs. So if the bundle was slow or failed, a buyer who tapped Add to Home Screen on /jane got an icon called \"AgentBio\". The Pages Function now removes the meta from both the human and the crawler HTML for /:username and /:username/listing/:id, the withdrawn-listing 404 included. useProfileManifest copes with the meta already being gone, and puts the AgentBio label back when the visitor leaves the profile for the dashboard.",
+      "acceptanceCriteria": [
+        "Human and crawler HTML for /jane and /jane/listing/abc-123 (including the withdrawn-listing 404) contain no apple-mobile-web-app-title meta",
+        "Apart from the manifest link and that meta, the human body is identical to the asset server's (tested)",
+        "useProfileManifest copes with the meta already being absent, and restores a single AgentBio label on leaving, including after moving from one agent to another (tested)",
+        "The label the hook restores equals public/manifest.json short_name and index.html's meta (tested)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- functions/_lib/profile-route.ts: added an exported `dropAppleWebAppTitle(html)`. Its regex matches the tag in any attribute order or quoting, and also removes the tag's own indentation and line break. It is called inside `linkProfileManifest`. Every response for an agent's page goes through that function: the human path (serveHumanDocument) and the crawler path (the injectSocialTags and markNoindex call sites). So no call site had to change.\n- src/hooks/useProfileManifest.ts: added `DASHBOARD_APPLE_TITLE = 'AgentBio'`. When the server has already removed the meta, the hook creates a fresh copy and adds it to <head> when the visitor leaves the profile. This mirrors the US-563 manifest-restore fix: a person who lands on /jane and then moves to /dashboard in the same tab still gets the AgentBio label. insertBefore now has a guard in case the sibling it was placed next to has moved.\n- functions/_tests/fixtures/prerendered-index.html: this fixture was captured before US-436 added the meta, so it did not contain it. I added the tag after apple-mobile-web-app-status-bar-style so the route tests run against what production actually serves.\n\nTests:\n- link-profile-manifest.test.ts: 4 new cases for dropAppleWebAppTitle.\n- username-route.test.ts: a new crawler test. The human (US-553) and listing tests now also check that the meta is gone, and compare the body with both the manifest link and the meta removed.\n- useProfileManifest.test.tsx: 2 new cases (meta already absent; restored label equals manifest short_name and index.html).\n- Regression check: with the call to dropAppleWebAppTitle taken out of linkProfileManifest, 4 username-route tests fail. They pass with it in.\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx vitest run src/hooks/useProfileManifest.test.tsx functions/_tests/link-profile-manifest.test.ts functions/_tests/username-route.test.ts src/pwa-manifest.test.ts: 4 files, 78 tests passed.\nRegression check (fix temporarily reverted): username-route 4 failed, 46 passed. Fix restored afterwards.\nnpx eslint on the 5 changed .ts/.tsx files: 0 errors. The only warnings are 3 \"File ignored because no matching configuration\" notices for files under functions/, which eslint does not lint. No new rule warnings.\nFull npx vitest run: 301 files passed; 2948 tests passed, 1 skipped.\nNo migration added, so verify:migrations was not needed.\n\nREVIEW: approve"
     }
   ]
 }
