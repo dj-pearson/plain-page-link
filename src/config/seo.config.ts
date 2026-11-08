@@ -13,6 +13,23 @@ export const SEO_STARTING_PRICE = String(
   PRICING_PLANS.filter((plan) => plan.price_monthly > 0)[0]?.price_monthly ?? 0
 );
 
+/**
+ * The `priceValidUntil` for an AgentBio plan Offer: one year from `now`, as an
+ * ISO date (US-502).
+ *
+ * Three schemas carried the literal '2026-12-31' — the homepage
+ * ProfessionalService offer, every city page and the /pricing Product. From
+ * 2027-01-01 that is a date in the past, and an Offer whose price has expired
+ * is one Google stops showing a price for. Our prices have no end date, so the
+ * honest value is a rolling one, the same rule Pricing.tsx already used for its
+ * own offers. A prerendered page carries its build date plus a year.
+ */
+export function offerPriceValidUntil(now: Date = new Date()): string {
+  const next = new Date(now.getTime());
+  next.setUTCFullYear(next.getUTCFullYear() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
 export const SEO_CONFIG = {
   siteName: 'AgentBio',
   // From lib/utils, so a staging deploy that sets VITE_APP_URL does not emit
@@ -60,7 +77,8 @@ export const SEO_CONFIG = {
       PRICING_PLANS.filter((plan) => plan.price_monthly > 0)[0]?.price_monthly ?? 0
     ),
     currency: 'USD',
-    priceValidUntil: '2026-12-31',
+    // priceValidUntil was the literal '2026-12-31' here; use
+    // offerPriceValidUntil() so it never falls into the past (US-502).
   },
 
   // Default keywords

@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
-import { websiteId } from '@/config/site-entities';
+import { getBaseUrl, getCanonicalUrl, offerPriceValidUntil } from '@/config/seo.config';
+import { publisherOrganization, websiteId } from '@/config/site-entities';
 import { useState } from 'react';
 import { Check, Zap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -96,14 +96,10 @@ export default function Pricing() {
               },
               availability: 'https://schema.org/InStock',
               url: `${baseUrl}/pricing`,
-              seller: {
-                '@type': 'Organization',
-                name: 'AgentBio',
-              },
+              // The site Organization by @id, not an anonymous one (US-491).
+              seller: publisherOrganization(baseUrl),
               ...((plan.price_yearly ?? 0) > 0 && {
-                priceValidUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 1))
-                  .toISOString()
-                  .split('T')[0],
+                priceValidUntil: offerPriceValidUntil(),
               }),
             })) || [],
         },

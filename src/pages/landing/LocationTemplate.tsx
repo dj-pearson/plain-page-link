@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
-import { SEO_CONFIG, getBaseUrl, getOgImageUrl } from '@/config/seo.config';
+import { SEO_CONFIG, getBaseUrl, getOgImageUrl, offerPriceValidUntil } from '@/config/seo.config';
 import { organizationId, websiteId } from '@/config/site-entities';
 import { getFeaturedLocations, type LocationData } from '@/data/locations';
 import { buildLocationFaqs } from './locationFaq';
@@ -124,7 +124,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
           '@type': 'Offer',
           price: SEO_CONFIG.pricing.startingPrice,
           priceCurrency: SEO_CONFIG.pricing.currency,
-          priceValidUntil: SEO_CONFIG.pricing.priceValidUntil,
+          priceValidUntil: offerPriceValidUntil(),
           availability: 'https://schema.org/InStock',
         },
         // aggregateRating removed (US-157). SEO_CONFIG.ratings held the same

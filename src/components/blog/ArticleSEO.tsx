@@ -81,7 +81,8 @@ export function ArticleSEO({
     dateModified: modifiedTime || publishedTime,
     author: author
       ? { '@type': 'Person', name: author.name, ...(author.url ? { url: author.url } : {}) }
-      : { '@type': 'Organization', name: siteName, url: siteUrl },
+      : // No named author: AgentBio wrote it, so say which AgentBio, by @id.
+        publisherOrganization(siteUrl),
     // The same Organization, by the same @id and with the same logo, as the
     // site-wide Organization node. This gave the 1536x1024 social banner as
     // the publisher's logo (US-346, US-356).
