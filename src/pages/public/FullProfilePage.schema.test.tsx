@@ -15,6 +15,7 @@ vi.mock('@/hooks/useProfileTracking', () => ({
   trackLinkClick: vi.fn(),
 }));
 vi.mock('@/hooks/useProfileShowsBranding', () => ({ useProfileShowsBranding: () => true }));
+vi.mock('@/hooks/useProfileCustomCss', () => ({ useProfileCustomCss: () => '' }));
 vi.mock('@/lib/analyticsEvents', () => ({
   trackContactTap: vi.fn(),
   trackListingView: vi.fn(),

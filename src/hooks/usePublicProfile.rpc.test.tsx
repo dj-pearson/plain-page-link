@@ -64,6 +64,7 @@ vi.mock('@/stores/useAuthStore', async () => {
 import { usePublicProfile } from './usePublicProfile';
 import { useProfileShowsBranding } from './useProfileShowsBranding';
 import { usePublicOpenHouses } from './useOpenHouses';
+import { useProfileCustomCss } from './useProfileCustomCss';
 
 const PAGE = {
   profile: {
@@ -130,6 +131,32 @@ describe('usePublicProfile via get_public_profile_page (US-329)', () => {
     await waitFor(() => expect(openHouses.result.current.data).toEqual([{ id: 'oh-1' }]));
     expect(branding.result.current).toBe(false);
     expect(h.calls).toEqual(['rpc:get_public_profile_page']);
+  });
+
+  it('hands the custom CSS to its hook sanitised and scoped, with no request of its own (US-514)', async () => {
+    h.page = { ...PAGE, customCss: '@import url(https://evil.test/x.css); h1 { color: red }' };
+    const profile = renderHook(() => usePublicProfile('janedoe'), { wrapper });
+    await waitFor(() => expect(profile.result.current.isSuccess).toBe(true));
+
+    const css = renderHook(() => useProfileCustomCss('agent-1'), { wrapper });
+    expect(css.result.current).toBe('.ab-custom-css h1 { color: red; }');
+    expect(h.calls).toEqual(['rpc:get_public_profile_page']);
+  });
+
+  it('a null customCss is seeded as nothing to apply; an absent one is asked for (older database)', async () => {
+    h.page = { ...PAGE, customCss: null };
+    const seeded = renderHook(() => usePublicProfile('janedoe'), { wrapper });
+    await waitFor(() => expect(seeded.result.current.isSuccess).toBe(true));
+    expect(client.getQueryData(['profile-custom-css', 'agent-1'])).toBeNull();
+
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    h.calls = [];
+    h.page = PAGE;
+    const legacy = renderHook(() => usePublicProfile('janedoe'), { wrapper });
+    await waitFor(() => expect(legacy.result.current.isSuccess).toBe(true));
+    const css = renderHook(() => useProfileCustomCss('agent-1'), { wrapper });
+    await waitFor(() => expect(h.calls).toContain('rpc:public_profile_custom_css'));
+    expect(css.result.current).toBe('');
   });
 
   it('does not seed open houses when the agent hides listings (the section never mounts)', async () => {

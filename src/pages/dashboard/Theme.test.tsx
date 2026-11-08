@@ -43,6 +43,7 @@ vi.mock('@/hooks/useSubscriptionLimits', () => ({
 vi.mock('@/hooks/usePlanUsage', () => ({ usePlanUsage: () => ({ hasFeature: () => true }) }));
 vi.mock('@/components/UpgradeModal', () => ({ UpgradeModal: () => null }));
 vi.mock('@/components/theme/SavedThemesManager', () => ({ SavedThemesManager: () => null }));
+vi.mock('@/components/theme/CustomCssEditor', () => ({ CustomCssEditor: () => null }));
 vi.mock('@/components/dashboard/ThemeCard', () => ({ ThemeCard: () => null }));
 vi.mock('@/lib/themes', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/themes')>();

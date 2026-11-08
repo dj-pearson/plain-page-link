@@ -9585,6 +9585,7 @@ export type Database = {
         Args: { _user_id: string };
         Returns: number;
       };
+      public_profile_custom_css: { Args: { _user_id: string }; Returns: string };
       queue_seo_notification: {
         Args: {
           p_channels: string[];

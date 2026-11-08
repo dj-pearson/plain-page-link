@@ -19,6 +19,7 @@ import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
 import { trackContactTap } from '@/lib/analyticsEvents';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
+import { useProfileCustomCss } from '@/hooks/useProfileCustomCss';
 import { SEOHead } from '@/components/SEOHead';
 import { PROFILE_MAIN_STYLE, useProfileTheme } from '@/hooks/useProfileTheme';
 import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
@@ -47,6 +48,7 @@ import { needsCanonicalRedirect, normalizeUsername } from '@/lib/username';
 import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
 import { LazyModal } from '@/components/profile/LazyModal';
 import { ProfileComplianceFooter } from '@/components/profile/ProfileComplianceFooter';
+import { ProfileCustomCssScope } from '@/components/profile/ProfileCustomCssScope';
 
 // Loaded on demand (US-244). These were static imports, so every visitor to
 // /:username downloaded react-hook-form, zod, DOMPurify, Radix Dialog and the
@@ -108,6 +110,8 @@ export default function FullProfilePage() {
   useProfileTracking(profileId, slug || '');
   // Plans with removeBranding hide "Powered by AgentBio" (20260923000002).
   const showBranding = useProfileShowsBranding(data?.profile?.id);
+  // The agent's custom CSS, sanitised and scoped (US-514); '' for none.
+  const customCss = useProfileCustomCss(data?.profile?.id);
 
   const activeTheme = useProfileTheme(data?.profile?.theme);
 
@@ -427,146 +431,150 @@ export default function FullProfilePage() {
       >
         <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 max-w-5xl relative z-10 pb-24 sm:pb-8">
           <div className="space-y-4 sm:space-y-6">
-            {/* Profile Header */}
-            <section id="about" className="scroll-mt-16 sm:scroll-mt-20">
-              <ProfileHeader
-                profile={profile}
-                stats={{
-                  propertiesSold: soldListings.length,
-                  averageRating: averageRating,
-                  reviewCount: testimonials.length,
-                  // Computed, or absent. This was the literal string
-                  // '< 1 hour' for every agent (US-111).
-                  responseTime: formatResponseTime(data.responseHours),
-                }}
-              />
-            </section>
-            {/* Contact Buttons */}
-            {settings?.show_contact_buttons !== false && (
-              <ContactButtons
-                profile={profile}
-                // logger.info wrote this to the visitor's own console and
-                // nowhere else, so an agent never learned that thirty people
-                // tapped Call this week (US-115).
-                onContactClick={(method) => {
-                  if (!isPreview) void trackContactTap(profile.id, method);
-                }}
-              />
-            )}
-
-            {/* Social Proof Banner */}
-            {settings?.show_social_proof !== false && (
-              <div className="pt-2 sm:pt-4">
-                <SocialProofBanner
+            {/* Everything the agent's custom CSS may style (US-514). The
+                compliance footer stays outside it. */}
+            <ProfileCustomCssScope css={customCss} className="space-y-4 sm:space-y-6">
+              {/* Profile Header */}
+              <section id="about" className="scroll-mt-16 sm:scroll-mt-20">
+                <ProfileHeader
+                  profile={profile}
                   stats={{
                     propertiesSold: soldListings.length,
-                    totalVolume: totalVolume,
                     averageRating: averageRating,
                     reviewCount: testimonials.length,
-                    yearsExperience: profile.years_experience ?? undefined,
+                    // Computed, or absent. This was the literal string
+                    // '< 1 hour' for every agent (US-111).
+                    responseTime: formatResponseTime(data.responseHours),
                   }}
                 />
-              </div>
-            )}
-
-            {/* Featured Listings Carousel */}
-            {settings?.show_listings !== false && activeListings.length > 0 && (
-              <section className="pt-4 sm:pt-6">
-                <FeaturedListingsCarousel
-                  listings={activeListings}
-                  listingHref={listingHref}
-                  autoRotate={true}
-                  interval={4000}
-                />
               </section>
-            )}
-
-            {/* Active Listings */}
-            {settings?.show_listings !== false && activeListings.length > 0 && (
-              <section id="listings" className="pt-4 sm:pt-6 scroll-mt-16 sm:scroll-mt-20">
-                <ListingGallery
-                  listings={activeListings}
-                  title="All Properties"
-                  listingHref={listingHref}
+              {/* Contact Buttons */}
+              {settings?.show_contact_buttons !== false && (
+                <ContactButtons
+                  profile={profile}
+                  // logger.info wrote this to the visitor's own console and
+                  // nowhere else, so an agent never learned that thirty people
+                  // tapped Call this week (US-115).
+                  onContactClick={(method) => {
+                    if (!isPreview) void trackContactTap(profile.id, method);
+                  }}
                 />
-              </section>
-            )}
+              )}
 
-            {/* Upcoming open houses. Renders nothing when there are none. */}
-            {settings?.show_listings !== false && (
-              <UpcomingOpenHouses
-                agentId={profile.id}
-                agentName={profile.full_name || profile.username}
-                profileUrl={currentUrl}
-                listingHref={(listingId) => {
-                  const listing = activeListings.find((l) => l.id === listingId);
-                  return listing ? listingHref(listing) : null;
-                }}
-              />
-            )}
+              {/* Social Proof Banner */}
+              {settings?.show_social_proof !== false && (
+                <div className="pt-2 sm:pt-4">
+                  <SocialProofBanner
+                    stats={{
+                      propertiesSold: soldListings.length,
+                      totalVolume: totalVolume,
+                      averageRating: averageRating,
+                      reviewCount: testimonials.length,
+                      yearsExperience: profile.years_experience ?? undefined,
+                    }}
+                  />
+                </div>
+              )}
 
-            {/* Lead Capture CTAs */}
-            <section id="contact" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
-              <LeadCaptureCTA
-                agentId={profile.id}
-                agentName={profile.full_name || profile.username}
-              />
-            </section>
+              {/* Featured Listings Carousel */}
+              {settings?.show_listings !== false && activeListings.length > 0 && (
+                <section className="pt-4 sm:pt-6">
+                  <FeaturedListingsCarousel
+                    listings={activeListings}
+                    listingHref={listingHref}
+                    autoRotate={true}
+                    interval={4000}
+                  />
+                </section>
+              )}
 
-            {/* Sold Properties */}
-            {settings?.show_sold_properties !== false && (
-              <div className="pt-2 sm:pt-4">
-                <SoldProperties listings={listings} listingHref={listingHref} />
-              </div>
-            )}
+              {/* Active Listings */}
+              {settings?.show_listings !== false && activeListings.length > 0 && (
+                <section id="listings" className="pt-4 sm:pt-6 scroll-mt-16 sm:scroll-mt-20">
+                  <ListingGallery
+                    listings={activeListings}
+                    title="All Properties"
+                    listingHref={listingHref}
+                  />
+                </section>
+              )}
 
-            {/* Testimonials.
-                Not gated on testimonials.length: the review invitation belongs
-                on a profile that has no reviews yet more than on one that has
-                plenty, and TestimonialSection already renders nothing when the
-                list is empty (US-113). */}
-            {settings?.show_testimonials !== false && (
-              <section id="testimonials" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
-                <TestimonialSection testimonials={testimonials} />
-                <ReviewInvite
-                  username={profile.username}
+              {/* Upcoming open houses. Renders nothing when there are none. */}
+              {settings?.show_listings !== false && (
+                <UpcomingOpenHouses
+                  agentId={profile.id}
+                  agentName={profile.full_name || profile.username}
+                  profileUrl={currentUrl}
+                  listingHref={(listingId) => {
+                    const listing = activeListings.find((l) => l.id === listingId);
+                    return listing ? listingHref(listing) : null;
+                  }}
+                />
+              )}
+
+              {/* Lead Capture CTAs */}
+              <section id="contact" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
+                <LeadCaptureCTA
+                  agentId={profile.id}
                   agentName={profile.full_name || profile.username}
                 />
               </section>
-            )}
 
-            {/* Anything the agent built in the page builder.
-                A section of this page, not a replacement for it: building a
-                page used to redirect /:username to /p/<slug> and take the
-                listings, testimonials, contact buttons and lead capture off
-                the public web entirely (US-116). */}
-            {customPage && (
-              <LazyLoadErrorBoundary fallback={null}>
-                <Suspense fallback={<div className="min-h-[200px]" aria-hidden="true" />}>
-                  <CustomBlocksSection
-                    blocks={customPage.blocks}
-                    userId={profile.id}
-                    title={customPage.title}
+              {/* Sold Properties */}
+              {settings?.show_sold_properties !== false && (
+                <div className="pt-2 sm:pt-4">
+                  <SoldProperties listings={listings} listingHref={listingHref} />
+                </div>
+              )}
+
+              {/* Testimonials.
+                  Not gated on testimonials.length: the review invitation belongs
+                  on a profile that has no reviews yet more than on one that has
+                  plenty, and TestimonialSection already renders nothing when the
+                  list is empty (US-113). */}
+              {settings?.show_testimonials !== false && (
+                <section id="testimonials" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
+                  <TestimonialSection testimonials={testimonials} />
+                  <ReviewInvite
+                    username={profile.username}
+                    agentName={profile.full_name || profile.username}
                   />
-                </Suspense>
-              </LazyLoadErrorBoundary>
-            )}
+                </section>
+              )}
 
-            {/* Custom Links */}
-            {links.length > 0 && (
-              <CustomLinks
-                links={links}
-                onLinkClick={async (link) => {
-                  // trackLinkClick already calls increment_link_clicks;
-                  // calling it again here counted every click twice.
-                  if (isPreview) return;
-                  await trackLinkClick(link.id.toString(), profile.id, link.title);
-                }}
-              />
-            )}
+              {/* Anything the agent built in the page builder.
+                  A section of this page, not a replacement for it: building a
+                  page used to redirect /:username to /p/<slug> and take the
+                  listings, testimonials, contact buttons and lead capture off
+                  the public web entirely (US-116). */}
+              {customPage && (
+                <LazyLoadErrorBoundary fallback={null}>
+                  <Suspense fallback={<div className="min-h-[200px]" aria-hidden="true" />}>
+                    <CustomBlocksSection
+                      blocks={customPage.blocks}
+                      userId={profile.id}
+                      title={customPage.title}
+                    />
+                  </Suspense>
+                </LazyLoadErrorBoundary>
+              )}
 
-            {/* Social Links */}
-            <SocialLinks profile={profile} />
+              {/* Custom Links */}
+              {links.length > 0 && (
+                <CustomLinks
+                  links={links}
+                  onLinkClick={async (link) => {
+                    // trackLinkClick already calls increment_link_clicks;
+                    // calling it again here counted every click twice.
+                    if (isPreview) return;
+                    await trackLinkClick(link.id.toString(), profile.id, link.title);
+                  }}
+                />
+              )}
+
+              {/* Social Links */}
+              <SocialLinks profile={profile} />
+            </ProfileCustomCssScope>
 
             {/* Compliance Footer with Equal Housing */}
             <ProfileComplianceFooter profile={profile} showBranding={showBranding} />
