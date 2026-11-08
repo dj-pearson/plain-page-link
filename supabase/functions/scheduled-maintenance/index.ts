@@ -232,21 +232,29 @@ serve(async (req) => {
     //    clients' upcoming dates, once a day from DIGEST_HOUR_UTC. Runs up to
     //    DIGEST_CATCHUP_HOURS later make up a missed run (US-331); digest_log
     //    keeps it to one per agent per day. POST {"force_digest": true} runs
-    //    it now (still once per agent per day).
+    //    it now (still once per agent per day). US-433: an agent with a time
+    //    zone gets it at DIGEST_LOCAL_HOUR on their own clock instead, so some
+    //    agent's edition is due in most hours and every run pages through
+    //    the profiles.
     // ---------------------------------------------------------------------
     const body = (await req.json().catch(() => ({}))) as { force_digest?: boolean };
     results.push(
       await run('digests', async () => {
-        const schedule = digestSchedule(new Date(), {
+        const now = new Date();
+        const force = body.force_digest === true;
+        const catchUpHours = Number.parseInt(Deno.env.get('DIGEST_CATCHUP_HOURS') ?? '', 10);
+        const localHour = Number.parseInt(Deno.env.get('DIGEST_LOCAL_HOUR') ?? '', 10);
+        const schedule = digestSchedule(now, {
           hour: Number.parseInt(Deno.env.get('DIGEST_HOUR_UTC') ?? '', 10),
-          catchUpHours: Number.parseInt(Deno.env.get('DIGEST_CATCHUP_HOURS') ?? '', 10),
-          force: body.force_digest === true,
+          catchUpHours,
+          force,
         });
-        if (!schedule) return 'outside the digest window';
-        // Hourly runs stop reading profiles once a clean pass has completed
-        // today (digest_runs, US-354); a forced run always does a full pass.
+        // Editions an earlier clean pass completed today are skipped without
+        // reading their agents' leads (digest_runs, US-354); a forced run
+        // always does a full pass.
         const report = await runDigests(supabaseDigestStore(supabase), {
           schedule,
+          scheduleFor: (timeZone) => digestSchedule(now, { hour: localHour, catchUpHours, force, timeZone }),
           siteUrl: getSiteUrl(),
           useRunMarker: body.force_digest !== true,
         });

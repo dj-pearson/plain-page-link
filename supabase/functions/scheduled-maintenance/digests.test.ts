@@ -5,6 +5,8 @@ import {
   digestKindFor,
   digestSchedule,
   dueCutoffDay,
+  editionSlot,
+  editionWindows,
   runDigests,
   summarizeDigestReport,
   ID_CHUNK,
@@ -89,6 +91,8 @@ const SCHEDULE = { day: '2026-11-10', anchor: new Date('2026-11-10T13:00:00Z') }
 const SITE = 'https://agentbio.net';
 const HOUR = 3_600_000;
 
+/** digest_runs key: the UTC edition keeps the bare date. */
+const runKey = (day: string, slot: string) => (slot === '' ? day : `${day}|${slot}`);
 const uid = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`;
 const hoursBefore = (h: number) => new Date(SCHEDULE.anchor.getTime() - h * HOUR).toISOString();
 
@@ -116,7 +120,7 @@ function memoryStore(opts: {
   const log = [...(opts.log ?? [])];
   const runs = new Map<string, { profiles: number; sent: number }>();
   const sent: { to: string; subject: string; body: string }[] = [];
-  const calls = { listProfiles: 0, listNewLeads: 0, getAgents: 0, agentIdsRead: 0, maxIds: 0 };
+  const calls = { listProfiles: 0, listNewLeads: 0, listClaimed: 0, getAgents: 0, agentIdsRead: 0, maxIds: 0, markerReads: 0 };
   let leadsReadFailures = opts.failLeadsReadOnce ? 1 : 0;
   const sorted = [...opts.profiles].sort((a, b) => a.id.localeCompare(b.id));
 
@@ -126,6 +130,7 @@ function memoryStore(opts: {
       return sorted.filter((p) => afterId === null || p.id > afterId).slice(0, limit);
     },
     async listClaimed(userIds, day) {
+      calls.listClaimed++;
       calls.maxIds = Math.max(calls.maxIds, userIds.length);
       return new Set(log.filter((r) => r.digest_date === day && userIds.includes(r.user_id)).map((r) => r.user_id));
     },
@@ -172,13 +177,14 @@ function memoryStore(opts: {
       const i = log.findIndex((r) => r.user_id === userId && r.digest_date === day && r.kind === kind);
       if (i >= 0) log.splice(i, 1);
     },
-    async hasCompletedRun(day) {
+    async hasCompletedRun(day, slot) {
+      calls.markerReads++;
       if (opts.failMarkerRead) throw new Error('digest_runs: timeout');
-      return runs.has(day);
+      return runs.has(runKey(day, slot));
     },
-    async markRunCompleted(day, totals) {
+    async markRunCompleted(day, slot, totals) {
       if (opts.failMarkerWrite) throw new Error('digest_runs: insert refused');
-      if (!runs.has(day)) runs.set(day, totals);
+      if (!runs.has(runKey(day, slot))) runs.set(runKey(day, slot), totals);
     },
     async sendEmail(mail) {
       if (opts.failSendFor?.has(mail.to)) return { ok: false, error: 'resend 500' };
@@ -363,19 +369,22 @@ describe('runDigests address lookup (US-378)', () => {
 describe('runDigests per-day run marker (US-354)', () => {
   const marked = { schedule: SCHEDULE, siteUrl: SITE, useRunMarker: true };
 
-  it('after one complete pass, later runs that day read no profiles', async () => {
+  it('after one complete pass, later runs that day read none of its agents’ rows', async () => {
     const env = memoryStore({ profiles: [profile(1), profile(2)], leads: [leadFor(1)] });
     const first = await runDigests(env.store, marked);
     expect(first.sent).toBe(1);
     expect(first.nothingToSend).toBe(1);
     expect(env.runs.get(SCHEDULE.day)).toEqual({ profiles: 2, sent: 1 });
 
-    const readsAfterFirst = env.calls.listProfiles;
+    const claimedReads = env.calls.listClaimed;
     const later = await runDigests(env.store, { ...marked, schedule: digestSchedule(new Date('2026-11-10T16:00:00Z'))! });
     expect(later.skipped).toBe(true);
-    expect(later.profiles).toBe(0);
-    expect(env.calls.listProfiles).toBe(readsAfterFirst);
+    // US-433: the profile ids and zones are paged every run (some zone's
+    // edition is due most hours), but a settled edition reads nothing else.
+    expect(later.settled).toBe(2);
+    expect(env.calls.listClaimed).toBe(claimedReads);
     expect(env.calls.listNewLeads).toBe(1);
+    expect(env.calls.markerReads).toBe(2);
     expect(summarizeDigestReport(later)).toBe('already completed today');
   });
 
@@ -455,5 +464,147 @@ describe('scheduled-maintenance wiring (US-331)', () => {
 
   it('no read in the store is capped by a bare limit', () => {
     expect(store).not.toMatch(/\.limit\(\s*\d/);
+  });
+
+  it('agents with a zone get their own local edition (US-433)', () => {
+    expect(index).toMatch(/scheduleFor: \(timeZone\) => digestSchedule\(now, \{[^}]*timeZone \}\)/);
+    expect(index).toMatch(/DIGEST_LOCAL_HOUR/);
+    expect(index).not.toMatch(/outside the digest window/);
+    expect(store).toMatch(/notification_preferences, timezone/);
+    expect(store).toMatch(/onConflict: 'digest_date,slot'/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US-433 (US-343): each agent's edition at their own local hour.
+// ---------------------------------------------------------------------------
+
+describe('digestSchedule in an agent’s time zone (US-433)', () => {
+  const at = (iso: string) => new Date(iso);
+
+  it('is due from 07:00 on the agent’s own clock, dated by their own day', () => {
+    // 10 Nov 2026: Los Angeles is PST (UTC-8), London GMT, Sydney AEDT (UTC+11).
+    expect(digestSchedule(at('2026-11-10T15:00:00Z'), { timeZone: 'America/Los_Angeles' })).toEqual({
+      day: '2026-11-10',
+      anchor: at('2026-11-10T15:00:00Z'),
+      timeZone: 'America/Los_Angeles',
+    });
+    expect(digestSchedule(at('2026-11-10T14:59:00Z'), { timeZone: 'America/Los_Angeles' })).toBeNull();
+    expect(digestSchedule(at('2026-11-10T07:20:00Z'), { timeZone: 'Europe/London' })?.anchor).toEqual(at('2026-11-10T07:00:00Z'));
+    expect(digestSchedule(at('2026-11-10T20:00:00Z'), { timeZone: 'Australia/Sydney' })).toEqual({
+      day: '2026-11-11',
+      anchor: at('2026-11-10T20:00:00Z'),
+      timeZone: 'Australia/Sydney',
+    });
+  });
+
+  it('follows daylight saving: 07:00 in London is 06:00Z in summer', () => {
+    expect(digestSchedule(at('2026-07-01T06:00:00Z'), { timeZone: 'Europe/London' })?.anchor).toEqual(at('2026-07-01T06:00:00Z'));
+    expect(digestSchedule(at('2026-07-01T05:59:00Z'), { timeZone: 'Europe/London' })).toBeNull();
+  });
+
+  it('an unusable zone is the UTC edition', () => {
+    expect(digestSchedule(at('2026-11-10T13:05:00Z'), { timeZone: 'Mars/Olympus_Mons' })).toEqual({
+      day: '2026-11-10',
+      anchor: at('2026-11-10T13:00:00Z'),
+    });
+  });
+});
+
+describe('editionWindows (US-433)', () => {
+  it('a zoned edition’s “due today” ends at the end of the agent’s local day', () => {
+    const sydney = digestSchedule(new Date('2026-11-10T20:00:00Z'), { timeZone: 'Australia/Sydney' })!;
+    // Under the UTC cutoff (2026-11-11T11:59:59.999Z) a task due 11 Nov in
+    // Sydney, stored as 12:59:59.999Z, was left out of that morning's email.
+    expect(editionWindows(sydney, SITE).endOfDay).toBe('2026-11-11T12:59:59.999Z');
+    const la = digestSchedule(new Date('2026-11-10T15:00:00Z'), { timeZone: 'America/Los_Angeles' })!;
+    expect(editionWindows(la, SITE).endOfDay).toBe('2026-11-11T07:59:59.999Z');
+  });
+
+  it('the UTC edition keeps the broad cutoff and its slot is empty', () => {
+    expect(editionWindows(SCHEDULE, SITE).endOfDay).toBe('2026-11-11T11:59:59.999Z');
+    expect(editionSlot(SCHEDULE)).toBe('');
+    expect(editionSlot({ ...SCHEDULE, timeZone: 'Europe/London' })).toBe('Europe/London');
+  });
+});
+
+describe('runDigests with local editions (US-433)', () => {
+  const zoned = (n: number, timezone: string | null): DigestProfile => ({ ...profile(n), timezone });
+  const leadAt = (n: number, iso: string): MemoryLead => ({
+    id: `lead-${n}`,
+    user_id: uid(n),
+    name: `Buyer ${n}`,
+    lead_type: 'buyer',
+    created_at: iso,
+  });
+  const email = (n: number) => `${uid(n).slice(-4)}@example.com`;
+
+  /** Hourly runs from `fromIso`, wired as index.ts wires them; who was sent at which hour. */
+  async function hourly(env: ReturnType<typeof memoryStore>, fromIso: string, hours: number, skip: Set<number> = new Set()) {
+    const sentAt: Record<string, string> = {};
+    for (let h = 0; h < hours; h++) {
+      if (skip.has(h)) continue;
+      const now = new Date(new Date(fromIso).getTime() + h * HOUR);
+      const before = env.sent.length;
+      const report = await runDigests(env.store, {
+        schedule: digestSchedule(now),
+        scheduleFor: (timeZone) => digestSchedule(now, { timeZone }),
+        siteUrl: SITE,
+        useRunMarker: true,
+      });
+      expect(report.errors).toEqual([]);
+      for (const mail of env.sent.slice(before)) sentAt[mail.to] = now.toISOString().slice(11, 16);
+    }
+    return sentAt;
+  }
+
+  it('Los Angeles, London and an agent with no zone each get it at their own hour, once', async () => {
+    const env = memoryStore({
+      profiles: [zoned(1, 'America/Los_Angeles'), zoned(2, 'Europe/London'), zoned(3, null)],
+      leads: [leadAt(1, '2026-11-10T06:00:00Z'), leadAt(2, '2026-11-10T06:00:00Z'), leadAt(3, '2026-11-10T06:00:00Z')],
+    });
+    const sentAt = await hourly(env, '2026-11-10T00:00:00Z', 24);
+    expect(sentAt).toEqual({ [email(1)]: '15:00', [email(2)]: '07:00', [email(3)]: '13:00' });
+    expect(env.sent).toHaveLength(3);
+    expect(env.runs.get('2026-11-10|America/Los_Angeles')).toEqual({ profiles: 1, sent: 1 });
+    expect(env.runs.get('2026-11-10|Europe/London')).toEqual({ profiles: 1, sent: 1 });
+    expect(env.runs.get('2026-11-10')).toEqual({ profiles: 1, sent: 1 });
+  });
+
+  it('a missed run is caught up exactly once per local day', async () => {
+    const env = memoryStore({ profiles: [zoned(1, 'America/Los_Angeles')], leads: [leadAt(1, '2026-11-10T06:00:00Z')] });
+    // Skip the 15:00Z run (07:00 in Los Angeles); the 16:00Z run sends.
+    const sentAt = await hourly(env, '2026-11-10T00:00:00Z', 24, new Set([15]));
+    expect(sentAt).toEqual({ [email(1)]: '16:00' });
+    expect(env.log).toEqual([{ user_id: uid(1), digest_date: '2026-11-10', kind: 'daily' }]);
+  });
+
+  it('Sydney’s edition is dated, and weekly, by Sydney’s calendar', async () => {
+    // 07:00 on Monday 9 Nov in Sydney is 20:00Z on Sunday 8 Nov.
+    const env = memoryStore({ profiles: [zoned(1, 'Australia/Sydney')], leads: [leadAt(1, '2026-11-08T10:00:00Z')] });
+    const sentAt = await hourly(env, '2026-11-08T12:00:00Z', 12);
+    expect(sentAt).toEqual({ [email(1)]: '20:00' });
+    expect(env.log).toEqual([{ user_id: uid(1), digest_date: '2026-11-09', kind: 'weekly' }]);
+  });
+
+  it('without scheduleFor every agent gets the UTC edition, as before', async () => {
+    const env = memoryStore({ profiles: [zoned(1, 'America/Los_Angeles')], leads: [leadFor(1)] });
+    const report = await runDigests(env.store, { schedule: SCHEDULE, siteUrl: SITE });
+    expect(report.sent).toBe(1);
+    expect(env.log[0].digest_date).toBe(SCHEDULE.day);
+  });
+
+  it('an agent whose edition is not due is counted, and nothing of theirs is read', async () => {
+    const env = memoryStore({ profiles: [zoned(1, 'Australia/Sydney')], leads: [leadFor(1)] });
+    const report = await runDigests(env.store, {
+      schedule: SCHEDULE,
+      scheduleFor: (timeZone) => digestSchedule(SCHEDULE.anchor, { timeZone }),
+      siteUrl: SITE,
+      useRunMarker: true,
+    });
+    expect(report.notDue).toBe(1);
+    expect(report.sent).toBe(0);
+    expect(env.calls.listClaimed).toBe(0);
+    expect(env.runs.size).toBe(0);
   });
 });

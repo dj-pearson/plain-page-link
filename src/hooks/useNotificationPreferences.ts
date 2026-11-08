@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { fetchOwnProfile } from '@/lib/ownProfile';
 import type { Json } from '@/integrations/supabase/types';
+import { agentTimeZoneKey, useAgentTimeZone } from '@/hooks/useAgentTimeZone';
 
 export type LeadNotificationMode = 'instant' | 'daily_digest' | 'off';
 
@@ -60,20 +61,37 @@ export function useNotificationPreferences() {
     },
   });
 
+  // US-433: the morning email's hour follows profiles.timezone. An agent who
+  // has never set one gets this device's zone the first time they save a
+  // notification setting, so the digest moves to their morning without a
+  // separate step. Only while the stored value is known to be empty.
+  const zone = useAgentTimeZone();
+  const zoneDefault = zone.isKnown && zone.timeZone === null ? zone.detected : null;
+
   const update = useMutation({
     mutationFn: async (next: Partial<NotificationPreferences>) => {
       // Merged onto what is stored, not replacing it: writing { leads } alone
       // would drop sla_hours, and vice versa.
       const merged = { ...preferences, ...next };
-      const { error } = await supabase
-        .from('profiles')
-        .update({ notification_preferences: merged })
-        .eq('id', user!.id);
+      const write = (withZone: boolean) =>
+        supabase
+          .from('profiles')
+          .update({
+            notification_preferences: merged,
+            ...(withZone ? { timezone: zoneDefault } : {}),
+          })
+          .eq('id', user!.id);
+      let { error } = await write(!!zoneDefault);
+      // The zone is a bonus: a refusal of it (an unknown column before the
+      // migration, or a name the database does not know) must not lose the
+      // setting the agent actually changed.
+      if (error && zoneDefault) ({ error } = await write(false));
       if (error) throw error;
       return merged;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notification-preferences', user?.id] });
+      if (zoneDefault) queryClient.invalidateQueries({ queryKey: agentTimeZoneKey(user?.id) });
     },
   });
 

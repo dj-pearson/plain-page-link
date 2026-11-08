@@ -35,6 +35,15 @@
  * on, signs up or gains a task due today after it, is not reconsidered until
  * tomorrow's edition — the same as a run exactly on the hour always meant.
  *
+ * US-433 (US-343): an agent with profiles.timezone set gets the edition at
+ * DIGEST_LOCAL_HOUR on their own wall clock, dated by their own calendar day,
+ * with "due today" measured to the end of that local day. Agents without one
+ * keep the UTC edition at DIGEST_HOUR_UTC. Each (local date, zone) is its own
+ * edition with its own digest_runs marker (slot = the zone, '' for UTC), so the
+ * hourly run now always pages through the profiles' ids, zones and
+ * preferences, but reads leads, tasks, dates and digest_log only for agents
+ * whose edition is due and not yet settled.
+ *
  * No Deno globals here, so it runs under vitest; the database side is
  * digest-store.ts.
  */
@@ -47,11 +56,14 @@ import {
   type WeeklyStats,
 } from '../_shared/digest.ts';
 import type { EmailOptions } from '../_shared/email.ts';
+import { addDays, localDateIn, normalizeTimeZone, zonedTimeToUtc } from '../_shared/timeZone.ts';
 
 export type DigestPreference = 'daily' | 'weekly' | 'off';
 export type DigestKind = 'daily' | 'weekly';
 
 export const DEFAULT_DIGEST_HOUR_UTC = 13;
+/** The local hour an agent with a time zone gets the edition (US-433). */
+export const DEFAULT_DIGEST_LOCAL_HOUR = 7;
 /** How many hourly runs after the digest hour may still send a missed edition. */
 export const DEFAULT_CATCHUP_HOURS = 6;
 /** Profiles per page; each page's related rows are read for its agents only. */
@@ -63,10 +75,15 @@ export const ROW_PAGE_SIZE = 1000;
 
 const HOUR_MS = 3_600_000;
 
-export function digestKindFor(pref: unknown, now: Date): DigestKind | null {
+/**
+ * Which edition an agent gets. `on` is the edition's date (`YYYY-MM-DD`, the
+ * agent's local date) or an instant read in UTC.
+ */
+export function digestKindFor(pref: unknown, on: Date | string): DigestKind | null {
   const p: DigestPreference = pref === 'weekly' || pref === 'off' ? pref : 'daily';
   if (p === 'off') return null;
-  const monday = now.getUTCDay() === 1;
+  const date = typeof on === 'string' ? new Date(`${on}T12:00:00Z`) : on;
+  const monday = date.getUTCDay() === 1;
   if (p === 'weekly') return monday ? 'weekly' : null;
   return monday ? 'weekly' : 'daily';
 }
@@ -77,37 +94,46 @@ export function dueCutoffDay(now: Date): string {
 }
 
 export interface DigestSchedule {
-  /** The edition's date, `YYYY-MM-DD` (digest_log.digest_date). */
+  /** The edition's date, `YYYY-MM-DD` (digest_log.digest_date): local to `timeZone`. */
   day: string;
   /** What the edition's windows are measured back from. */
   anchor: Date;
+  /** Set for an agent's local edition (US-433); absent for the UTC edition. */
+  timeZone?: string;
 }
 
 /**
  * Which edition, if any, a run at `now` should send. Null outside
- * [hour, hour + catchUpHours] UTC unless forced. Forced runs before the hour
- * anchor on `now`, so they never look into the future.
+ * [hour, hour + catchUpHours] on the wall clock of `timeZone` (UTC when
+ * absent) unless forced. Forced runs before the hour anchor on `now`, so they
+ * never look into the future.
  */
 export function digestSchedule(
   now: Date,
-  opts: { hour?: number; catchUpHours?: number; force?: boolean } = {}
+  opts: { hour?: number; catchUpHours?: number; force?: boolean; timeZone?: string | null } = {}
 ): DigestSchedule | null {
-  const hour = Number.isInteger(opts.hour) && opts.hour! >= 0 && opts.hour! <= 23 ? opts.hour! : DEFAULT_DIGEST_HOUR_UTC;
+  const timeZone = normalizeTimeZone(opts.timeZone);
+  const fallbackHour = timeZone ? DEFAULT_DIGEST_LOCAL_HOUR : DEFAULT_DIGEST_HOUR_UTC;
+  const hour = Number.isInteger(opts.hour) && opts.hour! >= 0 && opts.hour! <= 23 ? opts.hour! : fallbackHour;
   const requested = Number.isInteger(opts.catchUpHours) && opts.catchUpHours! >= 0 ? opts.catchUpHours! : DEFAULT_CATCHUP_HOURS;
   // Never roll past midnight: tomorrow's edition is a different day.
   const catchUp = Math.min(requested, 23 - hour);
-  const day = now.toISOString().slice(0, 10);
-  const scheduled = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour));
+  const zone = timeZone ?? 'UTC';
+  const day = localDateIn(now, zone);
+  const scheduled = zonedTimeToUtc(day, hour, zone);
   const since = now.getTime() - scheduled.getTime();
-  if (since >= 0 && since < (catchUp + 1) * HOUR_MS) return { day, anchor: scheduled };
+  const tag = timeZone ? { timeZone } : {};
+  if (since >= 0 && since < (catchUp + 1) * HOUR_MS) return { day, anchor: scheduled, ...tag };
   if (!opts.force) return null;
-  return { day, anchor: since >= 0 ? scheduled : now };
+  return { day, anchor: since >= 0 ? scheduled : now, ...tag };
 }
 
 export interface DigestProfile {
   id: string;
   full_name: string | null;
   notification_preferences: unknown;
+  /** IANA zone (US-433); null or absent = the UTC edition. */
+  timezone?: string | null;
 }
 
 export type DigestKeyDateRow = DigestKeyDate & { user_id: string };
@@ -138,10 +164,13 @@ export interface DigestStore {
   claim(userId: string, day: string, kind: DigestKind): Promise<'claimed' | 'duplicate'>;
   /** Undo a claim after a failed send, so the next run can retry. */
   release(userId: string, day: string, kind: DigestKind): Promise<void>;
-  /** Whether a complete, error-free pass already ran for `day` (digest_runs). */
-  hasCompletedRun(day: string): Promise<boolean>;
-  /** Record that the pass for `day` completed with no errors. Idempotent. */
-  markRunCompleted(day: string, totals: { profiles: number; sent: number }): Promise<void>;
+  /**
+   * Whether a complete, error-free pass already ran for the edition dated
+   * `day` in `slot` (digest_runs): the zone name, or '' for the UTC edition.
+   */
+  hasCompletedRun(day: string, slot: string): Promise<boolean>;
+  /** Record that the pass for that edition completed with no errors. Idempotent. */
+  markRunCompleted(day: string, slot: string, totals: { profiles: number; sent: number }): Promise<void>;
   sendEmail(mail: EmailOptions): Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -153,7 +182,11 @@ export interface DigestReport {
   noEmail: number;
   failed: number;
   profiles: number;
-  /** True when an earlier run today already completed a clean pass. */
+  /** Agents whose edition is not due at this hour (US-433). */
+  notDue: number;
+  /** Agents whose edition an earlier run already completed cleanly. */
+  settled: number;
+  /** True when every due edition was already completed by an earlier run. */
   skipped: boolean;
   errors: string[];
 }
@@ -190,13 +223,71 @@ function groupBy<T extends { user_id: string }>(rows: T[]): Map<string, T[]> {
 const short = (id: string) => id.slice(0, 8);
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+/** The digest_runs slot of an edition: its zone, or '' for the UTC edition. */
+export function editionSlot(schedule: DigestSchedule): string {
+  return schedule.timeZone ?? '';
+}
+
+export interface EditionWindows {
+  day: string;
+  anchor: Date;
+  anchorIso: string;
+  since24h: string;
+  since7d: string;
+  endOfDay: string;
+  /** The date the key-date reminders count from. */
+  today: Date;
+  siteUrl: string;
+}
+
+export function editionWindows(schedule: DigestSchedule, siteUrl: string): EditionWindows {
+  const { day, anchor, timeZone } = schedule;
+  // Tasks are stored as the end of the agent's local due day (US-240). With
+  // the agent's zone known, "due today" ends exactly at the end of their local
+  // day. Without it, noon UTC tomorrow is the end of today in UTC-12, so every
+  // US zone's "due today" is in, and no "due tomorrow" west of UTC+12 is.
+  const endOfDay = timeZone
+    ? new Date(zonedTimeToUtc(addDays(day, 1), 0, timeZone).getTime() - 1).toISOString()
+    : `${dueCutoffDay(anchor)}T11:59:59.999Z`;
+  return {
+    day,
+    anchor,
+    anchorIso: anchor.toISOString(),
+    since24h: new Date(anchor.getTime() - 24 * HOUR_MS).toISOString(),
+    since7d: new Date(anchor.getTime() - 7 * 24 * HOUR_MS).toISOString(),
+    endOfDay,
+    // Noon UTC of the edition's own date: the same calendar date in every
+    // zone the runtime might read it in, so a Sydney edition (anchored on the
+    // previous UTC day) counts birthdays from Sydney's today.
+    today: timeZone ? new Date(`${day}T12:00:00Z`) : anchor,
+    siteUrl,
+  };
+}
+
+interface Edition {
+  schedule: DigestSchedule;
+  windows: EditionWindows;
+  /** Null until asked; true when an earlier run completed it. */
+  completed: boolean | null;
+  /** Any error or failure for this edition in this run: write no marker. */
+  troubled: boolean;
+  profiles: number;
+  sent: number;
+}
+
 export async function runDigests(
   store: DigestStore,
   opts: {
-    schedule: DigestSchedule;
+    /** The UTC edition, for agents with no time zone. Null outside its window. */
+    schedule: DigestSchedule | null;
+    /**
+     * An agent's local edition for their zone (US-433), or null when it is not
+     * due. Without it, agents with a zone get the UTC edition too.
+     */
+    scheduleFor?: (timeZone: string) => DigestSchedule | null;
     siteUrl: string;
     /**
-     * Read and write the per-day run marker (digest_runs). True for the
+     * Read and write the per-edition run marker (digest_runs). True for the
      * hourly scheduled runs; false for a forced run, which always does a full
      * pass and, since it may anchor on `now` before the hour, records nothing
      * that would stop the on-time edition.
@@ -204,9 +295,8 @@ export async function runDigests(
     useRunMarker?: boolean;
   }
 ): Promise<DigestReport> {
-  const { day, anchor } = opts.schedule;
   const useRunMarker = opts.useRunMarker === true;
-  const { siteUrl } = opts;
+  const { siteUrl, scheduleFor } = opts;
   const report: DigestReport = {
     sent: 0,
     alreadySent: 0,
@@ -215,31 +305,46 @@ export async function runDigests(
     noEmail: 0,
     failed: 0,
     profiles: 0,
+    notDue: 0,
+    settled: 0,
     skipped: false,
     errors: [],
   };
 
-  if (useRunMarker) {
+  const editions = new Map<string, Edition>();
+  const editionOf = (profile: DigestProfile): Edition | null => {
+    const timeZone = scheduleFor ? normalizeTimeZone(profile.timezone) : null;
+    const schedule = timeZone && scheduleFor ? scheduleFor(timeZone) : opts.schedule;
+    if (!schedule) return null;
+    const key = `${schedule.day}|${editionSlot(schedule)}`;
+    let edition = editions.get(key);
+    if (!edition) {
+      edition = {
+        schedule,
+        windows: editionWindows(schedule, siteUrl),
+        completed: useRunMarker ? null : false,
+        troubled: false,
+        profiles: 0,
+        sent: 0,
+      };
+      editions.set(key, edition);
+    }
+    return edition;
+  };
+
+  const isCompleted = async (edition: Edition): Promise<boolean> => {
+    if (edition.completed !== null) return edition.completed;
     try {
-      if (await store.hasCompletedRun(day)) {
-        report.skipped = true;
-        return report;
-      }
+      edition.completed = await store.hasCompletedRun(edition.schedule.day, editionSlot(edition.schedule));
     } catch (error) {
       // Not knowing must not cost anyone their digest: do the full pass
-      // (digest_log still stops a double send) and say why it ran.
+      // (digest_log still stops a double send), say why, and record nothing.
       report.errors.push(`reading the digest run marker: ${message(error)}`);
+      edition.completed = false;
+      edition.troubled = true;
     }
-  }
-
-  const anchorIso = anchor.toISOString();
-  const since24h = new Date(anchor.getTime() - 24 * HOUR_MS).toISOString();
-  const since7d = new Date(anchor.getTime() - 7 * 24 * HOUR_MS).toISOString();
-  // Tasks are stored as the end of the agent's local due day (US-240): a task
-  // due today in Los Angeles is 06:59Z tomorrow. Noon UTC tomorrow is the end
-  // of today in UTC-12, so every US zone's "due today" is in, and no "due
-  // tomorrow" west of UTC+12 is.
-  const endOfDay = `${dueCutoffDay(anchor)}T11:59:59.999Z`;
+    return edition.completed;
+  };
 
   let afterId: string | null = null;
   for (;;) {
@@ -250,33 +355,60 @@ export async function runDigests(
     afterId = profiles[profiles.length - 1].id;
     report.profiles += profiles.length;
 
-    const wanted: { profile: DigestProfile; kind: DigestKind }[] = [];
+    const byEdition = new Map<Edition, { profile: DigestProfile; kind: DigestKind }[]>();
     for (const profile of profiles) {
+      const edition = editionOf(profile);
+      if (!edition) {
+        report.notDue++;
+        continue;
+      }
+      if (await isCompleted(edition)) {
+        report.settled++;
+        continue;
+      }
+      edition.profiles++;
       const prefs = (profile.notification_preferences ?? {}) as { digest?: unknown };
-      const kind = digestKindFor(prefs.digest, anchor);
-      if (kind) wanted.push({ profile, kind });
-      else report.off++;
+      const kind = digestKindFor(prefs.digest, edition.schedule.day);
+      if (!kind) {
+        report.off++;
+        continue;
+      }
+      const list = byEdition.get(edition);
+      if (list) list.push({ profile, kind });
+      else byEdition.set(edition, [{ profile, kind }]);
     }
 
-    if (wanted.length > 0) {
+    for (const [edition, wanted] of byEdition) {
+      const before = { errors: report.errors.length, failed: report.failed, sent: report.sent };
       try {
-        await sendPage(store, wanted, { day, anchor, anchorIso, since24h, since7d, endOfDay, siteUrl }, report);
+        await sendPage(store, wanted, edition.windows, report);
       } catch (error) {
         // One page's failed read must not cost every later page its digest.
         report.errors.push(`profiles after ${short(wanted[0].profile.id)}: ${message(error)}`);
         report.failed += wanted.length;
       }
+      edition.sent += report.sent - before.sent;
+      if (report.errors.length > before.errors || report.failed > before.failed) edition.troubled = true;
     }
 
     if (profiles.length < PROFILE_PAGE_SIZE) break;
   }
 
-  if (useRunMarker && report.errors.length === 0 && report.failed === 0) {
-    try {
-      await store.markRunCompleted(day, { profiles: report.profiles, sent: report.sent });
-    } catch (error) {
-      // Every digest went out; the next run will just do the pass again.
-      report.errors.push(`recording the digest run marker: ${message(error)}`);
+  const seen = [...editions.values()];
+  report.skipped = seen.length > 0 && seen.every((e) => e.completed === true);
+
+  if (useRunMarker) {
+    for (const edition of seen) {
+      if (edition.completed || edition.troubled) continue;
+      try {
+        await store.markRunCompleted(edition.schedule.day, editionSlot(edition.schedule), {
+          profiles: edition.profiles,
+          sent: edition.sent,
+        });
+      } catch (error) {
+        // Every digest went out; the next run will just do the pass again.
+        report.errors.push(`recording the digest run marker: ${message(error)}`);
+      }
     }
   }
 
@@ -286,7 +418,7 @@ export async function runDigests(
 async function sendPage(
   store: DigestStore,
   wanted: { profile: DigestProfile; kind: DigestKind }[],
-  w: { day: string; anchor: Date; anchorIso: string; since24h: string; since7d: string; endOfDay: string; siteUrl: string },
+  w: EditionWindows,
   report: DigestReport
 ): Promise<void> {
   const ids = wanted.map((x) => x.profile.id);
@@ -326,7 +458,7 @@ async function sendPage(
         dueTasks: tasksBy.get(profile.id) ?? [],
         keyDates: datesBy.get(profile.id) ?? [],
         weekly,
-        today: w.anchor,
+        today: w.today,
       };
       if (!buildDigest({ ...content, to: 'check@invalid', agentName: 'there' })) {
         report.nothingToSend++;
@@ -399,6 +531,7 @@ export function summarizeDigestReport(report: DigestReport): string {
   if (report.skipped) return 'already completed today';
   return (
     `sent ${report.sent}, already sent ${report.alreadySent}, nothing to send ${report.nothingToSend}, ` +
-    `off ${report.off}, no email ${report.noEmail}, failed ${report.failed} (of ${report.profiles} profiles)`
+    `off ${report.off}, no email ${report.noEmail}, not due ${report.notDue}, settled ${report.settled}, ` +
+    `failed ${report.failed} (of ${report.profiles} profiles)`
   );
 }
