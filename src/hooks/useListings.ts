@@ -4,6 +4,9 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
 import { toStringList } from '@/types/profile';
 import { applySortOrderChanges, type SortOrderChange } from '@/lib/listingOrder';
+import { LISTING_PHOTO_BUCKET } from '@/lib/images';
+import { listingPhotoUrls, orphanedListingPhotoPaths } from '@/lib/listingPhotoCleanup';
+import { logger } from '@/lib/logger';
 import type { Database } from '@/integrations/supabase/types';
 
 type ListingRow = Database['public']['Tables']['listings']['Row'];
@@ -33,6 +36,27 @@ export type NewListing = Omit<Database['public']['Tables']['listings']['Insert']
 
 /** The columns a caller may change on an existing listing. */
 export type ListingUpdate = Database['public']['Tables']['listings']['Update'];
+
+/**
+ * Remove listing-photos objects that no listing refers to any more (US-451).
+ *
+ * Best-effort and never awaited by the caller's success path: the row write
+ * has already succeeded, and a storage hiccup must not turn a saved edit or a
+ * completed delete into an error toast. A failure is logged and the object
+ * simply stays, which is what always happened before.
+ */
+async function removeListingPhotoObjects(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    const { error } = await supabase.storage.from(LISTING_PHOTO_BUCKET).remove(paths);
+    if (error) throw error;
+  } catch (error) {
+    logger.warn('Could not remove orphaned listing photos', {
+      count: paths.length,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 export function useListings() {
   const user = useAuthStore((s) => s.user);
@@ -100,6 +124,9 @@ export function useListings() {
   const updateListing = useMutation({
     mutationFn: async ({ id, ...updates }: ListingUpdate & { id: string }) => {
       if (!user?.id) throw new Error('User not authenticated');
+      // Read before the write: the cached row is the only record of which
+      // photos this edit drops.
+      const before = queryClient.getQueryData<Listing[]>(['listings', user.id]) ?? [];
 
       // Security: Verify user owns this listing by requiring both id and user_id match
       const { data, error } = await supabase
@@ -111,6 +138,24 @@ export function useListings() {
         .single();
 
       if (error) throw error;
+
+      const previous = before.find((l) => l.id === id);
+      if (previous && ('photos' in updates || 'image' in updates)) {
+        const next = {
+          photos: 'photos' in updates ? toStringList(updates.photos ?? null) : previous.photos,
+          image: 'image' in updates ? (updates.image ?? null) : previous.image,
+        };
+        void removeListingPhotoObjects(
+          orphanedListingPhotoPaths({
+            removed: listingPhotoUrls(previous),
+            stillReferenced: [
+              ...listingPhotoUrls(next),
+              ...before.filter((l) => l.id !== id).flatMap(listingPhotoUrls),
+            ],
+            userId: user.id,
+          })
+        );
+      }
       return data;
     },
     onSuccess: (_data, variables) => {
@@ -171,15 +216,31 @@ export function useListings() {
   const deleteListing = useMutation({
     mutationFn: async (id: string) => {
       if (!user?.id) throw new Error('User not authenticated');
+      const before = queryClient.getQueryData<Listing[]>(['listings', user.id]) ?? [];
 
       // Security: Verify user owns this listing by requiring both id and user_id match
-      const { error } = await supabase
+      const { data: removedRows, error } = await supabase
         .from('listings')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
 
       if (error) throw error;
+
+      // The row is gone; its photos should not outlive it on a public URL.
+      // Only when the delete really removed it: RLS turns a refused delete
+      // into zero rows, not an error.
+      const deleted = before.find((l) => l.id === id);
+      if (deleted && (removedRows ?? []).length > 0) {
+        void removeListingPhotoObjects(
+          orphanedListingPhotoPaths({
+            removed: listingPhotoUrls(deleted),
+            stillReferenced: before.filter((l) => l.id !== id).flatMap(listingPhotoUrls),
+            userId: user.id,
+          })
+        );
+      }
     },
     onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['listings', user?.id] });
