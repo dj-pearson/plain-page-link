@@ -52,3 +52,18 @@ export function isNotTeammateError(error: unknown): boolean {
   const e = error as { code?: unknown; details?: unknown };
   return e.code === '23514' && e.details === 'lead_assignee_not_teammate';
 }
+
+/**
+ * The Leads list's assignee filter (US-515): 'unassigned', or one person's
+ * user id. It comes from the URL, so anything else (a mistyped link, a stale
+ * param) reads as no filter rather than as an empty list.
+ */
+export type AssigneeFilter = 'unassigned' | string;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function normalizeAssigneeFilter(raw: string | null | undefined): AssigneeFilter | null {
+  if (!raw) return null;
+  if (raw === 'unassigned') return 'unassigned';
+  return UUID_RE.test(raw) ? raw.toLowerCase() : null;
+}

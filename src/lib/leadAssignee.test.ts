@@ -1,7 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { assigneeLabel, describeAssignee, isNotTeammateError } from './leadAssignee';
+import {
+  assigneeLabel,
+  describeAssignee,
+  isNotTeammateError,
+  normalizeAssigneeFilter,
+} from './leadAssignee';
 
 const ROSTER = [{ userId: 'u2', label: 'jo@acme.test' }];
+
+describe('normalizeAssigneeFilter (US-515)', () => {
+  it('keeps unassigned and a user id, lower-cased', () => {
+    expect(normalizeAssigneeFilter('unassigned')).toBe('unassigned');
+    expect(normalizeAssigneeFilter('22222222-2222-4222-8222-AAAAAAAAAAAA')).toBe(
+      '22222222-2222-4222-8222-aaaaaaaaaaaa'
+    );
+  });
+
+  it('reads anything else as no filter', () => {
+    expect(normalizeAssigneeFilter(null)).toBeNull();
+    expect(normalizeAssigneeFilter('')).toBeNull();
+    expect(normalizeAssigneeFilter('me')).toBeNull();
+    expect(normalizeAssigneeFilter('x,user_id.neq.1')).toBeNull();
+  });
+});
 
 describe('describeAssignee', () => {
   it("says 'Unassigned' only to a team owner looking at their own lead", () => {

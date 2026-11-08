@@ -67,7 +67,7 @@ import { timeAgo } from '@/lib/timeAgo';
 import { useLeadStats } from '@/hooks/useLeadStats';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useLeadAssignees } from '@/hooks/useLeadAssignees';
-import { describeAssignee } from '@/lib/leadAssignee';
+import { describeAssignee, normalizeAssigneeFilter } from '@/lib/leadAssignee';
 
 /*
  * Every dialog on this page is closed on first render, so none of them ships
@@ -120,11 +120,17 @@ export default function Leads() {
   const statusFilter = normalizeStatusFilter(searchParams.get('status'));
   const typeFilter = searchParams.get('type') ?? 'all';
   const assignedToMe = searchParams.get('assigned') === 'me';
+  // US-515: the owner's split of their team's leads ('unassigned' or a
+  // teammate's id). A malformed value reads as everyone.
+  const assigneeFilter = normalizeAssigneeFilter(searchParams.get('assignee'));
 
-  const setFilter = (key: 'status' | 'type' | 'assigned', value: string) => {
+  const setFilter = (key: 'status' | 'type' | 'assigned' | 'assignee', value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value === 'all') next.delete(key);
     else next.set(key, value);
+    // Both narrow assigned_to; together they would AND into an empty list.
+    if (value !== 'all' && key === 'assigned') next.delete('assignee');
+    if (value !== 'all' && key === 'assignee') next.delete('assigned');
     setSearchParams(next, { replace: true });
     setSelectedLeadIds(new Set());
   };
@@ -151,7 +157,13 @@ export default function Leads() {
     isFetchingNextPage,
     bulkUpdateStatus,
     bulkDelete,
-  } = useLeads({ status: statusFilter, leadType: typeFilter, search: searchQuery, assignedToMe });
+  } = useLeads({
+    status: statusFilter,
+    leadType: typeFilter,
+    search: searchQuery,
+    assignedToMe,
+    assignee: assigneeFilter,
+  });
 
   // Only teammates have leads assigned to them; the filter shows for them.
   const { data: assignedCount = 0 } = useQuery({
@@ -176,6 +188,24 @@ export default function Leads() {
     // 'Unassigned' on every row of a team owner's list is noise; the detail
     // dialog says it, next to the control that changes it.
     return text === 'Unassigned' ? null : text;
+  };
+  // Shown to a team owner with someone to hand leads to, and kept while a
+  // link's filter is applied so it can be cleared.
+  const showAssigneeFilter = !!ownedTeamId && (assignees.length > 0 || !!assigneeFilter);
+  const hasActiveFilters =
+    statusFilter !== 'all' ||
+    typeFilter !== 'all' ||
+    assignedToMe ||
+    !!assigneeFilter ||
+    !!searchQuery.trim() ||
+    needsAttentionOnly;
+  const clearFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    for (const key of ['status', 'type', 'assigned', 'assignee']) next.delete(key);
+    setSearchParams(next, { replace: true });
+    setSearchInput('');
+    setNeedsAttentionOnly(false);
+    setSelectedLeadIds(new Set());
   };
 
   // Tapping a lead's email or phone number on the card records the response,
@@ -422,6 +452,7 @@ export default function Leads() {
           leadType: typeFilter,
           search: searchQuery,
           assignedToMe,
+          assignee: assigneeFilter,
         }),
         import('@/lib/exportUtils'),
       ]);
@@ -779,6 +810,37 @@ export default function Leads() {
               <SelectItem value="open_house">Open house</SelectItem>
             </SelectContent>
           </Select>
+          {/* US-515: a team owner can see who holds what. Solo agents, and
+              teammates (who see only their own and assigned leads), have
+              nobody to filter by. */}
+          {showAssigneeFilter && (
+            <Select value={assigneeFilter ?? 'all'} onValueChange={(v) => setFilter('assignee', v)}>
+              <SelectTrigger
+                className="w-[170px] min-h-[44px] flex-shrink-0"
+                aria-label="Filter by assignee"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Everyone</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {assignees.map((a) => (
+                  <SelectItem key={a.userId} value={a.userId}>
+                    {a.label}
+                  </SelectItem>
+                ))}
+                {/* A link to someone who has since left keeps working, and
+                    the trigger says so instead of going blank. */}
+                {assigneeFilter &&
+                  assigneeFilter !== 'unassigned' &&
+                  !assignees.some((a) => a.userId === assigneeFilter) && (
+                    <SelectItem value={assigneeFilter}>
+                      {assigneeFilter === user?.id ? 'Me' : 'Not on your team'}
+                    </SelectItem>
+                  )}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             variant={sortBy === 'score' ? 'default' : 'outline'}
             onClick={() => setSortBy(sortBy === 'date' ? 'score' : 'date')}
@@ -1125,12 +1187,28 @@ export default function Leads() {
               <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-accent rounded-full mb-3 sm:mb-4">
                 <MessageSquare className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
-                No leads yet
-              </h3>
-              <p className="text-sm sm:text-base text-muted-foreground max-w-sm mx-auto">
-                Leads will appear here when visitors contact you through your profile
-              </p>
+              {/* A filtered view with no rows is not an account with no
+                  leads: an owner filtering to a teammate holding nothing
+                  used to read "No leads yet". */}
+              {hasActiveFilters ? (
+                <>
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+                    No leads match these filters
+                  </h3>
+                  <Button variant="outline" onClick={clearFilters} className="min-h-[44px] mt-2">
+                    Clear filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+                    No leads yet
+                  </h3>
+                  <p className="text-sm sm:text-base text-muted-foreground max-w-sm mx-auto">
+                    Leads will appear here when visitors contact you through your profile
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
