@@ -94,3 +94,12 @@ export function formatDistanceWithSuffix(date: Date, base: Date): string {
 
   return comparison > 0 ? `in ${words}` : `${words} ago`;
 }
+
+/**
+ * date-fns formatDistanceToNow(date, { addSuffix: true }): the distance from
+ * now, with "ago" or "in". Throws RangeError on an invalid date, as date-fns
+ * does.
+ */
+export function formatDistanceToNowWithSuffix(date: Date | number): string {
+  return formatDistanceWithSuffix(date instanceof Date ? date : new Date(date), new Date());
+}

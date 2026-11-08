@@ -11,7 +11,8 @@
  */
 import { Link } from 'react-router-dom';
 import { CalendarHeart, DoorOpen, PhoneCall } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/dateFormat';
+import { formatDistanceToNowWithSuffix } from '@/lib/relativeTime';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { contactName, useContactsDueForTouch, useKeyDates } from '@/hooks/useContacts';
@@ -62,9 +63,9 @@ export function ComingUp() {
                   {formatOpenHouseAddress(nextOpenHouse.listings)}
                 </span>
                 <span className="block text-xs text-muted-foreground">
-                  {format(new Date(nextOpenHouse.starts_at), 'EEE, MMM d · h:mm a')}
+                  {formatDate(new Date(nextOpenHouse.starts_at), 'EEE, MMM d · h:mm a')}
                   {' – '}
-                  {format(new Date(nextOpenHouse.ends_at), 'h:mm a')}
+                  {formatDate(new Date(nextOpenHouse.ends_at), 'h:mm a')}
                 </span>
               </span>
               {nextOpenHouse.signInCount > 0 && (
@@ -99,7 +100,7 @@ export function ComingUp() {
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {kd.label}
-                          {owner} · {format(item.occursOn, 'EEE, MMM d')}
+                          {owner} · {formatDate(item.occursOn, 'EEE, MMM d')}
                         </span>
                       </span>
                       <Badge
@@ -132,7 +133,7 @@ export function ComingUp() {
                     <span className="truncate text-sm font-medium">{contactName(c)}</span>
                     <span className="flex-shrink-0 text-xs text-muted-foreground">
                       {c.last_contacted_at
-                        ? `Last ${formatDistanceToNow(new Date(c.last_contacted_at), { addSuffix: true })}`
+                        ? `Last ${formatDistanceToNowWithSuffix(new Date(c.last_contacted_at))}`
                         : 'Not contacted yet'}
                     </span>
                   </Link>

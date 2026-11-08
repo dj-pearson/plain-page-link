@@ -6,7 +6,7 @@
  * meter that says "2 of 3" means the third will save.
  */
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/dateFormat';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -43,7 +43,7 @@ export function PlanUsageCard() {
 
   const endsOn =
     plan.cancel_at_period_end && plan.current_period_end
-      ? format(new Date(plan.current_period_end), 'MMM d')
+      ? formatDate(new Date(plan.current_period_end), 'MMM d')
       : null;
 
   return (
