@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -93,7 +93,7 @@ const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/web
 interface AddListingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (data: ListingFormData) => void;
+  onSave?: (data: ListingFormData) => void | Promise<void>;
 }
 
 const STEPS = [
@@ -110,6 +110,13 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
+  // US-570: a save in flight. The ref is the guard (set synchronously, so a
+  // double-click or a second Enter in the same tick cannot slip past it); the
+  // state mirrors it for rendering. react-hook-form's handleSubmit does not
+  // block a second submit, and each one inserted a listing counted against
+  // the plan's active-listing limit.
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   const {
     register,
@@ -247,6 +254,9 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
   };
 
   const onSubmit = async (data: ListingFormData) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       setError(null);
       await onSave?.(data);
@@ -263,10 +273,17 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
           ? `${err.message} Your listing details are still here — fix that and try again.`
           : 'Failed to add listing. Your details are still here; please try again.'
       );
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
   const handleClose = () => {
+    // US-570: Cancel, Escape, the X and an outside click used to close the
+    // dialog mid-save, so a save that then failed reported its error to a
+    // dialog nobody could see. It stays open until the save settles.
+    if (savingRef.current) return;
     onOpenChange(false);
     setCurrentStep(0);
   };
@@ -319,7 +336,19 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+        <form
+          onSubmit={(e) => {
+            // Checked before validation as well, so a second submit while the
+            // first is saving does not even re-run the resolver.
+            if (savingRef.current) {
+              e.preventDefault();
+              return;
+            }
+            void handleSubmit(onSubmit)(e);
+          }}
+          aria-busy={saving}
+          className="flex flex-col flex-1 overflow-hidden"
+        >
           {error && (
             <div
               role="alert"
@@ -695,6 +724,7 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
               type="button"
               variant="outline"
               onClick={currentStep === 0 ? handleClose : goToPrevStep}
+              disabled={saving}
             >
               {currentStep === 0 ? (
                 'Cancel'
@@ -712,7 +742,9 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                 Next <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (
-              <Button type="submit">Add Listing</Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Saving…' : 'Add Listing'}
+              </Button>
             )}
           </div>
         </form>
