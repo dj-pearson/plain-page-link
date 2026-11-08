@@ -193,6 +193,12 @@ Stripe webhook endpoint: point Stripe → Developers → Webhooks at
 `<functions-url>/stripe-webhook` and copy its signing secret into
 `STRIPE_WEBHOOK_SECRET`.
 
+Resend webhook endpoint (US-448): in Resend → Webhooks add
+`<functions-url>/resend-webhook` for the `email.bounced` and
+`email.complained` events and copy its signing secret (`whsec_...`) into
+`RESEND_WEBHOOK_SECRET`. Hard bounces and spam complaints then go into
+`email_suppressions`, and the drips stop mailing those addresses.
+
 ---
 
 ## 4. Post-deploy verification checklist

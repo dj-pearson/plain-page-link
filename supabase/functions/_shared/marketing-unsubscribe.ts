@@ -21,6 +21,8 @@
  *   - Every drip send asks isSuppressed() first. The suppression is per
  *     address, so it also covers that person's later captures and the other
  *     tool's drip.
+ *   - resend-webhook (US-448) adds hard bounces and spam complaints to the
+ *     same table, so isSuppressed() stops those addresses too.
  *
  * The /unsubscribe page asks for a click before it posts: link scanners and
  * prefetchers follow GET links, and an opt-out they trigger is one the person
