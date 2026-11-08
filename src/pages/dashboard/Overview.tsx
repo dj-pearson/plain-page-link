@@ -22,6 +22,7 @@ import { ConversionFunnel } from '@/components/dashboard/ConversionFunnel';
 import { DueFollowUps } from '@/components/dashboard/DueFollowUps';
 import { ComingUp } from '@/components/dashboard/ComingUp';
 import { PlanUsageCard } from '@/components/dashboard/PlanUsageCard';
+import { TimeZonePrompt } from '@/components/dashboard/TimeZonePrompt';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { topByClicks } from '@/lib/linkOrder';
 import { CHECKOUT_RETURN_PATH, CHECKOUT_STATUS_PARAM } from '@/lib/checkoutReturn';
@@ -76,6 +77,9 @@ export default function Overview() {
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">{subtitle}</p>
       </div>
+
+      {/* US-560: agents onboarded before US-537 have no saved time zone. */}
+      <TimeZonePrompt />
 
       {/* Profile Completion Widget */}
       <ProfileCompletionWidget />
