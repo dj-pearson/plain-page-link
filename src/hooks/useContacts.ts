@@ -436,6 +436,7 @@ export function useKeyDates(contactId?: string) {
   return {
     keyDates: query.data ?? [],
     isLoading: query.isLoading,
+    isError: query.isError,
     error: query.error,
     refetch: query.refetch,
     addKeyDate,
@@ -512,6 +513,8 @@ export function useContactInteractions(contactId: string | null | undefined) {
   return {
     interactions: query.data ?? [],
     isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
     logInteraction,
     deleteInteraction,
   };

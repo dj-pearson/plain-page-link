@@ -51,7 +51,7 @@ export function useNotificationPreferences() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
-  const { data: preferences = DEFAULTS, isLoading } = useQuery({
+  const query = useQuery({
     queryKey: ['notification-preferences', user?.id],
     enabled: !!user?.id,
     queryFn: async (): Promise<NotificationPreferences> => {
@@ -70,6 +70,10 @@ export function useNotificationPreferences() {
       };
     },
   });
+  const preferences = query.data ?? DEFAULTS;
+  // US-612: whether `preferences` is what is stored, or only the defaults
+  // standing in for a read that has not succeeded.
+  const loaded = query.data !== undefined;
 
   // US-433: the morning email's hour follows profiles.timezone. An agent who
   // has never set one gets this device's zone the first time they save a
@@ -80,6 +84,16 @@ export function useNotificationPreferences() {
 
   const update = useMutation({
     mutationFn: async (next: Partial<NotificationPreferences>) => {
+      // US-612: the write is the whole column, merged onto what was read. With
+      // the read failed or still in flight, `preferences` is DEFAULTS, and the
+      // merge would reset every other stored setting (an agent who had turned
+      // lead emails off would have them switched back on by changing the
+      // response window). Refuse rather than guess.
+      if (!loaded) {
+        throw new Error(
+          'Your notification settings have not loaded yet, so nothing was changed. Reload and try again.'
+        );
+      }
       // Merged onto what is stored, not replacing it: writing { leads } alone
       // would drop sla_hours, and vice versa.
       const merged = { ...preferences, ...next };
@@ -111,7 +125,9 @@ export function useNotificationPreferences() {
     leadMode: preferences.leads,
     digestMode: preferences.digest,
     digestHour: digestHourOf(preferences),
-    isLoading,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
     update,
   };
 }

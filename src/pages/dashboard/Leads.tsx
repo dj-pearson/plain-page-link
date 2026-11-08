@@ -146,7 +146,20 @@ export default function Leads() {
   };
 
   const { slaHours, update: updatePreferences } = useNotificationPreferences();
-  const setSlaHours = (hours: number) => updatePreferences.mutate({ sla_hours: hours });
+  // US-612: a refused save (including one refused because the settings never
+  // loaded) used to fail silently and leave the old window in place.
+  const setSlaHours = (hours: number) =>
+    updatePreferences.mutate(
+      { sla_hours: hours },
+      {
+        onError: (error: unknown) =>
+          toast({
+            title: 'Response window not saved',
+            description: error instanceof Error ? error.message : 'Please try again.',
+            variant: 'destructive',
+          }),
+      }
+    );
   // US-534: the chips and the Needs-attention badge count what the list shows
   // under the assignee filters ("Assigned to me" is the same filter on my id).
   // US-557: and under the type filter and the name search. Status is not

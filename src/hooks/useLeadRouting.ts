@@ -112,6 +112,8 @@ export function useLeadRouting(teamId: string | undefined) {
   return {
     rules: rules.data ?? [],
     isLoading: rules.isLoading,
+    isError: rules.isError,
+    refetch: rules.refetch,
     createRule,
     toggleRule,
     deleteRule,

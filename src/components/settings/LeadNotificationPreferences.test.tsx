@@ -4,11 +4,14 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { digestHourOf } from '@/hooks/useNotificationPreferences';
 
 const mutate = vi.fn();
 let prefs: { digestMode: 'daily' | 'weekly' | 'off'; digestHour: number };
 let zone: { timeZone: string | null; detected: string | null };
+let failed = false;
+const refetch = vi.fn();
 
 vi.mock('@/hooks/useNotificationPreferences', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/useNotificationPreferences')>()),
@@ -17,6 +20,8 @@ vi.mock('@/hooks/useNotificationPreferences', async (importOriginal) => ({
     slaHours: 2,
     ...prefs,
     isLoading: false,
+    isError: failed,
+    refetch,
     update: { mutate, isPending: false },
   }),
 }));
@@ -32,6 +37,7 @@ const hourControl = () => screen.queryByRole('combobox', { name: 'Send it at' })
 describe('LeadNotificationPreferences morning email hour (US-518)', () => {
   beforeEach(() => {
     mutate.mockClear();
+    failed = false;
     prefs = { digestMode: 'daily', digestHour: 7 };
     zone = { timeZone: 'Europe/London', detected: 'America/Chicago' };
   });
@@ -62,6 +68,25 @@ describe('LeadNotificationPreferences morning email hour (US-518)', () => {
     prefs.digestMode = 'off';
     render(<LeadNotificationPreferences />);
     expect(hourControl()).toBeNull();
+  });
+});
+
+describe('LeadNotificationPreferences failed load (US-612)', () => {
+  beforeEach(() => {
+    failed = true;
+    refetch.mockClear();
+    prefs = { digestMode: 'daily', digestHour: 7 };
+    zone = { timeZone: 'Europe/London', detected: null };
+  });
+
+  it('says the settings did not load instead of showing the defaults as choices', async () => {
+    render(<LeadNotificationPreferences />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Your notification settings did not load.');
+    expect(screen.queryByRole('combobox')).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Retry loading notification settings' })
+    );
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
 

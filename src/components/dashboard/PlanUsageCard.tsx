@@ -20,9 +20,28 @@ import {
   tierFor,
 } from '@/lib/planLimits';
 import { cn } from '@/lib/utils';
+import { SectionLoadError } from './SectionLoadError';
 
 export function PlanUsageCard() {
-  const { plan, status, isLoading } = usePlanUsage();
+  const { plan, status, isLoading, isError, refetch } = usePlanUsage();
+  // US-612: a failed read used to return null like loading does, so the agent
+  // lost sight of their limits without being told. Say so, with a retry.
+  if (isError && !plan) {
+    return (
+      <Card>
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">Your plan</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SectionLoadError
+            message="Your plan and usage did not load."
+            onRetry={() => void refetch()}
+            retryLabel="Retry loading your plan"
+          />
+        </CardContent>
+      </Card>
+    );
+  }
   if (isLoading || !plan) return null;
 
   const tier = tierFor(plan.plan_name);

@@ -75,6 +75,7 @@ export function usePlanUsage() {
     plan,
     planName: plan?.plan_name ?? 'free',
     isLoading: query.isLoading,
+    isError: query.isError,
     refetch: query.refetch,
     status,
     canAdd: (key: PlanLimitKey) => status(key).canAdd,
