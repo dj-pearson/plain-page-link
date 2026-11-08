@@ -17,6 +17,7 @@ import { useAuditLog, AuditLogEntry } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CLIENT_REPORTED_HINT, CLIENT_REPORTED_LABEL, isClientReported } from '@/lib/auditSource';
 
 export function AuditLogViewer() {
   const { logs, totalLogs, isLoading, error, refetch, getActionLabel, groupLogsByDate } =
@@ -98,7 +99,17 @@ export function AuditLogViewer() {
                       <div className="flex items-center gap-3">
                         {getStatusIcon(log.status)}
                         <div>
-                          <div className="font-medium text-sm">{getActionLabel(log.action)}</div>
+                          <div className="font-medium text-sm">
+                            {getActionLabel(log.action)}
+                            {isClientReported(log.details) && (
+                              <span
+                                className="ml-2 whitespace-nowrap text-xs font-normal text-muted-foreground"
+                                title={CLIENT_REPORTED_HINT}
+                              >
+                                {CLIENT_REPORTED_LABEL}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {log.created_at
                               ? new Date(log.created_at).toLocaleTimeString()
@@ -167,6 +178,11 @@ export function AuditLogViewer() {
                     : 'unknown'}
                 </span>
               </div>
+              {isClientReported(selectedLog.details) && (
+                <p className="text-xs text-muted-foreground">
+                  {CLIENT_REPORTED_LABEL}. {CLIENT_REPORTED_HINT}
+                </p>
+              )}
               {selectedLog.ip_address && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">IP Address:</span>
