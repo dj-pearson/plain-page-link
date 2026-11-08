@@ -96,6 +96,44 @@ export function useListings() {
     gcTime: 10 * 60 * 1000, // 10 minutes - cache retention
   });
 
+  /**
+   * Remove photos uploaded in a dialog that never reached a saved row (US-461).
+   *
+   * ListingPhotoManager uploads as soon as files are picked, and the add form
+   * uploads before its insert. A cancelled edit, a photo removed before the
+   * save, or an insert that fails (a plan limit, a dropped connection) left
+   * those objects public in the bucket for good, and a retry uploaded them
+   * again. Callers pass the URLs uploaded in the session that the save did not
+   * keep; addListing calls it itself when its insert fails.
+   *
+   * The listings are re-read rather than taken from the cache, which can be
+   * stale (a save that errored on the way back may still have landed): any
+   * object a stored row refers to is kept, and if that read fails nothing is
+   * removed. Best-effort like the rest of the cleanup; it never throws.
+   */
+  const discardUnsavedPhotos = async (urls: readonly string[]): Promise<void> => {
+    if (!user?.id || urls.length === 0) return;
+    const userId = user.id;
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('photos, image')
+        .eq('user_id', userId);
+      if (error) throw error;
+      const stored = (data ?? []).flatMap((row) =>
+        listingPhotoUrls({ photos: toStringList(row.photos), image: row.image })
+      );
+      await removeListingPhotoObjects(
+        orphanedListingPhotoPaths({ removed: urls, stillReferenced: stored, userId })
+      );
+    } catch (error) {
+      logger.warn('Could not check unsaved listing photos before removing them', {
+        count: urls.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   const addListing = useMutation({
     mutationFn: async (listingData: NewListing) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -109,7 +147,20 @@ export function useListings() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // The add form uploads before it inserts. Without a row those photos
+        // are public objects nothing points at, and a retry uploads them
+        // again (US-461). discardUnsavedPhotos only touches the agent's own
+        // listing-photos objects that no stored listing refers to, so an
+        // imported or hot-linked URL is never a candidate.
+        void discardUnsavedPhotos(
+          listingPhotoUrls({
+            photos: toStringList(listingData.photos ?? null),
+            image: listingData.image ?? null,
+          })
+        );
+        throw error;
+      }
       return data;
     },
     onSuccess: (data) => {
@@ -261,5 +312,6 @@ export function useListings() {
     updateListing,
     reorderListings,
     deleteListing,
+    discardUnsavedPhotos,
   };
 }

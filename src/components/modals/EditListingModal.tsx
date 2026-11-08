@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,7 +43,16 @@ export interface EditListingFormData {
 interface EditListingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: EditListingFormData) => void;
+  /**
+   * `uploaded` is every photo URL uploaded while the dialog was open, so the
+   * caller can remove the ones the save did not keep (US-461).
+   */
+  onSubmit: (data: EditListingFormData, uploaded: string[]) => void;
+  /**
+   * Called with photos uploaded in this dialog that are not on the saved
+   * listing, when the dialog closes without saving (US-461).
+   */
+  onDiscardUploads?: (urls: string[]) => void;
   initialData: EditListingFormData;
   /** Used to group newly uploaded photos under the listing's own folder. */
   listingId?: string;
@@ -55,6 +64,7 @@ export function EditListingModal({
   onSubmit,
   initialData,
   listingId,
+  onDiscardUploads,
 }: EditListingModalProps) {
   // Seeded once. There used to be an effect that reset this whenever
   // initialData changed — and the caller builds initialData inline, so every
@@ -63,13 +73,41 @@ export function EditListingModal({
   // still mounts a fresh form.
   const [formData, setFormData] = useState<EditListingFormData>(initialData);
 
+  // Photos uploaded while this dialog is open (US-461). ListingPhotoManager
+  // uploads the moment files are picked, so a cancel used to leave them
+  // public in the bucket with no row pointing at them.
+  const uploadedRef = useRef<string[]>([]);
+  const closedRef = useRef(false);
+
+  const handleUploaded = (urls: string[]) => {
+    // An upload that finishes after the dialog closed can never be saved.
+    if (closedRef.current) {
+      onDiscardUploads?.(urls);
+      return;
+    }
+    uploadedRef.current = [...uploadedRef.current, ...urls];
+  };
+
+  const handleClose = () => {
+    if (!closedRef.current) {
+      closedRef.current = true;
+      // Only this session's uploads: a photo already on the saved listing is
+      // never a candidate, whatever the agent did to it in the form.
+      const saved = new Set(initialData.photos);
+      const unsaved = uploadedRef.current.filter((url) => !saved.has(url));
+      uploadedRef.current = [];
+      if (unsaved.length > 0) onDiscardUploads?.(unsaved);
+    }
+    onClose();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    onSubmit(formData, [...uploadedRef.current]);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         aria-describedby={undefined}
         className="max-w-2xl gap-0 border-border bg-card p-0 text-card-foreground"
@@ -224,6 +262,7 @@ export function EditListingModal({
                 photos={formData.photos}
                 onChange={(photos) => setFormData({ ...formData, photos })}
                 listingId={listingId}
+                onUploaded={handleUploaded}
               />
             </div>
 
@@ -303,7 +342,7 @@ export function EditListingModal({
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
               Cancel
             </Button>
             <Button type="submit" className="flex-1">
