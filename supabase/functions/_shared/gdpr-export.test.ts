@@ -5,11 +5,14 @@ import {
   buildExportDocument,
   collectSections,
   ExportIncompleteError,
+  exportDocumentChunks,
+  exportDownloadStream,
   layoutSectionKeys,
   maskLoginAttempt,
   readAllRows,
   sectionCounts,
   SECTIONS,
+  startExportDownload,
   writeExportDocument,
   type CollectedSections,
   type ExportReader,
@@ -323,5 +326,125 @@ describe('writeExportDocument (US-576)', () => {
     const keys = layoutSectionKeys();
     expect([...keys].sort()).toEqual(SECTIONS.map((s) => s.key).sort());
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  describe('the streamed GET download (US-584)', () => {
+    const drain = async (stream: ReadableStream<Uint8Array>) => {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let text = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return text;
+        text += decoder.decode(value, { stream: true });
+      }
+    };
+
+    it('with failFast, stops at the first failed section and never writes the closing brace', async () => {
+      const { reader, calls } = fakeReader(tables(), (spec, from) =>
+        spec.table === 'leads' && from === 10 ? 'timeout' : null
+      );
+      const seen: string[] = [];
+      const it = exportDocumentChunks(reader, subject, decrypt, { now: NOW, pageSize: 10, failFast: true });
+      const error = await (async () => {
+        for (;;) {
+          const step = await it.next();
+          if (step.done) return null;
+          seen.push(step.value);
+        }
+      })().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ExportIncompleteError);
+      expect((error as ExportIncompleteError).failed.map((f) => f.section)).toEqual(['leads']);
+      // Nothing after leads was read, and what was produced does not parse.
+      expect(calls.some((c) => c.table === 'lead_activities')).toBe(false);
+      expect(() => JSON.parse(seen.join(''))).toThrow();
+      expect(seen.join('')).not.toMatch(/"meta"/);
+    });
+
+    it('without failFast, never yields the closing brace of a failed document either', async () => {
+      const { reader } = fakeReader(tables(), (spec) => (spec.table === 'gdpr_data_requests' ? 'timeout' : null));
+      const seen: string[] = [];
+      const it = exportDocumentChunks(reader, subject, decrypt, { now: NOW, pageSize: 10 });
+      const error = await (async () => {
+        for (;;) {
+          const step = await it.next();
+          if (step.done) return null;
+          seen.push(step.value);
+        }
+      })().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ExportIncompleteError);
+      expect(() => JSON.parse(seen.join(''))).toThrow();
+    });
+
+    it('a document smaller than the buffer is answered whole, byte-identical to the in-memory one', async () => {
+      const t = tables();
+      const start = await startExportDownload(
+        exportDocumentChunks(fakeReader(t).reader, subject, decrypt, { now: NOW, pageSize: 10, failFast: true })
+      );
+      expect(start.kind).toBe('complete');
+      if (start.kind !== 'complete') return;
+      const expected = await buildExportDocument(subject, collectedFrom(t), decrypt, NOW);
+      expect(start.body).toBe(JSON.stringify(expected, null, 2));
+      expect(start.summary.counts).toEqual(sectionCounts(collectedFrom(t)));
+    });
+
+    it('a failure before anything is sent is reported, so the function can still answer 503', async () => {
+      const { reader } = fakeReader(tables(), (spec) => (spec.table === 'contacts' ? 'timeout' : null));
+      const start = await startExportDownload(
+        exportDocumentChunks(reader, subject, decrypt, { now: NOW, pageSize: 10, failFast: true })
+      );
+      expect(start.kind).toBe('failed');
+      if (start.kind === 'failed') expect(start.error.failed.map((f) => f.section)).toEqual(['contacts']);
+    });
+
+    it('a larger document is streamed and arrives byte-identical', async () => {
+      const t = tables();
+      const start = await startExportDownload(
+        exportDocumentChunks(fakeReader(t).reader, subject, decrypt, { now: NOW, pageSize: 10, failFast: true }),
+        200
+      );
+      expect(start.kind).toBe('streaming');
+      if (start.kind !== 'streaming') return;
+      expect(start.head.length).toBeGreaterThanOrEqual(200);
+      const outcomes: unknown[] = [];
+      const text = await drain(exportDownloadStream(start.head, start.rest, (o) => void outcomes.push(o)));
+      const expected = await buildExportDocument(subject, collectedFrom(t), decrypt, NOW);
+      expect(text).toBe(JSON.stringify(expected, null, 2));
+      expect(outcomes).toEqual([{ ok: true, summary: { counts: sectionCounts(collectedFrom(t)), truncated: [] } }]);
+    });
+
+    it('a section failing after streaming began errors the body instead of ending it as if complete', async () => {
+      const { reader } = fakeReader(tables(), (spec) => (spec.table === 'audit_logs' ? 'timeout' : null));
+      const start = await startExportDownload(
+        exportDocumentChunks(reader, subject, decrypt, { now: NOW, pageSize: 10, failFast: true }),
+        200
+      );
+      expect(start.kind).toBe('streaming');
+      if (start.kind !== 'streaming') return;
+      const outcomes: { ok: boolean; error?: unknown }[] = [];
+      const error = await drain(exportDownloadStream(start.head, start.rest, (o) => void outcomes.push(o))).catch(
+        (e: unknown) => e
+      );
+      expect(error).toBeInstanceOf(ExportIncompleteError);
+      expect(outcomes).toHaveLength(1);
+      expect(outcomes[0].ok).toBe(false);
+      expect((outcomes[0].error as ExportIncompleteError).failed.map((f) => f.section)).toEqual(['auditLogs']);
+    });
+
+    it('holds one chunk at a time once streaming: the database is read only as the body is consumed', async () => {
+      const { reader, calls } = fakeReader(tables());
+      const start = await startExportDownload(
+        exportDocumentChunks(reader, subject, decrypt, { now: NOW, pageSize: 10, failFast: true }),
+        200
+      );
+      if (start.kind !== 'streaming') throw new Error('expected a streamed download');
+      const readsAtStart = calls.length;
+      const body = exportDownloadStream(start.head, start.rest, () => undefined).getReader();
+      await body.read(); // the held head
+      expect(calls.length).toBe(readsAtStart);
+      await body.cancel();
+      // Cancelling stops the reads.
+      expect(calls.length).toBeLessThanOrEqual(readsAtStart + 1);
+    });
   });
 });

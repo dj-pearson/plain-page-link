@@ -351,9 +351,10 @@ export async function buildExportDocument(
  * serialises that page, and lets the rows go. Peak memory is the serialised
  * file plus a single page, not every section's row objects plus their copies.
  *
- * Sections are read one after another rather than concurrently: this runs in
- * the hourly job with nobody waiting on it, and concurrent reads would hold a
- * page of every section at once again.
+ * Sections are read one after another rather than concurrently: concurrent
+ * reads would hold a page of every section at once again. The immediate GET
+ * download uses it too (US-584); for a small account that costs one round
+ * trip per section (about 27) where collectSections overlapped them.
  */
 
 type LayoutNode =
@@ -433,28 +434,49 @@ export interface WrittenExport {
   truncated: string[];
 }
 
+/** What {@link exportDocumentChunks} returns once the last chunk is out. */
+export type ExportSummary = Omit<WrittenExport, 'chunks'>;
+
+export interface ExportChunkOptions {
+  now?: Date;
+  pageSize?: number;
+  maxRows?: number;
+  /**
+   * Throw at the first section that cannot be read, before another chunk is
+   * produced (US-584). A streamed download cannot take back what it has sent,
+   * so it has to stop before the document's closing brace: the subject is
+   * left with text that does not parse, never a file that reads as complete.
+   * Off, every section is still read so the error names all that failed; the
+   * caller holds the chunks and discards them.
+   */
+  failFast?: boolean;
+}
+
 /**
- * The export document as text, read and written one page at a time. Throws
- * {@link ExportIncompleteError}, naming every section that could not be read,
- * rather than returning a document missing one.
+ * The export document as text, one chunk per page of rows, read one page of
+ * one section at a time. Chunks are yielded as they are produced and nothing
+ * is retained, so a consumer that sends each chunk on (the streamed GET
+ * download, US-584) holds a single page, not the file. Throws
+ * {@link ExportIncompleteError} instead of finishing a document missing a
+ * section: at the first failure with `failFast`, after the last section
+ * without it. Either way the document's closing brace is never produced.
  */
-export async function writeExportDocument(
+export async function* exportDocumentChunks(
   reader: ExportReader,
   subject: ExportSubject,
   decrypt: Decrypt,
-  now: Date = new Date(),
-  pageSize = PAGE_SIZE,
-  maxRows = MAX_ROWS_PER_SECTION
-): Promise<WrittenExport> {
+  opts: ExportChunkOptions = {}
+): AsyncGenerator<string, ExportSummary, void> {
+  const { now = new Date(), pageSize = PAGE_SIZE, maxRows = MAX_ROWS_PER_SECTION, failFast = false } = opts;
   const specs = new Map(SECTIONS.map((spec) => [spec.key, spec]));
-  const chunks: string[] = [];
   const rowCounts: Record<string, number> = {};
   const singleCounts: Record<string, number> = {};
   const truncated: string[] = [];
   const failed: { section: string; message: string }[] = [];
-  const out = (text: string) => void chunks.push(text);
-  const recordFailure = (key: string, err: unknown) =>
+  const recordFailure = (key: string, err: unknown) => {
     failed.push({ section: key, message: err instanceof Error ? err.message : String(err) });
+    if (failFast) throw new ExportIncompleteError(failed);
+  };
 
   // sectionCounts' order: list sections, then single-row ones.
   const counts = () => {
@@ -464,53 +486,65 @@ export async function writeExportDocument(
     return ordered;
   };
 
-  const writeSection = async (key: string, indent: string) => {
+  async function* writeSection(key: string, indent: string): AsyncGenerator<string, void, void> {
     const spec = specs.get(key);
     if (!spec) throw new Error(`export layout names unknown section ${key}`);
     if (spec.single) {
+      let text = 'null';
       try {
         const { data, error } = await reader.one(spec, subject.id);
         if (error) throw new Error(error.message || 'query failed');
         singleCounts[key] = data ? 1 : 0;
-        out(pretty(data ?? null, indent));
+        text = pretty(data ?? null, indent);
       } catch (err) {
         recordFailure(key, err);
-        out('null');
       }
+      yield text;
       return;
     }
 
     const inner = `${indent}  `;
     const transform = ROW_TRANSFORMS[key];
     let written = 0;
-    out('[');
+    let count = 0;
+    let hitCap = true;
+    yield '[';
+    // forEachPage hands pages to a callback, which cannot yield, so its paging
+    // is spelled out here with the same rules: stop at a short page or the cap.
     try {
-      const result = await forEachPage(
-        reader,
-        spec,
-        subject.id,
-        async (page) => {
+      for (let from = 0; from < maxRows; from += pageSize) {
+        const to = Math.min(from + pageSize, maxRows) - 1;
+        const { data, error } = await reader.page(spec, subject.id, from, to);
+        if (error) throw new Error(error.message || 'query failed');
+        const page = data ?? [];
+        count += page.length;
+        if (page.length > 0) {
           const rows = transform ? await transform(page, decrypt) : page;
           let text = '';
           for (const row of rows) {
             text += `${written > 0 ? ',' : ''}\n${inner}${pretty(row, inner)}`;
             written += 1;
           }
-          out(text);
-        },
-        pageSize,
-        maxRows
-      );
-      rowCounts[key] = result.count;
-      if (result.truncated) truncated.push(key);
+          yield text;
+        }
+        if (page.length < to - from + 1) {
+          hitCap = false;
+          break;
+        }
+      }
+      rowCounts[key] = count;
+      if (hitCap) truncated.push(key);
     } catch (err) {
       recordFailure(key, err);
     }
-    out(written > 0 ? `\n${indent}]` : ']');
-  };
+    yield written > 0 ? `\n${indent}]` : ']';
+  }
 
-  const writeNode = async (node: LayoutNode, indent: string): Promise<void> => {
-    if ('section' in node) return writeSection(node.section, indent);
+  async function* writeNode(node: LayoutNode, indent: string): AsyncGenerator<string, void, void> {
+    if ('section' in node) {
+      yield* writeSection(node.section, indent);
+      return;
+    }
     if ('computed' in node) {
       const value =
         node.computed === 'exportedAt'
@@ -518,21 +552,28 @@ export async function writeExportDocument(
           : node.computed === 'user'
             ? exportUser(subject)
             : { counts: counts(), truncated: [...truncated].sort() };
-      out(pretty(value, indent));
+      yield pretty(value, indent);
       return;
     }
     const inner = `${indent}  `;
-    out('{');
+    yield '{';
     let first = true;
     for (const [name, child] of node.group) {
-      out(`${first ? '' : ','}\n${inner}${JSON.stringify(name)}: `);
+      yield `${first ? '' : ','}\n${inner}${JSON.stringify(name)}: `;
       first = false;
-      await writeNode(child, inner);
+      yield* writeNode(child, inner);
     }
-    out(`\n${indent}}`);
-  };
+    yield `\n${indent}}`;
+  }
 
-  await writeNode(DOCUMENT_LAYOUT, '');
+  // The closing brace is the last chunk. Without failFast a failure is only
+  // known once every section has been read, so each chunk is held back by
+  // one and the closing brace is replaced by the error.
+  let pending: string | null = null;
+  for await (const chunk of writeNode(DOCUMENT_LAYOUT, '')) {
+    if (pending !== null) yield pending;
+    pending = chunk;
+  }
 
   if (failed.length > 0) {
     // Reported in SECTIONS order, as collectSections does.
@@ -540,5 +581,133 @@ export async function writeExportDocument(
     failed.sort((a, b) => order.indexOf(a.section) - order.indexOf(b.section));
     throw new ExportIncompleteError(failed);
   }
-  return { chunks, counts: counts(), truncated: [...truncated].sort() };
+  if (pending !== null) yield pending;
+  return { counts: counts(), truncated: [...truncated].sort() };
+}
+
+/**
+ * The export document as text, read and written one page at a time, with
+ * every chunk held for the caller (the queued job uploads them as one Blob).
+ * Throws {@link ExportIncompleteError}, naming every section that could not
+ * be read, rather than returning a document missing one.
+ */
+export async function writeExportDocument(
+  reader: ExportReader,
+  subject: ExportSubject,
+  decrypt: Decrypt,
+  now: Date = new Date(),
+  pageSize = PAGE_SIZE,
+  maxRows = MAX_ROWS_PER_SECTION
+): Promise<WrittenExport> {
+  const chunks: string[] = [];
+  const it = exportDocumentChunks(reader, subject, decrypt, { now, pageSize, maxRows });
+  for (;;) {
+    const step = await it.next();
+    if (step.done) return { chunks, ...step.value };
+    chunks.push(step.value);
+  }
+}
+
+/*
+ * The immediate GET download (US-584).
+ *
+ * It used to read every section into memory (collectSections), build the
+ * document (buildExportDocument) and JSON.stringify it whole, so peak memory
+ * was every row three times over. It now writes from exportDocumentChunks.
+ *
+ * Streaming has a catch: once the 200 and its headers are sent, a section
+ * that fails can no longer be answered with a 503 and the offer of the
+ * emailed link. So the first STREAM_AFTER_CHARS of the document are held
+ * before anything is sent. An account whose whole export fits in that (most
+ * of them) behaves exactly as before: a complete document, or a 503 naming
+ * what failed. Only a larger one is streamed, and for it the writer runs
+ * with failFast, so a failure ends the body before the closing brace and the
+ * subject's browser holds text that does not parse, never a file that looks
+ * complete.
+ */
+
+/** Characters of the document held before a download is streamed. */
+export const STREAM_AFTER_CHARS = 2 * 1024 * 1024;
+
+export type ExportDownloadStart =
+  /** The whole document fitted in the buffer. */
+  | { kind: 'complete'; body: string; summary: ExportSummary }
+  /** A section could not be read before anything was sent. */
+  | { kind: 'failed'; error: ExportIncompleteError }
+  /**
+   * The document outgrew the buffer: send `head`, then each chunk `rest`
+   * yields. `rest` throws ExportIncompleteError if a later section fails.
+   */
+  | { kind: 'streaming'; head: string; rest: AsyncGenerator<string, ExportSummary, void> };
+
+/**
+ * Starts the download: reads until the document is finished, a section fails,
+ * or `limit` characters are held, and says which happened.
+ */
+export async function startExportDownload(
+  chunks: AsyncGenerator<string, ExportSummary, void>,
+  limit = STREAM_AFTER_CHARS
+): Promise<ExportDownloadStart> {
+  const held: string[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const step = await chunks.next();
+      if (step.done) return { kind: 'complete', body: held.join(''), summary: step.value };
+      held.push(step.value);
+      size += step.value.length;
+      if (size >= limit) return { kind: 'streaming', head: held.join(''), rest: chunks };
+    }
+  } catch (err) {
+    if (err instanceof ExportIncompleteError) return { kind: 'failed', error: err };
+    throw err;
+  }
+}
+
+/**
+ * The response body for a streamed download: `head`, then each chunk as the
+ * consumer asks for it, so only one page is held at a time. `onDone` hears
+ * how it ended. A failure errors the stream, which aborts the response
+ * rather than ending it cleanly.
+ */
+export function exportDownloadStream(
+  head: string,
+  rest: AsyncGenerator<string, ExportSummary, void>,
+  onDone: (outcome: { ok: true; summary: ExportSummary } | { ok: false; error: unknown }) => void | Promise<void>
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  let headSent = false;
+  // A failure to record the outcome must not change what the subject receives.
+  const report = async (outcome: Parameters<typeof onDone>[0]) => {
+    try {
+      await onDone(outcome);
+    } catch {
+      // onDone does its own logging; nothing more can be done here.
+    }
+  };
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (!headSent) {
+        headSent = true;
+        controller.enqueue(encoder.encode(head));
+        return;
+      }
+      try {
+        const step = await rest.next();
+        if (step.done) {
+          await report({ ok: true, summary: step.value });
+          controller.close();
+          return;
+        }
+        controller.enqueue(encoder.encode(step.value));
+      } catch (error) {
+        await report({ ok: false, error });
+        controller.error(error);
+      }
+    },
+    async cancel() {
+      // The subject's browser went away: stop reading the database.
+      await rest.return({ counts: {}, truncated: [] });
+    },
+  });
 }

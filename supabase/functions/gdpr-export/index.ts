@@ -1,7 +1,8 @@
 /**
  * GDPR Data Export Edge Function
  *
- * GET builds the export in this request and returns it as a download. It
+ * GET builds the export in this request and returns it as a download, written
+ * a page at a time and streamed once it outgrows a small buffer (US-584). It
  * does not touch the subject's queued requests (US-424).
  * POST queues it: scheduled-maintenance builds the same document into the
  * private gdpr-exports bucket and emails the subject a link that expires
@@ -22,12 +23,12 @@ import { sendEmail } from '../_shared/email.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 import { resendExportLink, supabaseExportResendStore } from '../_shared/gdpr-export-queue.ts';
 import {
-  buildExportDocument,
-  collectSections,
   ExportIncompleteError,
-  sectionCounts,
+  exportDocumentChunks,
+  exportDownloadStream,
+  startExportDownload,
   supabaseExportReader,
-  type CollectedSections,
+  type ExportSummary,
 } from '../_shared/gdpr-export.ts';
 
 serve(async (req: Request) => {
@@ -173,17 +174,16 @@ serve(async (req: Request) => {
         }
       );
     } else if (req.method === 'GET') {
-      // Every section, every row (paged past PostgREST's row cap), and any
-      // query that fails fails the export instead of exporting as empty.
+      // Every section, every row (paged past PostgREST's row cap), written a
+      // page at a time (US-584). A query that fails fails the export instead
+      // of exporting as empty.
       const reader = supabaseExportReader(serviceSupabase);
+      // decryptSecret passes through any value that is not enc:v1: prefixed.
+      const chunks = exportDocumentChunks(reader, user, decryptSecret, { failFast: true });
 
-      let collected: CollectedSections;
-      try {
-        collected = await collectSections(reader, user.id);
-      } catch (err) {
-        if (!(err instanceof ExportIncompleteError)) throw err;
-        console.error('[gdpr-export] export incomplete:', err.failed);
-        void reportError(err, { functionName: 'gdpr-export', status: 503, method: 'GET' });
+      const auditFailure = async (err: ExportIncompleteError, streamed: boolean) => {
+        console.error('[gdpr-export] export incomplete:', err.failed, streamed ? '(after streaming began)' : '');
+        void reportError(err, { functionName: 'gdpr-export', status: streamed ? 200 : 503, method: 'GET' });
         await serviceSupabase.rpc('log_audit_event', {
           p_user_id: user.id,
           p_action: 'gdpr_data_export',
@@ -191,51 +191,70 @@ serve(async (req: Request) => {
           p_resource_type: 'gdpr',
           p_ip_address: clientIP,
           p_user_agent: userAgent,
-          p_details: { failed_sections: err.failed.map((f) => f.section) },
+          p_details: { failed_sections: err.failed.map((f) => f.section), streamed },
           p_risk_level: 'medium',
         });
-        return new Response(
-          JSON.stringify({ success: false, error: err.message, failedSections: err.failed.map((f) => f.section) }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
-        );
-      }
-
-      // decryptSecret passes through any value that is not enc:v1: prefixed.
-      const exportData = await buildExportDocument(user, collected, decryptSecret);
+      };
 
       // A queued export the subject made earlier is deliberately left alone
       // (US-424). This download has no file in the bucket and sends no email,
       // so marking the request completed showed 'Completed' with no link; the
       // queue still builds it and emails the link the subject asked for.
+      const auditSuccess = async (summary: ExportSummary) => {
+        const { error: auditError } = await serviceSupabase.rpc('log_audit_event', {
+          p_user_id: user.id,
+          p_action: 'gdpr_data_export',
+          p_status: 'success',
+          p_resource_type: 'gdpr',
+          p_ip_address: clientIP,
+          p_user_agent: userAgent,
+          p_details: { records_exported: summary.counts, truncated: summary.truncated },
+          p_risk_level: 'medium',
+        });
+        if (auditError) {
+          console.error('[gdpr-export] could not write audit entry:', auditError.message);
+        }
+      };
 
-      const { error: auditError } = await serviceSupabase.rpc('log_audit_event', {
-        p_user_id: user.id,
-        p_action: 'gdpr_data_export',
-        p_status: 'success',
-        p_resource_type: 'gdpr',
-        p_ip_address: clientIP,
-        p_user_agent: userAgent,
-        p_details: { records_exported: sectionCounts(collected), truncated: collected.truncated },
-        p_risk_level: 'medium',
-      });
-      if (auditError) {
-        console.error('[gdpr-export] could not write audit entry:', auditError.message);
+      const start = await startExportDownload(chunks);
+
+      if (start.kind === 'failed') {
+        await auditFailure(start.error, false);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: start.error.message,
+            failedSections: start.error.failed.map((f) => f.section),
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
+        );
       }
 
-      // Return as downloadable JSON
       const filename = `agentbio-data-export-${new Date().toISOString().split('T')[0]}.json`;
+      const downloadHeaders = {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      };
 
-      return new Response(
-        JSON.stringify(exportData, null, 2),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'Content-Disposition': `attachment; filename="${filename}"`,
-          },
-          status: 200,
+      if (start.kind === 'complete') {
+        await auditSuccess(start.summary);
+        return new Response(start.body, { headers: downloadHeaders, status: 200 });
+      }
+
+      // Larger than the buffer: streamed, one page held at a time. A section
+      // that fails from here on aborts the body before the closing brace.
+      const body = exportDownloadStream(start.head, start.rest, async (outcome) => {
+        if (outcome.ok) {
+          await auditSuccess(outcome.summary);
+        } else if (outcome.error instanceof ExportIncompleteError) {
+          await auditFailure(outcome.error, true);
+        } else {
+          console.error('[gdpr-export] streamed export failed:', outcome.error);
+          void reportError(outcome.error, { functionName: 'gdpr-export', status: 200, method: 'GET' });
         }
-      );
+      });
+      return new Response(body, { headers: downloadHeaders, status: 200 });
     } else {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),

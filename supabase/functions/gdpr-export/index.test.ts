@@ -16,7 +16,8 @@ const source = readFileSync(join(__dirname, 'index.ts'), 'utf-8');
 function getBranch(): string {
   const start = source.indexOf("} else if (req.method === 'GET') {");
   expect(start).toBeGreaterThan(-1);
-  const end = source.indexOf('} else {', start);
+  // The method dispatch's own else, not one nested inside the branch.
+  const end = source.indexOf('\n    } else {', start);
   expect(end).toBeGreaterThan(start);
   return source.slice(start, end);
 }
@@ -28,5 +29,19 @@ describe('gdpr-export GET', () => {
 
   it('still records the download in the audit log', () => {
     expect(getBranch()).toMatch(/p_action: 'gdpr_data_export'/);
+  });
+
+  it('writes the download a page at a time instead of holding every section (US-584)', () => {
+    const branch = getBranch();
+    expect(branch).not.toMatch(/collectSections|buildExportDocument|JSON\.stringify\(exportData/);
+    expect(branch).toMatch(/exportDocumentChunks\([^)]*failFast: true/);
+    expect(branch).toMatch(/startExportDownload\(/);
+    expect(branch).toMatch(/exportDownloadStream\(/);
+  });
+
+  it('still answers 503 when a section fails before anything was sent', () => {
+    const branch = getBranch();
+    expect(branch).toMatch(/start\.kind === 'failed'/);
+    expect(branch).toMatch(/status: 503/);
   });
 });
