@@ -2161,8 +2161,8 @@ check('is_sample cannot be written by an agent, and samples are never public', (
       out.push('an agent flipped their own lead to is_sample = true');
 
     // An agent's ordinary edits still work.
-    if (refused(() => as(uid, `UPDATE public.leads SET notes = 'called' WHERE user_id = '${uid}';`)))
-      out.push("an agent could not edit their own lead's notes");
+    if (refused(() => as(uid, `UPDATE public.leads SET timeline = 'asap' WHERE user_id = '${uid}';`)))
+      out.push("an agent could not edit their own lead's timeline");
 
     // The admin tool still seeds samples, and visitors never see them.
     if (refused(() => as(admin, `INSERT INTO public.listings (user_id, address, city, price, status, is_sample)
@@ -2624,8 +2624,8 @@ check('a locked lead cannot be backdated, and lead/contact/open-house dates are 
     if (!isLocked()) out.push('backdating created_at unlocked a locked lead');
 
     // The agent's ordinary edits still work, including on the locked lead.
-    if (refused(() => as(`UPDATE public.leads SET status = 'contacted', notes = 'called' WHERE id = '${locked}';`)))
-      out.push("an agent could not update their own lead's status and notes");
+    if (refused(() => as(`UPDATE public.leads SET status = 'contacted', timeline = 'asap' WHERE id = '${locked}';`)))
+      out.push("an agent could not update their own lead's status and timeline");
     // Writing the unchanged value (a full-row PATCH) is not a change.
     if (refused(() => as(`UPDATE public.leads SET created_at = created_at, user_id = user_id WHERE id = '${locked}';`)))
       out.push('an agent was refused a write that left created_at and user_id unchanged');
@@ -2717,7 +2717,7 @@ check("the browser cannot select a lead's ciphertext, and a copied one is recogn
       )
     )
       out.push('setup: the owner could not add a contact');
-    if (refused(() => as(`UPDATE public.leads SET notes = 'called', encrypted_phone = 'enc:v1:new' WHERE user_id = '${agent}' AND name = 'L1' RETURNING id, name;`)))
+    if (refused(() => as(`UPDATE public.leads SET timeline = 'asap', encrypted_phone = 'enc:v1:new' WHERE user_id = '${agent}' AND name = 'L1' RETURNING id, name;`)))
       out.push('the owner could not update a lead (including its ciphertext) and read back id, name');
 
     // locked_lead_ciphertexts: the locked lead's values, nobody else's.
