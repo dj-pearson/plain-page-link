@@ -36,6 +36,55 @@ describe('wallTimeToIso (US-628)', () => {
     );
   });
 
+  it('keeps valid times on the spring-forward day where they are (zones behind UTC)', () => {
+    // 9 AM on DST Sunday is PDT (UTC-7); the naive guess lands before the
+    // 10:00Z transition, so only the second pass gets it right.
+    expect(wallTimeToIso('2026-03-08', '09:00', 'America/Los_Angeles')).toBe(
+      '2026-03-08T16:00:00.000Z'
+    );
+    expect(wallTimeToIso('2026-03-08', '03:30', 'America/Chicago')).toBe(
+      '2026-03-08T08:30:00.000Z'
+    );
+  });
+
+  it('handles the spring-forward day in a zone ahead of UTC', () => {
+    // Berlin jumps from 02:00 CET to 03:00 CEST on 2026-03-29.
+    expect(wallTimeToIso('2026-03-29', '01:30', 'Europe/Berlin')).toBe('2026-03-29T00:30:00.000Z');
+    expect(wallTimeToIso('2026-03-29', '03:30', 'Europe/Berlin')).toBe('2026-03-29T01:30:00.000Z');
+    // The skipped 02:30 moves forward to 03:30 CEST.
+    expect(wallTimeToIso('2026-03-29', '02:30', 'Europe/Berlin')).toBe('2026-03-29T01:30:00.000Z');
+  });
+
+  it('round-trips every existing time on both DST days', () => {
+    const days: Array<[string, string, string]> = [
+      ['America/Los_Angeles', '2026-03-08', '2026-11-01'],
+      ['America/Chicago', '2026-03-08', '2026-11-01'],
+      ['America/New_York', '2026-03-08', '2026-11-01'],
+      ['Europe/Berlin', '2026-03-29', '2026-10-25'],
+      ['Australia/Sydney', '2026-10-04', '2026-04-05'],
+    ];
+    for (const [zone, ...dates] of days) {
+      for (const date of dates) {
+        let shifted = 0;
+        for (let m = 0; m < 24 * 60; m += 15) {
+          const time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+          const back = isoToWallTime(wallTimeToIso(date, time, zone), zone);
+          // A gap time moves forward by an hour; every other time reads back exactly.
+          if (back.time !== time) {
+            expect(back.date).toBe(date);
+            const backMin = Number(back.time.slice(0, 2)) * 60 + Number(back.time.slice(3));
+            expect(backMin - m).toBe(60);
+            shifted += 1;
+          } else {
+            expect(back).toEqual({ date, time });
+          }
+        }
+        // Only the skipped hour (four quarter-hours) may move, and only on the spring day.
+        expect(shifted === 0 || shifted === 4).toBe(true);
+      }
+    }
+  });
+
   it('resolves a time repeated by fall-back to its first occurrence', () => {
     // 2026-11-01 01:30 happens twice in New York; the first is EDT.
     expect(wallTimeToIso('2026-11-01', '01:30', 'America/New_York')).toBe(

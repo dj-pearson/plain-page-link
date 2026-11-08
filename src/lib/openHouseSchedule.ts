@@ -88,15 +88,20 @@ export function wallTimeToIso(date: string, time: string, timeZone: string): str
   // guess and the answer.
   const first = guess - offsetMs(new Date(guess), timeZone);
   const second = guess - offsetMs(new Date(first), timeZone);
-  if (first === second) {
-    // Fall-back overlap: an hour earlier may show the same wall time; prefer it.
-    const earlier = first - 60 * 60 * 1000;
-    const p = wallParts(new Date(earlier), timeZone);
-    if (p.hour === h && p.minute === mi && p.day === d) return new Date(earlier).toISOString();
-    return new Date(first).toISOString();
-  }
-  // Spring-forward gap: neither candidate shows the asked wall time; the later
-  // one is the asked time moved forward by the gap.
+  const shows = (at: number) => {
+    const p = wallParts(new Date(at), timeZone);
+    return p.year === y && p.month === mo && p.day === d && p.hour === h && p.minute === mi;
+  };
+  // Either pass can be the right one: in a zone behind UTC, a valid time on
+  // the spring-forward day whose naive UTC guess falls before the transition
+  // is answered by the second pass, not the first. Keep whichever reads back
+  // as the asked wall time. An hour earlier is also tried, so a time repeated
+  // by a fall-back resolves to its first occurrence.
+  const hour = 60 * 60 * 1000;
+  const matches = [first, second, first - hour, second - hour].filter(shows);
+  if (matches.length > 0) return new Date(Math.min(...matches)).toISOString();
+  // Spring-forward gap: no instant shows the asked wall time; the later
+  // candidate is the asked time moved forward by the gap.
   return new Date(Math.max(first, second)).toISOString();
 }
 
