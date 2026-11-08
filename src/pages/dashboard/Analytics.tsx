@@ -1,5 +1,4 @@
-import { useState, useMemo } from 'react';
-import { subDays } from 'date-fns';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { AnalyticsChart } from '@/components/dashboard/AnalyticsChart';
 import { LeadsTable } from '@/components/dashboard/LeadsTable';
@@ -40,7 +39,7 @@ import { LeadSourceBreakdown } from '@/components/analytics/LeadSourceBreakdown'
 import { TopListingsCard } from '@/components/analytics/TopListingsCard';
 import { useTopListings } from '@/hooks/useTopListings';
 import { InsightsPanel } from '@/components/analytics/InsightsPanel';
-import { ReportBuilder, type ReportConfig } from '@/components/analytics/ReportBuilder';
+import type { ReportConfig } from '@/components/analytics/ReportBuilder';
 import {
   calculateFunnel,
   analyzeLeadSources,
@@ -50,11 +49,37 @@ import {
 import { logger } from '@/lib/logger';
 import { summarizeLeadStatuses } from '@/lib/leadStatus';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
-import { UpgradeModal } from '@/components/UpgradeModal';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
+
+/**
+ * The Reports tab and the upgrade dialog load when they are first opened, not
+ * with the route (US-558, the US-412 pattern). The report builder brought
+ * date-fns, the PDF writer and two form controls to every agent who came to
+ * read their numbers; Radix renders a tab's content only while it is active,
+ * so the lazy builder is fetched on the first click of Reports. Hovering or
+ * focusing the tab warms it.
+ */
+const loadReportBuilder = () => import('@/components/analytics/ReportBuilder');
+const ReportBuilder = lazy(() => loadReportBuilder().then((m) => ({ default: m.ReportBuilder })));
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+/** A failed prefetch is retried by the click that needs the chunk. */
+const preloadReportBuilder = () => void loadReportBuilder().catch(() => undefined);
+
+/** `days` calendar days before `date`, local time (date-fns subDays). */
+function daysBefore(date: Date, days: number): Date {
+  const result = new Date(date.getTime());
+  result.setDate(result.getDate() - days);
+  return result;
+}
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState<TimeRange>('30d');
   const [analyticsUpgradeOpen, setAnalyticsUpgradeOpen] = useState(false);
+  const upgradeModal = useMountOnFirstOpen(analyticsUpgradeOpen);
   const { status: planStatus, planName } = usePlanUsage();
   const analyticsDays = planStatus('analytics_days').limit;
   const {
@@ -81,7 +106,7 @@ export default function Analytics() {
   // source table used to count the first page of the paged lead list (the
   // latest 50 leads of all time) beside visitor numbers bound to the range.
   const rangeStart = useMemo(
-    () => subDays(new Date(), { '7d': 7, '30d': 30, '90d': 90 }[dateRange]),
+    () => daysBefore(new Date(), { '7d': 7, '30d': 30, '90d': 90 }[dateRange]),
     [dateRange]
   );
   const { stats: leadStats } = useLeadStats({ since: rangeStart });
@@ -138,7 +163,7 @@ export default function Analytics() {
       dateRange === '7d' ? 'week' : dateRange === '30d' ? 'month' : 'quarter';
     const days = { '7d': 7, '30d': 30, '90d': 90 }[dateRange];
     const now = new Date();
-    const startDate = subDays(now, days);
+    const startDate = daysBefore(now, days);
 
     const current: AnalyticsData = {
       pageViews: stats.totalViews,
@@ -160,7 +185,7 @@ export default function Analytics() {
       revenue: 0,
       avgResponseTime: 0,
       period,
-      startDate: subDays(startDate, days),
+      startDate: daysBefore(startDate, days),
       endDate: startDate,
     };
 
@@ -408,7 +433,12 @@ export default function Analytics() {
             <Filter className="h-4 w-4" />
             <span>Funnel</span>
           </TabsTrigger>
-          <TabsTrigger value="reports" className="gap-2">
+          <TabsTrigger
+            value="reports"
+            className="gap-2"
+            onPointerEnter={preloadReportBuilder}
+            onFocus={preloadReportBuilder}
+          >
             <FileText className="h-4 w-4" />
             <span>Reports</span>
           </TabsTrigger>
@@ -712,15 +742,42 @@ export default function Analytics() {
           {/* The orphan page also had a grid of four "Available Reports" cards
               with cursor-pointer and no onClick at all. They are not carried
               over; the builder below is the part that produces anything. */}
-          <ReportBuilder onGenerateReport={handleGenerateReport} />
+          <LazyLoadErrorBoundary
+            fallback={
+              <Card>
+                <CardContent className="p-6 text-center text-sm text-muted-foreground" role="alert">
+                  The report builder could not be loaded. Check your connection and reload the page.
+                </CardContent>
+              </Card>
+            }
+          >
+            <Suspense
+              fallback={
+                <div className="h-64 animate-pulse rounded-xl bg-muted" role="status">
+                  <span className="sr-only">Loading the report builder…</span>
+                </div>
+              }
+            >
+              <ReportBuilder onGenerateReport={handleGenerateReport} />
+            </Suspense>
+          </LazyLoadErrorBoundary>
         </TabsContent>
       </Tabs>
-      <UpgradeModal
-        open={analyticsUpgradeOpen}
-        onOpenChange={setAnalyticsUpgradeOpen}
-        feature="analytics"
-        currentPlan={planName}
-      />
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setAnalyticsUpgradeOpen(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={analyticsUpgradeOpen}
+            onOpenChange={setAnalyticsUpgradeOpen}
+            feature="analytics"
+            currentPlan={planName}
+          />
+        </LazyModal>
+      )}
     </div>
   );
 }

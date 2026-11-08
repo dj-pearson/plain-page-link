@@ -142,6 +142,29 @@ describe('dashboard-weight manifest helpers (US-535)', () => {
   });
 });
 
+describe('date-fns and closed panels stay off first paint (US-558)', () => {
+  const source = (path: string) => readFileSync(join(ROOT, path), 'utf8');
+  const importsDateFns = /from\s+['"]date-fns/;
+
+  it('keeps date-fns out of the shared format and analytics modules', () => {
+    // format.ts is imported by every route that shows a price; analytics.ts by
+    // the Analytics route on first paint. Either importing date-fns puts
+    // date-vendor (6.3 KB gzip) back on those routes.
+    expect(source('src/lib/format.ts')).not.toMatch(importsDateFns);
+    expect(source('src/lib/analytics.ts')).not.toMatch(importsDateFns);
+    expect(source('src/lib/relativeTime.ts')).not.toMatch(importsDateFns);
+  });
+
+  it('loads the Analytics report builder and upgrade dialog on open', () => {
+    const analytics = source('src/pages/dashboard/Analytics.tsx');
+    expect(analytics).not.toMatch(importsDateFns);
+    expect(analytics).not.toMatch(/import\s+\{[^}]*\bReportBuilder\b[^}]*\}\s+from/);
+    expect(analytics).not.toMatch(/import\s+\{[^}]*\bUpgradeModal\b[^}]*\}\s+from/);
+    expect(analytics).toMatch(/import\('@\/components\/analytics\/ReportBuilder'\)/);
+    expect(analytics).toMatch(/import\('@\/components\/UpgradeModal'\)/);
+  });
+});
+
 describe('dashboard-weight budgets cover the real routes (US-535)', () => {
   it('budgets every dashboard page App.tsx lazy-loads', () => {
     const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');

@@ -3,7 +3,27 @@
  * Processes and calculates analytics metrics for the dashboard
  */
 
-import { format, eachDayOfInterval } from 'date-fns';
+/**
+ * 'Nov 8', as date-fns format(date, 'MMM d') wrote it. Native so that the
+ * Analytics route, which calls this module on first paint, does not download
+ * date-vendor for two labels (US-558).
+ */
+const shortDayLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
+/** Each local calendar day from start to end, both included (date-fns eachDayOfInterval). */
+function eachDay(start: Date, end: Date): Date[] {
+  const reversed = start.getTime() > end.getTime();
+  const endTime = reversed ? start.getTime() : end.getTime();
+  const current = new Date(reversed ? end.getTime() : start.getTime());
+  current.setHours(0, 0, 0, 0);
+  const days: Date[] = [];
+  while (current.getTime() <= endTime) {
+    days.push(new Date(current.getTime()));
+    current.setDate(current.getDate() + 1);
+    current.setHours(0, 0, 0, 0);
+  }
+  return reversed ? days.reverse() : days;
+}
 import { logger } from '@/lib/logger';
 
 // Types
@@ -160,10 +180,10 @@ export class AnalyticsEngine {
     endDate: Date,
     dataGenerator: (date: Date) => number
   ): TimeSeriesData[] {
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    const days = eachDay(startDate, endDate);
 
     return days.map((date) => ({
-      date: format(date, 'MMM d'),
+      date: shortDayLabel.format(date),
       value: dataGenerator(date),
     }));
   }
@@ -295,7 +315,7 @@ export class AnalyticsEngine {
       predictedDate.setDate(predictedDate.getDate() + i);
 
       predictions.push({
-        date: format(predictedDate, 'MMM d'),
+        date: shortDayLabel.format(predictedDate),
         value: predictedValue,
         label: 'predicted',
       });
@@ -399,7 +419,7 @@ export class AnalyticsEngine {
   /**
    * Export data to CSV format
    */
-  static exportToCSV(data: any[], filename: string): void {
+  static exportToCSV(data: Record<string, unknown>[], filename: string): void {
     if (data.length === 0) return;
 
     // Get headers from first object
