@@ -21,7 +21,14 @@
  * stated once and tested.
  */
 
-/** Days past current_period_end that a past_due subscription keeps its plan. */
+/**
+ * Days after a subscription went past_due that it keeps its plan. Counted from
+ * user_subscriptions.past_due_since, which a trigger sets when the status
+ * changes into past_due and keeps while it stays there (US-605). Not from a
+ * Stripe period field: Stripe rolls a past_due subscription into new periods
+ * for as long as it is left past_due, so current_period_end runs ahead of the
+ * failure and, after the second unpaid renewal, so does current_period_start.
+ */
 export const PAST_DUE_GRACE_DAYS = 7;
 
 /** The subset of a Stripe subscription these decisions read. */
@@ -33,6 +40,8 @@ export interface StripeSubscriptionLike {
 /** The subset of a stored user_subscriptions row these decisions read. */
 export interface StoredSubscription {
   status: string | null;
+  past_due_since?: string | null;
+  current_period_start?: string | null;
   current_period_end?: string | null;
 }
 
@@ -58,21 +67,30 @@ export function isEntitled(subscription: StoredSubscription, now: Date = new Dat
 
   if (status === 'active' || status === 'trialing') return true;
 
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end)
-    : null;
-  if (!periodEnd || Number.isNaN(periodEnd.getTime())) return false;
+  const periodEnd = parseDate(subscription.current_period_end);
 
   // Cancelled, but paid through the end of the period.
   if (status === 'canceled' || status === 'cancelled') {
-    return periodEnd.getTime() > now.getTime();
+    return periodEnd !== null && periodEnd.getTime() > now.getTime();
   }
 
-  // A failed payment is a dunning problem, not an immediate downgrade.
+  // A failed renewal is a dunning problem, not an immediate downgrade. The
+  // grace runs from when the row went past_due; a row without past_due_since
+  // falls back to current_period_start, then current_period_end, as
+  // get_user_plan does.
   if (status === 'past_due') {
-    const graceEnds = periodEnd.getTime() + PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000;
+    const anchor =
+      parseDate(subscription.past_due_since) ?? parseDate(subscription.current_period_start) ?? periodEnd;
+    if (!anchor) return false;
+    const graceEnds = anchor.getTime() + PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000;
     return graceEnds > now.getTime();
   }
 
   return false;
+}
+
+function parseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }

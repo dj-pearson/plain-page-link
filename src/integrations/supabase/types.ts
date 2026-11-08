@@ -8182,6 +8182,7 @@ export type Database = {
           current_period_end: string | null;
           current_period_start: string | null;
           id: string;
+          past_due_since: string | null;
           plan_id: string | null;
           status: Database['public']['Enums']['subscription_status'] | null;
           stripe_customer_id: string | null;
@@ -8195,6 +8196,7 @@ export type Database = {
           current_period_end?: string | null;
           current_period_start?: string | null;
           id?: string;
+          past_due_since?: string | null;
           plan_id?: string | null;
           status?: Database['public']['Enums']['subscription_status'] | null;
           stripe_customer_id?: string | null;
@@ -8208,6 +8210,7 @@ export type Database = {
           current_period_end?: string | null;
           current_period_start?: string | null;
           id?: string;
+          past_due_since?: string | null;
           plan_id?: string | null;
           status?: Database['public']['Enums']['subscription_status'] | null;
           stripe_customer_id?: string | null;
