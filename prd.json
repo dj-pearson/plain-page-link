@@ -7538,7 +7538,7 @@
       "acceptanceCriteria": ["Decision recorded and implemented"],
       "priority": 2,
       "passes": false,
-      "notes": " (follow-up from US-474)"
+      "notes": " (follow-up from US-474) OWNER DECISION 2026-11-08: agents CAN add custom CSS. Keep the feature: make it work on the public page, scoped to the profile and sanitised (no url()/@import to other origins, no breaking out of the profile container), within plan limits."
     },
     {
       "id": "US-475",

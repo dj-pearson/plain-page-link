@@ -5800,3 +5800,5 @@ Other findings:
 - [mobile] src/hooks/useProfileImageUpload.ts cleanup deletes every object in <uid>/ except the new one. That is why the icon names have to be excluded explicitly. Anything else stored in the avatars uid folder in future would be deleted on the next avatar upload.
 - [mobile] src/components/ui/OptimizedImage.tsx:257-277 generateSupabaseImageSources appends ?width= to /object/public URLs. Supabase only resizes under /storage/v1/render/image/, so these 'sources' are the full image every time (performance lane).
 - [mobile] public/manifest.json theme_color (#2563eb) and index.html theme-color (#0ea5e9) still differ, as already recorded under US-283 (profile lane). profile-manifest.ts also hard-codes #2563eb.
+
+Owner decisions 2026-11-08: agents can add custom CSS (keep, scoped and sanitised; unblocks US-488); self-hosted storage should answer HEAD with 200.

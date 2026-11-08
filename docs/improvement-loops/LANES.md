@@ -32,6 +32,10 @@ Each lane is one agent per round. A lane only looks inside its own scope.
   hours and local-morning digests (unblocks US-318, US-343).
 - 2026-11-07: **Lead statuses include `nurturing` and `closed`** in the one
   status vocabulary (unblocks US-278).
+- 2026-11-08: **Agents can add custom CSS** to their public page. Keep it,
+  scoped to the profile and sanitised (unblocks US-488).
+- 2026-11-08: Self-hosted storage is expected to answer HEAD on public objects
+  with 200 (home-screen icons rely on it).
 - 2026-11-07: **Silent updates stay.** The service worker keeps calling
   skipWaiting, so a deploy takes over open tabs without a Refresh prompt.
 
