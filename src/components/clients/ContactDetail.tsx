@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/dateFormat';
+import { formatDistanceToNowWithSuffix, formatDistanceToNowWords } from '@/lib/relativeTime';
 import {
   Calendar,
   Mail,
@@ -104,7 +105,7 @@ function cadenceLabel(days: number | null): string {
 export function formatKeyDate(eventDate: string, yearKnown: boolean): string {
   const date = parseCalendarDate(eventDate);
   if (!date) return eventDate;
-  return format(date, yearKnown ? 'MMM d, yyyy' : 'MMM d');
+  return formatDate(date, yearKnown ? 'MMM d, yyyy' : 'MMM d');
 }
 
 const actionLinkClass =
@@ -275,7 +276,7 @@ function ContactBody({
         </Fact>
         <Fact label="Last contacted">
           {contact.last_contacted_at
-            ? `${formatDistanceToNow(new Date(contact.last_contacted_at))} ago`
+            ? `${formatDistanceToNowWords(new Date(contact.last_contacted_at))} ago`
             : 'Not yet'}
         </Fact>
       </dl>
@@ -642,7 +643,7 @@ function ActivityPanel({ contactId }: { contactId: string }) {
                 {item.summary && <p className="text-sm text-muted-foreground">{item.summary}</p>}
                 <p className="text-xs text-muted-foreground">
                   <time dateTime={item.occurred_at}>
-                    {formatDistanceToNow(new Date(item.occurred_at), { addSuffix: true })}
+                    {formatDistanceToNowWithSuffix(new Date(item.occurred_at))}
                   </time>
                 </p>
               </div>
@@ -710,7 +711,7 @@ function DetailsPanel({ contact }: { contact: Contact }) {
         <Fact label="Work">{work || '—'}</Fact>
         <Fact label="Referred by">{contact.referred_by || '—'}</Fact>
         <Fact label="Source">{contact.source || '—'}</Fact>
-        <Fact label="Client since">{format(new Date(contact.created_at), 'MMM d, yyyy')}</Fact>
+        <Fact label="Client since">{formatDate(new Date(contact.created_at), 'MMM d, yyyy')}</Fact>
       </dl>
 
       {contact.notes && (

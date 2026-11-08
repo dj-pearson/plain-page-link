@@ -64,6 +64,10 @@ const LAYOUT_SRC = 'src/components/layout/DashboardLayout.tsx';
  *   (date-fns' format/formatDistanceToNow replaced by src/lib/dateFormat.ts
  *   and relativeTime.ts). Budgets lowered; date-vendor is now banned outside
  *   the routes still listed under its `allow`.
+ * US-655 (2026-11-08): Clients 20.4 -> 15.1 (Clients.tsx and ContactDetail
+ *   moved to dateFormat.ts / relativeTime.ts). OpenHouses had already stopped
+ *   reaching date-vendor (its dialogs load on open). date-vendor's allow list
+ *   is now empty, and the Clients budget lowered.
  */
 export const DASHBOARD_ROUTES = [
   // What every dashboard route pays first; measured beyond the entry only.
@@ -71,7 +75,7 @@ export const DASHBOARD_ROUTES = [
   { src: 'src/pages/dashboard/Overview.tsx', maxKb: 38 },
   { src: 'src/pages/dashboard/Listings.tsx', maxKb: 37 },
   { src: 'src/pages/dashboard/Leads.tsx', maxKb: 35 },
-  { src: 'src/pages/dashboard/Clients.tsx', maxKb: 24 },
+  { src: 'src/pages/dashboard/Clients.tsx', maxKb: 18 },
   { src: 'src/pages/dashboard/OpenHouses.tsx', maxKb: 33 },
   { src: 'src/pages/dashboard/Profile.tsx', maxKb: 18 },
   { src: 'src/pages/dashboard/Theme.tsx', maxKb: 23 },
@@ -115,11 +119,12 @@ export const ROUTE_MUST_NOT_INCLUDE = {
   },
   // US-574: the Overview (the first screen after sign-in), Leads, Listings,
   // Analytics and the lead detail dialog format dates without date-fns
-  // (src/lib/dateFormat.ts, relativeTime.ts, timeAgo.ts). The two allowed
-  // routes still import it directly; take each off this list as it moves.
+  // (src/lib/dateFormat.ts, relativeTime.ts, timeAgo.ts). US-655 took the
+  // last two (Clients, OpenHouses) off; dialogs that load on open may still
+  // use date-fns.
   'date-vendor': {
     why: 'date-fns (6.2 KB gzip). Use src/lib/dateFormat.ts or relativeTime.ts.',
-    allow: ['src/pages/dashboard/Clients.tsx', 'src/pages/dashboard/OpenHouses.tsx'],
+    allow: [],
   },
 };
 
