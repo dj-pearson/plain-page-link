@@ -9606,9 +9606,9 @@
         "KNOWN set in edge-function-routing.test.ts is empty",
         "pii tests updated and passing"
       ],
-      "priority": 2,
-      "passes": false,
-      "notes": "Check against the live hosts first: does api.agentbio.net/functions/v1/pii-crypto still return 500? (follow-up from US-611)"
+      "priority": 1,
+      "passes": true,
+      "notes": "Check against the live hosts first: does api.agentbio.net/functions/v1/pii-crypto still return 500? (follow-up from US-611) DONE by the integrator after round 17: pii.ts now calls pii-crypto through callEdgeFunction (VITE_FUNCTIONS_URL, with the JWT); the routing test's KNOWN allowlist is empty, so no supabase.functions.invoke caller remains."
     },
     {
       "id": "US-612",

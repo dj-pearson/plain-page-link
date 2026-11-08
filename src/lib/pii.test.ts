@@ -27,6 +27,24 @@ let invocations: { op: string; body: Record<string, unknown> }[] = [];
 let failNextCall = false;
 let profilePhoneReply: string | null = '+1 555 000 1111';
 
+// pii.ts calls pii-crypto through callEdgeFunction (US-622). Route it into the
+// invoke mock below so the existing replies and failure switches still apply.
+vi.mock('@/lib/edgeFunctions', async () => {
+  const { supabase } = await import('@/integrations/supabase/client');
+  return {
+    callEdgeFunction: async (name: string, opts: { body: Record<string, unknown> }) => {
+      const { data, error } = await (
+        supabase.functions.invoke as unknown as (
+          n: string,
+          o: { body: Record<string, unknown> }
+        ) => Promise<{ data: unknown; error: unknown }>
+      )(name, { body: opts.body });
+      if (error) throw error;
+      return data;
+    },
+  };
+});
+
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     functions: {

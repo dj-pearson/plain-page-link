@@ -19,7 +19,7 @@
  * still decrypt.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { callEdgeFunction } from '@/lib/edgeFunctions';
 
 const PII_PREFIX = 'enc:v1:';
 
@@ -27,6 +27,28 @@ type Nullable<T> = T | null | undefined;
 
 function isEmpty(value: Nullable<string>): value is null | undefined | '' {
   return value === null || value === undefined || value === '';
+}
+
+/**
+ * One call to pii-crypto on functions.agentbio.net, in the { data, error }
+ * shape the helpers below were written against.
+ *
+ * US-622: these calls used supabase.functions.invoke, which posts to
+ * ${VITE_SUPABASE_URL}/functions/v1. Nothing public routes there (US-611 found
+ * every review submission failing the same way), so in production lead and
+ * contact details never decrypted and a phone number could not be encrypted
+ * for saving. callEdgeFunction goes to VITE_FUNCTIONS_URL, the router that
+ * serves every function, with the caller's JWT.
+ */
+async function invokePiiCrypto<T>(
+  body: Record<string, unknown>
+): Promise<{ data: T | null; error: Error | null }> {
+  try {
+    const data = await callEdgeFunction<T>('pii-crypto', { body, auth: true });
+    return { data, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
+  }
 }
 
 /** True if a string looks like an encryptPII() output. */
@@ -39,10 +61,7 @@ export function isEncryptedPII(value: Nullable<string>): boolean {
  * values needing no work — see the batch helpers below.
  */
 async function callPiiCrypto(op: 'encrypt', values: (string | null)[]) {
-  const { data, error } = await supabase.functions.invoke<{ values: (string | null)[] }>(
-    'pii-crypto',
-    { body: { op, values } }
-  );
+  const { data, error } = await invokePiiCrypto<{ values: (string | null)[] }>({ op, values });
 
   if (error || !data?.values || data.values.length !== values.length) {
     // Fail closed on encrypt (the caller must not silently write plaintext into
@@ -113,10 +132,10 @@ export async function decryptLeadContacts(
   if (ids.length === 0) return out;
 
   try {
-    const { data, error } = await supabase.functions.invoke<{ leads: DecryptedLeadContact[] }>(
-      'pii-crypto',
-      { body: { op: 'decrypt_leads', leadIds: ids } }
-    );
+    const { data, error } = await invokePiiCrypto<{ leads: DecryptedLeadContact[] }>({
+      op: 'decrypt_leads',
+      leadIds: ids,
+    });
     if (error || !data?.leads) return out;
     for (const lead of data.leads) out.set(lead.id, lead);
   } catch {
@@ -143,9 +162,10 @@ export async function decryptContactDetails(
   // pii-crypto takes at most 100 ids a call.
   for (let i = 0; i < ids.length; i += 100) {
     try {
-      const { data, error } = await supabase.functions.invoke<{
-        contacts: DecryptedContactDetails[];
-      }>('pii-crypto', { body: { op: 'decrypt_contacts', contactIds: ids.slice(i, i + 100) } });
+      const { data, error } = await invokePiiCrypto<{ contacts: DecryptedContactDetails[] }>({
+        op: 'decrypt_contacts',
+        contactIds: ids.slice(i, i + 100),
+      });
       if (error || !data?.contacts) continue;
       for (const contact of data.contacts) out.set(contact.id, contact);
     } catch {
@@ -170,8 +190,8 @@ export async function decryptContactDetails(
  * those untouched) is the same failure.
  */
 export async function decryptOwnProfilePhone(): Promise<string | null> {
-  const { data, error } = await supabase.functions.invoke<{ phone: string | null }>('pii-crypto', {
-    body: { op: 'decrypt_profile' },
+  const { data, error } = await invokePiiCrypto<{ phone: string | null }>({
+    op: 'decrypt_profile',
   });
   if (error) throw error;
   if (!data) throw new Error('pii-crypto returned an unexpected response');

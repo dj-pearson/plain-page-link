@@ -90,7 +90,7 @@ describe('edge-function routing (US-199)', () => {
     //
     // KNOWN is the existing caller nobody has moved yet; it belongs to another
     // lane and is recorded as a finding. Shrink this list, never grow it.
-    const KNOWN = new Set(['src/lib/pii.ts']);
+    const KNOWN = new Set<string>();
     const offenders = sourceFiles(join(ROOT, 'src'))
       .filter((file) => {
         // Comments may name it (this change's own explanation does); calls may not.

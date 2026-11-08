@@ -6343,3 +6343,7 @@ Other findings:
 - [mobile] docs/architecture/TECH_SPEC_PWA_MOBILE.md is still mostly the October 2025 plan (Laravel backend, FCM push sections 5.x). I added a current-state note at the top; it may be worth rewriting or moving to docs/archive/
 - [mobile] docs/setup/GETTING_STARTED.md:240-250 still lists a Laravel/MySQL backend and 'Zustand or Redux Toolkit', which is stale
 - [mobile] DueFollowUps: once the update succeeds the button is enabled again until the tasks query refetches, so a quick second tap in that gap re-sends the (idempotent) update and shows a second toast. Updating the cached list optimistically would close that gap
+
+## Round 17 integrator fix — US-622: lead and contact details never decrypted in production
+
+src/lib/pii.ts called supabase.functions.invoke('pii-crypto'), which posts to ${VITE_SUPABASE_URL}/functions/v1; nothing public routes there (the same cause as US-611's failing reviews). So the dashboard could not show lead or contact email/phone, and saving a phone number could not encrypt it. All four calls now go through callEdgeFunction (VITE_FUNCTIONS_URL, auth). The edge-function routing test now allows no invoke() caller at all. 3159 tests pass; build OK. Frontend-only: ships with the Cloudflare Pages deploy.
