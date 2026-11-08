@@ -12,9 +12,11 @@ import {
   base64UrlDecodeToString,
   checkSocialIdToken,
   derivePkceVerifier,
+  newSocialUserMetadata,
   pkceChallenge,
   resolveStateSecret,
   safeRedirectPath,
+  sanitizeSignupAttribution,
   signState,
   tokenErrorForLog,
   verifyState,
@@ -207,5 +209,60 @@ describe('callers', () => {
     expect(s).not.toMatch(/atob\(/);
     expect(s).toMatch(/verifyState\(/);
     expect(s).toMatch(/checkSocialIdToken\(/);
+  });
+});
+
+describe('signup attribution through social sign-in (US-594)', () => {
+  it('carries ref and source in the signed state', async () => {
+    const state = await signState(SECRET, payload({ ref: 'janedoe', source: 'profile_badge' }));
+    const d = await verifyState(SECRET, state, NOW);
+    expect(d).toEqual({ ok: true, value: payload({ ref: 'janedoe', source: 'profile_badge' }) });
+  });
+
+  it('cannot be altered without breaking the signature', async () => {
+    const state = await signState(SECRET, payload({ ref: 'janedoe' }));
+    const [body, sig] = state.split('.');
+    const forged = b64url(base64UrlDecodeToString(body).replace('janedoe', 'mallory'));
+    expect((await verifyState(SECRET, `${forged}.${sig}`, NOW)).ok).toBe(false);
+  });
+
+  it('drops values that do not fit rather than truncating them', () => {
+    expect(sanitizeSignupAttribution(' JaneDoe ', ' instagram ')).toEqual({ ref: 'janedoe', source: 'instagram' });
+    expect(sanitizeSignupAttribution('../admin', 'x'.repeat(101))).toEqual({});
+    expect(sanitizeSignupAttribution('a'.repeat(41), 'line\nbreak')).toEqual({});
+    expect(sanitizeSignupAttribution(null, undefined)).toEqual({});
+  });
+
+  it('a state without attribution still verifies as before', async () => {
+    const d = await verifyState(SECRET, await signState(SECRET, payload()), NOW);
+    expect(d.ok && d.value.ref).toBeFalsy();
+  });
+
+  it('puts them on the new user under the keys handle_new_user reads', () => {
+    const meta = newSocialUserMetadata({ email: 'a@b.co', name: 'Ann' }, 'apple', {
+      ref: 'janedoe',
+      source: 'profile_badge',
+    });
+    expect(meta).toEqual({
+      full_name: 'Ann',
+      avatar_url: undefined,
+      provider: 'apple',
+      ref: 'janedoe',
+      signup_source: 'profile_badge',
+    });
+    const migration = readFileSync(
+      join(__dirname, '..', '..', 'migrations', '20260930000010_signup_referral.sql'),
+      'utf8',
+    );
+    expect(migration).toMatch(/raw_user_meta_data ->> 'ref'/);
+    expect(migration).toMatch(/raw_user_meta_data ->> 'signup_source'/);
+    expect(newSocialUserMetadata({ email: 'a@b.co' }, 'google', {})).not.toHaveProperty('ref');
+  });
+
+  it('oauth-proxy reads them on authorize and writes them on create', () => {
+    const s = readFileSync(join(__dirname, 'index.ts'), 'utf8');
+    expect(s).toMatch(/searchParams\.get\('ref'\)/);
+    expect(s).toMatch(/searchParams\.get\('signup_source'\)/);
+    expect(s).toMatch(/user_metadata: newSocialUserMetadata\(/);
   });
 });
