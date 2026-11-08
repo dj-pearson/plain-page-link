@@ -53,6 +53,18 @@ export function dripLookbackDays(schedule: DripSchedule): number {
   return lastDripDay(schedule) + DRIP_GRACE_DAYS;
 }
 
+/**
+ * True when a capture is too old to be worked: it is outside the window the
+ * bio sender queries (created within the last dripLookbackDays days, so at
+ * most dripLookbackDays - 1 whole days old). A sender whose query has no age
+ * bound (get_pending_listing_emails) must apply this itself, or every stale
+ * capture with unsent rows gets the drip months after sign-up, and a send that
+ * keeps failing is retried on every run.
+ */
+export function isPastDripWindow(schedule: DripSchedule, daysSinceCapture: number): boolean {
+  return daysSinceCapture >= dripLookbackDays(schedule);
+}
+
 /** Whole days elapsed since the capture, never negative. */
 export function wholeDaysSince(createdAt: string | Date, now: Date = new Date()): number {
   const created = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;

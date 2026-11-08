@@ -6,6 +6,7 @@ import {
   dripLookbackDays,
   dripOrder,
   isFinalDripEmail,
+  isPastDripWindow,
   lastDripDay,
   nextDueDripEmail,
   wholeDaysSince,
@@ -108,5 +109,30 @@ describe('listing drip schedule (US-479)', () => {
     for (const n of dripOrder(LISTING_DRIP_DAY)) {
       expect(LISTING_DRIP[n].subject.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('listing drip window (US-479 review)', () => {
+  it('works a capture up to the bio window and closes it off after', () => {
+    const lookback = dripLookbackDays(LISTING_DRIP_DAY);
+    expect(lookback).toBeGreaterThan(lastDripDay(LISTING_DRIP_DAY) + 1);
+    expect(isPastDripWindow(LISTING_DRIP_DAY, lastDripDay(LISTING_DRIP_DAY))).toBe(false);
+    expect(isPastDripWindow(LISTING_DRIP_DAY, lookback - 1)).toBe(false);
+    expect(isPastDripWindow(LISTING_DRIP_DAY, lookback)).toBe(true);
+  });
+
+  it('a capture from 20 months ago with nothing sent is past the window', () => {
+    const now = new Date('2026-11-08T12:00:00Z');
+    const days = wholeDaysSince('2025-03-01T12:00:00Z', now);
+    expect(nextDueDripEmail(LISTING_DRIP_DAY, days, [])).toBe(1);
+    expect(isPastDripWindow(LISTING_DRIP_DAY, days)).toBe(true);
+  });
+
+  it('the listing sender skips and completes captures past the shared window', () => {
+    const src = read('supabase/functions/send-scheduled-listing-emails/index.ts');
+    const guard = src.indexOf('isPastDripWindow(LISTING_DRIP_DAY, daysSinceCapture)');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(src.indexOf('nextDueDripEmail('));
+    expect(src.slice(guard, guard + 600)).toMatch(/email_sequence_completed: true[\s\S]*continue;/);
   });
 });

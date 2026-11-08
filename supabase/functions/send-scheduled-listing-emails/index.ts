@@ -19,7 +19,7 @@ import {
 import { safeHtmlText } from '../_shared/public-email.ts';
 import { maskEmail } from '../_shared/log-redaction.ts';
 import { LISTING_DRIP, LISTING_DRIP_DAY } from '../_shared/listing-drip.ts';
-import { isFinalDripEmail, nextDueDripEmail } from '../_shared/drip-schedule.ts';
+import { isFinalDripEmail, isPastDripWindow, nextDueDripEmail } from '../_shared/drip-schedule.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'noreply@agentbio.net';
@@ -105,6 +105,20 @@ serve(async (req) => {
       const daysSinceCapture = Number(capture.days_since_capture) || 0;
 
       try {
+        // get_pending_listing_emails() has no upper age bound, and no cron ever
+        // called this function, so every historical capture still has unsent
+        // rows. Past the drip window (dripLookbackDays, the same one the bio
+        // sender queries) a capture is closed off instead of being sent a
+        // nurture email months after sign-up, or retried on every run.
+        if (isPastDripWindow(LISTING_DRIP_DAY, daysSinceCapture)) {
+          const { error: closeError } = await supabase
+            .from('listing_email_captures')
+            .update({ email_sequence_completed: true })
+            .eq('id', capture.id);
+          if (closeError) throw new Error(`Could not close stale sequence: ${closeError.message}`);
+          continue;
+        }
+
         const { data: sentRows, error: sentError } = await supabase
           .from('listing_email_sequences')
           .select('sequence_number')
