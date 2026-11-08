@@ -184,6 +184,82 @@ describe('buildProfileTags', () => {
   });
 });
 
+describe('buildProfileTags listings in the JSON-LD (US-551)', () => {
+  const home = (over: Partial<BodyListing> = {}): BodyListing => ({
+    id: 'abc-123',
+    status: 'active',
+    address: '412 Maple Avenue',
+    city: 'Salt Lake City',
+    state: 'UT',
+    price: '$525,000',
+    bedrooms: 3,
+    bathrooms: 2,
+    square_feet: 1980,
+    ...over,
+  });
+
+  it('names no homes when none are passed', () => {
+    const tags = buildProfileTags(profile, ORIGIN);
+    expect(tags.jsonLd).not.toHaveProperty('makesOffer');
+    expect(tags.jsonLd['@id']).toBe('https://agentbio.net/jane#agent');
+  });
+
+  it("offers each visible home, linked to its listing page's node by @id", () => {
+    const tags = buildProfileTags(profile, ORIGIN, [
+      home(),
+      home({ id: 'sold-1', status: 'sold', address: '9 Birch Court', price: 'call' }),
+    ]);
+    expect(tags.jsonLd.makesOffer).toEqual([
+      {
+        '@type': 'Offer',
+        url: 'https://agentbio.net/jane/listing/abc-123',
+        availability: 'https://schema.org/InStock',
+        price: 525000,
+        priceCurrency: 'USD',
+        itemOffered: {
+          '@id': 'https://agentbio.net/jane/listing/abc-123#listing',
+          name: '412 Maple Avenue, Salt Lake City, UT',
+          url: 'https://agentbio.net/jane/listing/abc-123',
+        },
+      },
+      {
+        '@type': 'Offer',
+        url: 'https://agentbio.net/jane/listing/sold-1',
+        availability: 'https://schema.org/SoldOut',
+        itemOffered: {
+          '@id': 'https://agentbio.net/jane/listing/sold-1#listing',
+          name: '9 Birch Court, Salt Lake City, UT',
+          url: 'https://agentbio.net/jane/listing/sold-1',
+        },
+      },
+    ]);
+  });
+
+  it('uses the @id the listing page itself declares', () => {
+    const offer = (
+      buildProfileTags(profile, ORIGIN, [home()]).jsonLd.makesOffer as {
+        itemOffered: { '@id': string };
+      }[]
+    )[0];
+    expect(offer.itemOffered['@id']).toBe(buildListingTags(profile, listing, ORIGIN).jsonLd['@id']);
+  });
+
+  it('caps the offers at the same number of homes the body links to', () => {
+    const many = Array.from({ length: PROFILE_BODY_LISTING_LIMIT + 5 }, (_, i) =>
+      home({ id: `l-${i}` })
+    );
+    const offers = buildProfileTags(profile, ORIGIN, many).jsonLd.makesOffer as unknown[];
+    expect(offers).toHaveLength(PROFILE_BODY_LISTING_LIMIT);
+  });
+
+  it('keeps a hostile address inert inside the serialised script', () => {
+    const tags = buildProfileTags(profile, ORIGIN, [home({ address: '</script><b>x' })]);
+    const html = injectSocialTags('<html><head></head><body></body></html>', tags);
+    expect(html).not.toContain('</script><b>');
+    expect(html).toContain('\\u003c/script>\\u003cb>x');
+  });
+});
+
 describe('buildListingTags', () => {
   it('describes the property, with its own photo', () => {
     const tags = buildListingTags(profile, listing, ORIGIN);

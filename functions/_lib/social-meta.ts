@@ -255,10 +255,57 @@ function absolute(url: string | null | undefined, origin: string): string | null
   return `${origin.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
 }
 
+/** A listing's own page: /:username/listing/:id (US-275). */
+function listingPageUrl(origin: string, username: string, listingId: string): string {
+  return `${origin.replace(/\/$/, '')}/${encodeURIComponent(username)}/listing/${encodeURIComponent(listingId)}`;
+}
+
+/**
+ * The homes the agent's page shows, as offers the agent makes (US-551).
+ *
+ * Each names its listing page by url and by the `#listing` node id that page
+ * declares (here and in ListingPage.tsx), so a consumer merging by @id links
+ * the agent to the home's full description. Sold homes stay in the list, as
+ * on the page, with availability SoldOut — the same mapping
+ * realEstateListingSchema uses. The caller passes only listings already held
+ * to selectListingForPage, so nothing the agent hid can reach this.
+ */
+function listingOffers(
+  listings: readonly BodyListing[],
+  username: string,
+  origin: string
+): Record<string, unknown>[] {
+  return listings.slice(0, PROFILE_BODY_LISTING_LIMIT).map((listing) => {
+    const url = listingPageUrl(origin, username, listing.id);
+    const address = listing.address?.trim() || 'Property';
+    const place = [listing.city?.trim(), listing.state?.trim()].filter(Boolean).join(', ');
+    const price = Number(String(listing.price ?? '').replace(/[^0-9.]/g, ''));
+    return {
+      '@type': 'Offer',
+      url,
+      availability:
+        listing.status === 'sold' ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+      ...(Number.isFinite(price) && price > 0 ? { price, priceCurrency: 'USD' } : {}),
+      itemOffered: {
+        '@id': `${url}#listing`,
+        name: `${address}${place ? `, ${place}` : ''}`,
+        url,
+      },
+    };
+  });
+}
+
 /**
  * The tags for an agent's profile page.
+ *
+ * `listings` is the visible set the crawler body shows (US-551); without it
+ * the JSON-LD names no homes.
  */
-export function buildProfileTags(profile: ProfileMeta, origin: string): SocialTags {
+export function buildProfileTags(
+  profile: ProfileMeta,
+  origin: string,
+  listings: readonly BodyListing[] = []
+): SocialTags {
   const name = profile.full_name?.trim() || profile.username;
   const role = profile.title?.trim() || 'Real Estate Agent';
   const brokerage = profile.brokerage_name?.trim();
@@ -287,12 +334,15 @@ export function buildProfileTags(profile: ProfileMeta, origin: string): SocialTa
     jsonLd: {
       '@context': 'https://schema.org',
       '@type': 'RealEstateAgent',
+      // The same node id FullProfilePage.tsx declares for the agent.
+      '@id': `${url}#agent`,
       name,
       url,
       ...(profile.avatar_url ? { image: absolute(profile.avatar_url, origin) } : {}),
       ...(profile.bio ? { description: summarise(profile.bio, 500) } : {}),
       ...(brokerage ? { worksFor: { '@type': 'Organization', name: brokerage } } : {}),
       ...(cities.length ? { areaServed: cities.map((c) => ({ '@type': 'City', name: c })) } : {}),
+      ...(listings.length ? { makesOffer: listingOffers(listings, profile.username, origin) } : {}),
     },
   };
 }
@@ -328,7 +378,7 @@ export function buildListingTags(
     : `${facts.join(' · ')}${facts.length ? '. ' : ''}Listed by ${name}.`;
 
   // The listing's own page (US-275), whichever URL the crawler arrived on.
-  const url = `${origin.replace(/\/$/, '')}/${profile.username}/listing/${encodeURIComponent(listing.id)}`;
+  const url = listingPageUrl(origin, profile.username, listing.id);
 
   return {
     title: `${address}${place ? `, ${place}` : ''}${price ? ` — ${price}` : ''}`,
@@ -339,6 +389,8 @@ export function buildListingTags(
     jsonLd: {
       '@context': 'https://schema.org',
       '@type': 'SingleFamilyResidence',
+      // The id the agent's page links each offered home to (US-551).
+      '@id': `${url}#listing`,
       name: address,
       url,
       ...(listing.description ? { description: summarise(listing.description, 500) } : {}),
@@ -619,7 +671,7 @@ export function buildProfileBody(
     const items = listings.map((listing) => {
       const address = listing.address?.trim() || 'Property';
       const place = [listing.city?.trim(), listing.state?.trim()].filter(Boolean).join(', ');
-      const href = `${base}/${encodeURIComponent(profile.username)}/listing/${encodeURIComponent(listing.id)}`;
+      const href = listingPageUrl(base, profile.username, listing.id);
       const details = [...statusLabel(listing.status), ...listingFacts(listing)];
       return `<li><a href="${escapeAttribute(href)}">${escapeAttribute(
         `${address}${place ? `, ${place}` : ''}`

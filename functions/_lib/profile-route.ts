@@ -373,7 +373,11 @@ export async function serveProfileRoute(
     next(),
     listingId ? Promise.resolve(null) : fetchProfileBodyOptions(base, apiKey, profile.id),
   ]);
-  if (bodyOptions) body = buildProfileBody(profile, tags, origin, bodyOptions);
+  if (bodyOptions) {
+    // The JSON-LD names the same visible homes the body lists (US-551).
+    tags = buildProfileTags(profile, origin, bodyOptions.listings);
+    body = buildProfileBody(profile, tags, origin, bodyOptions);
+  }
   const contentType = assetResponse.headers.get('content-type') ?? '';
   if (!contentType.includes('text/html')) {
     return assetResponse;

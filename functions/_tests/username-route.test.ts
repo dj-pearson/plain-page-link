@@ -431,6 +431,39 @@ describe("the agent's page body for crawlers (US-539)", () => {
     expect(html).toContain('<a href="mailto:jane@summit.example">jane@summit.example</a>');
   });
 
+  it('lists the same visible homes in the JSON-LD as in the body (US-551)', async () => {
+    serve({});
+    const html = await profileHtml();
+    const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+    expect(blocks).toHaveLength(1);
+    const agent = JSON.parse(blocks[0][1]) as {
+      '@type': string;
+      makesOffer: { url: string; itemOffered: { '@id': string } }[];
+    };
+    expect(agent['@type']).toBe('RealEstateAgent');
+    expect(agent.makesOffer.map((offer) => offer.url)).toEqual([
+      'https://agentbio.net/jane/listing/abc-123',
+      'https://agentbio.net/jane/listing/sold-1',
+    ]);
+    expect(agent.makesOffer[0].itemOffered['@id']).toBe(
+      'https://agentbio.net/jane/listing/abc-123#listing'
+    );
+    expect(blocks[0][1]).not.toContain('draft-1');
+  });
+
+  it('names no hidden home in the JSON-LD either (US-551)', async () => {
+    serve({ settings: [{ show_listings: true, show_sold_properties: false }] });
+    const html = await profileHtml();
+    expect(html).toContain('"makesOffer"');
+    expect(html).not.toContain('sold-1');
+
+    serve({ settings: [{ show_listings: false, show_sold_properties: false }] });
+    expect(await profileHtml()).not.toContain('makesOffer');
+
+    serve({ settings: 'error' });
+    expect(await profileHtml()).not.toContain('makesOffer');
+  });
+
   it('reads the listings and the toggles scoped to the agent, without photos', async () => {
     serve({});
     await profileHtml();
