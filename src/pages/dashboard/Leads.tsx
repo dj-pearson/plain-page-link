@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   Home,
   DoorOpen,
+  UserCheck,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useLeads, fetchAllLeads } from '@/hooks/useLeads';
@@ -65,6 +66,8 @@ import { describeLeadOrigin } from '@/lib/leadAttribution';
 import { timeAgo } from '@/lib/timeAgo';
 import { useLeadStats } from '@/hooks/useLeadStats';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useLeadAssignees } from '@/hooks/useLeadAssignees';
+import { describeAssignee } from '@/lib/leadAssignee';
 
 /*
  * Every dialog on this page is closed on first render, so none of them ships
@@ -164,6 +167,16 @@ export default function Leads() {
       return count ?? 0;
     },
   });
+
+  // Who holds each lead (US-497). The roster is the owner's own team; a
+  // teammate viewing leads assigned to them gets an empty one.
+  const { teamId: ownedTeamId, assignees } = useLeadAssignees();
+  const assigneeText = (lead: Lead): string | null => {
+    const text = describeAssignee(lead, user?.id ?? null, assignees, !!ownedTeamId);
+    // 'Unassigned' on every row of a team owner's list is noise; the detail
+    // dialog says it, next to the control that changes it.
+    return text === 'Unassigned' ? null : text;
+  };
 
   // Tapping a lead's email or phone number on the card records the response,
   // the same way the detail modal does (US-101).
@@ -987,6 +1000,12 @@ export default function Leads() {
                         <Badge variant="outline" className="capitalize text-xs">
                           {lead.lead_type}
                         </Badge>
+                        {assigneeText(lead) && (
+                          <Badge variant="secondary" className="gap-1 text-xs font-normal">
+                            <UserCheck className="h-3 w-3" aria-hidden="true" />
+                            {assigneeText(lead)}
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="space-y-1.5 text-xs sm:text-sm text-muted-foreground">

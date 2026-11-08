@@ -819,6 +819,103 @@ check('zip routing rules match against the property address', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 6d-2. A lead can be handed only to an accepted teammate (US-497).
+//
+//       The owner picks the assignee on the Leads dashboard. Whoever
+//       assigned_to names can read and update the lead and decrypt its contact
+//       details, so guard_lead_assignee refuses a browser write naming anyone
+//       but NULL, the owner, or an accepted member of a team the owner owns.
+// ---------------------------------------------------------------------------
+check('a lead can be assigned only to an accepted teammate', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-0000000a9701';
+  const member = '00000000-dead-beef-0000-0000000a9702';
+  const pending = '00000000-dead-beef-0000-0000000a9703';
+  const stranger = '00000000-dead-beef-0000-0000000a9704';
+  const team = '00000000-dead-beef-0000-0000000a9705';
+  const lead = '00000000-dead-beef-0000-0000000a9706';
+
+  // Runs one UPDATE as the owner; returns the error text, or '' if it worked.
+  const assignAsOwner = (value) => {
+    try {
+      q(`SET ROLE authenticated;
+         SET request.jwt.claim.sub = '${owner}';
+         UPDATE public.leads SET assigned_to = ${value === null ? 'NULL' : `'${value}'`}
+          WHERE id = '${lead}';`);
+      return '';
+    } catch (e) {
+      return String(e.stderr || e.message);
+    }
+  };
+  const assignee = () =>
+    q(`SELECT coalesce(assigned_to::text, '') FROM public.leads WHERE id = '${lead}';`)[0] ?? '';
+
+  try {
+    for (const [id, email] of [
+      [owner, 'assignowner@example.test'],
+      [member, 'assignmember@example.test'],
+      [pending, 'assignpending@example.test'],
+      [stranger, 'assignstranger@example.test'],
+    ]) {
+      q(`INSERT INTO auth.users (id, email) VALUES ('${id}', '${email}')
+         ON CONFLICT (id) DO NOTHING;`);
+    }
+    q(`
+      INSERT INTO public.teams (id, owner_id, name)
+      VALUES ('${team}', '${owner}', 'Assignee Check Team') ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.team_members (team_id, user_id, accepted_at, invited_at)
+      VALUES ('${team}', '${member}', now(), now()) ON CONFLICT DO NOTHING;
+      INSERT INTO public.team_members (team_id, user_id, accepted_at, invited_at)
+      VALUES ('${team}', '${pending}', NULL, now()) ON CONFLICT DO NOTHING;
+      INSERT INTO public.leads (id, user_id, name, encrypted_email, lead_type)
+      VALUES ('${lead}', '${owner}', 'Assignee Check', 'enc:v1:assigncheck', 'buyer');
+    `);
+
+    for (const [value, label] of [
+      [member, 'an accepted teammate'],
+      [null, 'nobody'],
+      [owner, 'the owner'],
+    ]) {
+      const err = assignAsOwner(value);
+      if (err) out.push(`the owner could not assign a lead to ${label}: ${err.split('\n')[0]}`);
+      else if (assignee() !== (value ?? '')) out.push(`assigning to ${label} did not stick`);
+    }
+
+    for (const [value, label] of [
+      [stranger, 'someone outside the team'],
+      [pending, 'an invitee who has not accepted'],
+    ]) {
+      const before = assignee();
+      const err = assignAsOwner(value);
+      if (!err) out.push(`the owner assigned a lead to ${label}`);
+      else if (!err.includes('lead_assignee_not_teammate') && !err.includes('accepted member')) {
+        out.push(`assigning to ${label} failed for the wrong reason: ${err.split('\n')[0]}`);
+      }
+      if (assignee() !== before) out.push(`a refused assignment to ${label} changed the lead`);
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'lead assignee check raised an error');
+  } finally {
+    try {
+      q(`
+        DELETE FROM public.leads WHERE id = '${lead}';
+        DELETE FROM public.team_round_robin WHERE team_id = '${team}';
+        DELETE FROM public.team_members WHERE team_id = '${team}';
+        DELETE FROM public.teams WHERE id = '${team}';
+        DELETE FROM auth.users WHERE id IN ('${owner}', '${member}', '${pending}', '${stranger}');
+      `);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 6e. An anonymous visitor must be able to read an agent's visibility toggles,
 //     and nothing else from that table.
 //
@@ -3221,6 +3318,7 @@ check('an assignee works a lead but cannot take it or hand it away', () => {
   const mate = '00000000-dead-beef-0000-000000236b02';
   const third = '00000000-dead-beef-0000-000000236b03';
   const lead = '00000000-dead-beef-0000-000000236b04';
+  const team = '00000000-dead-beef-0000-000000236b05';
   const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
   const row = () => q(`SELECT user_id || '|' || coalesce(assigned_to::text, '-') FROM public.leads WHERE id = '${lead}';`)[0];
   const refused = (fn) => {
@@ -3235,6 +3333,13 @@ check('an assignee works a lead but cannot take it or hand it away', () => {
     q(`INSERT INTO auth.users (id, email) VALUES
          ('${owner}', 'take-owner@example.test'), ('${mate}', 'take-mate@example.test'), ('${third}', 'take-third@example.test')
          ON CONFLICT (id) DO NOTHING;
+       -- Both are accepted teammates of the owner: since US-497 a lead can only
+       -- be handed to one (guard_lead_assignee), so the owner's reassignment to
+       -- third below needs third on the owner's team.
+       INSERT INTO public.teams (id, owner_id, name) VALUES ('${team}', '${owner}', 'Take Check Team');
+       INSERT INTO public.team_members (team_id, user_id, email, role, accepted_at) VALUES
+         ('${team}', '${mate}', 'take-mate@example.test', 'member', now()),
+         ('${team}', '${third}', 'take-third@example.test', 'member', now());
        INSERT INTO public.leads (id, user_id, assigned_to, lead_type, name, encrypted_email)
          VALUES ('${lead}', '${owner}', '${mate}', 'buyer', 'Assigned Lead', 'enc');`);
 
@@ -3270,6 +3375,8 @@ check('an assignee works a lead but cannot take it or hand it away', () => {
     try {
       q(`DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}', '${third}');
          DELETE FROM public.leads WHERE id = '${lead}';
+         DELETE FROM public.team_members WHERE team_id = '${team}';
+         DELETE FROM public.teams WHERE id = '${team}';
          DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}', '${third}');
          DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}', '${third}');`);
     } catch {
