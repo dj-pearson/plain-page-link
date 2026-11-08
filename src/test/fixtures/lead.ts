@@ -76,5 +76,5 @@ export const makeLead = (overrides: Partial<Lead> = {}): Lead => ({
  */
 export const mockLeadRow: LeadRow = (() => {
   const { email, phone, ...rest } = mockLead;
-  return { ...rest, encrypted_email: email, encrypted_phone: phone };
+  return { ...rest, encrypted_email: email, encrypted_phone: phone, phone_hash: null };
 })();

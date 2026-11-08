@@ -4,11 +4,12 @@ import type { Database } from '@/integrations/supabase/types';
 export type LeadRow = Database['public']['Tables']['leads']['Row'];
 
 /**
- * The columns the browser may read (US-254). anon/authenticated hold SELECT on
- * every column of `leads` except the two ciphertexts — select LEAD_COLUMNS
- * (src/lib/leadColumns.ts) and decrypt through pii-crypto by lead id.
+ * The columns the browser may read (US-254). authenticated holds SELECT on
+ * every column of `leads` except the two ciphertexts and phone_hash (US-522,
+ * read only by submit-lead) — select LEAD_COLUMNS (src/lib/leadColumns.ts)
+ * and decrypt through pii-crypto by lead id.
  */
-export type LeadReadRow = Omit<LeadRow, 'encrypted_email' | 'encrypted_phone'>;
+export type LeadReadRow = Omit<LeadRow, 'encrypted_email' | 'encrypted_phone' | 'phone_hash'>;
 
 /**
  * A lead as the app consumes it: the row, with the contact details decrypted.

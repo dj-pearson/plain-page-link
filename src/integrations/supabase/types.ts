@@ -2776,6 +2776,7 @@ export type Database = {
           message: string | null;
           name: string;
           open_house_id: string | null;
+          phone_hash: string | null;
           preapproved: boolean | null;
           price_range: string | null;
           property_address: string | null;
@@ -2810,6 +2811,7 @@ export type Database = {
           message?: string | null;
           name: string;
           open_house_id?: string | null;
+          phone_hash?: string | null;
           preapproved?: boolean | null;
           price_range?: string | null;
           property_address?: string | null;
@@ -2844,6 +2846,7 @@ export type Database = {
           message?: string | null;
           name?: string;
           open_house_id?: string | null;
+          phone_hash?: string | null;
           preapproved?: boolean | null;
           price_range?: string | null;
           property_address?: string | null;

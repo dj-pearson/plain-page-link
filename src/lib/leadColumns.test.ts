@@ -32,6 +32,11 @@ describe('LEAD_COLUMNS (US-254)', () => {
     expect(split(LEAD_COLUMNS)).not.toContain('encrypted_phone');
   });
 
+  it('never asks for phone_hash, which only submit-lead reads (US-522)', () => {
+    expect(split(LEAD_COLUMNS)).not.toContain('phone_hash');
+    expect(grantedLeadColumns()).not.toContain('phone_hash');
+  });
+
   it('names every readable column in types.ts, once', () => {
     const cols = split(LEAD_COLUMNS);
     expect(new Set(cols).size).toBe(cols.length);
