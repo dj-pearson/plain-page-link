@@ -13,6 +13,7 @@ import {
   ENRICH_TOKEN_TTL_MINUTES,
 } from '../_shared/lead-enrichment.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { mergeRepeatEnquiry } from '../_shared/lead-repeat.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl } from '../_shared/validation.ts'
 import { safeFetch } from '../_shared/ssrf-guard.ts'
@@ -246,14 +247,16 @@ serve(async (req) => {
 
     // US-220: the same person enquiring again within a day — a double submit,
     // a refresh, or a bot replaying one address — is folded into the lead they
-    // already have: its form answers are merged, and nothing is notified,
-    // auto-replied or counted against the agent's allowance a second time.
+    // already have, and nothing is notified, auto-replied or counted against
+    // the agent's allowance a second time. US-513: the fold keeps both
+    // messages (it used to overwrite the first), fills in a listing only when
+    // the lead had none, and puts anything new on the lead's timeline.
     const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY')
     const emailHash = hashSecret && leadData.email ? await emailLookupHash(leadData.email, hashSecret) : null
     if (emailHash) {
       const { data: earlier, error: earlierError } = await supabase
         .from('leads')
-        .select('id, form_data, message')
+        .select('id, form_data, message, listing_id')
         .eq('user_id', leadData.user_id)
         .eq('lead_type', leadData.lead_type)
         .eq('email_hash', emailHash)
@@ -263,15 +266,50 @@ serve(async (req) => {
         .maybeSingle()
       if (earlierError) throw earlierError
       if (earlier) {
+        // The listing id arrives from the visitor's browser. Only one of this
+        // agent's own listings may be attached to (or named on) their lead.
+        const { data: repeatListing } =
+          leadData.listing_id && leadData.listing_id !== earlier.listing_id
+            ? await supabase
+                .from('listings')
+                .select('id, address')
+                .eq('id', leadData.listing_id)
+                .eq('user_id', leadData.user_id)
+                .maybeSingle()
+            : { data: null }
+
+        const merge = mergeRepeatEnquiry(
+          {
+            message: earlier.message ?? null,
+            listing_id: earlier.listing_id ?? null,
+            form_data: (earlier.form_data as Record<string, unknown> | null) ?? null,
+          },
+          {
+            message: leadData.message,
+            listing_id: repeatListing?.id ?? null,
+            listing_address: (repeatListing?.address as string | undefined) ?? null,
+            form_data: leadData.form_data,
+            source: leadData.source,
+          }
+        )
+
         const { error: mergeError } = await supabase
           .from('leads')
-          .update({
-            form_data: { ...(earlier.form_data ?? {}), ...(leadData.form_data ?? {}) },
-            message: leadData.message ?? earlier.message,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ ...merge.update, updated_at: new Date().toISOString() })
           .eq('id', earlier.id)
         if (mergeError) throw mergeError
+
+        if (merge.activity) {
+          // Best effort: the enquiry is already stored on the lead.
+          const { error: activityError } = await supabase.from('lead_activities').insert({
+            lead_id: earlier.id,
+            user_id: leadData.user_id,
+            ...merge.activity,
+          })
+          if (activityError) {
+            console.error(`[submit-lead] could not log the repeat enquiry on ${earlier.id}: ${activityError.message}`)
+          }
+        }
         return successResponse({ lead_id: earlier.id, update_token: await issueEnrichToken(earlier.id) }, req)
       }
     }
