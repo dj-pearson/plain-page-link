@@ -53,7 +53,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: 'Why do real estate agents need a specialized link-in-bio tool?',
     answer:
-      "Generic link-in-bio tools like Linktree can't showcase property listings with photos and pricing, don't have lead capture forms specific to real estate, and lack features like appointment booking for showings. Real estate agents need a platform built for their specific workflow and lead generation needs.",
+      'General-purpose link-in-bio tools such as Linktree are built to hold links for anyone with an audience. AgentBio is built around how an agent gets enquiries: listing cards with photos and price, separate buyer and seller forms that ask timeline and pre-approval, and showing booking through your Calendly link. If you are not collecting leads from your bio link, a general tool may be all you need.',
   },
   {
     question: 'What features does AgentBio include for real estate agents?',
@@ -74,7 +74,7 @@ export default function ForRealEstateAgents() {
         url: getCanonicalUrl('/for-real-estate-agents'),
         name: 'Link in Bio Built for Real Estate Agents | AgentBio',
         description:
-          'AgentBio is a specialized link-in-bio platform for real estate agents that includes property listings, lead forms, and calendar booking—features not found in generic tools like Linktree.',
+          'AgentBio is a link-in-bio platform built for real estate agents: property listings, buyer and seller lead forms, and showing booking on one page your bio link opens.',
       },
       faqPageSchema(FAQ_ENTRIES),
     ],
@@ -84,7 +84,7 @@ export default function ForRealEstateAgents() {
     <>
       <SEOHead
         title="Link in Bio Built for Real Estate Agents | AgentBio"
-        description="AgentBio is a specialized link-in-bio platform for real estate agents that includes property listings, lead forms, and calendar booking—features not found in generic tools like Linktree."
+        description="AgentBio is a link-in-bio platform built for real estate agents: property listings, buyer and seller lead forms, and showing booking on one page your bio link opens."
         keywords={[
           'link in bio for real estate agents',
           'real estate link in bio tool',
@@ -107,9 +107,9 @@ export default function ForRealEstateAgents() {
                   AgentBio is a specialized link-in-bio platform for real estate agents
                 </strong>{' '}
                 that includes property listing galleries, lead capture forms, calendar booking, and
-                testimonials—features not found in generic tools like Linktree. Real estate
-                professionals use AgentBio to convert Instagram and social media followers into
-                qualified buyer and seller leads through a mobile-optimized portfolio page.
+                testimonials on one page. Real estate professionals use AgentBio to convert
+                Instagram and social media followers into qualified buyer and seller leads through a
+                mobile-optimized portfolio page.
               </p>
             </div>
           </div>
@@ -118,8 +118,8 @@ export default function ForRealEstateAgents() {
         {/* Hero */}
         <HeroSectionLazy
           title="Link in Bio Built for Real Estate Agents"
-          subtitle="Everything Generic Tools Are Missing for Converting Social Media Traffic"
-          description="AgentBio isn't just another link tool—it's a complete real estate portfolio designed specifically for agents who need more than basic link organization."
+          subtitle="A Bio Link That Turns Social Media Traffic Into Enquiries"
+          description="AgentBio is a real estate portfolio behind your bio link: listings, lead forms, booking and reviews, designed for agents rather than for every kind of creator."
           primaryCta={{
             text: 'Create Your Agent Bio Page Free',
             href: '/auth/register',
@@ -135,18 +135,21 @@ export default function ForRealEstateAgents() {
           showStats={false}
         />
 
-        {/* Why Generic Link-in-Bio Tools Fail for Realtors */}
+        {/* Was "Why Generic Link-in-Bio Tools Fail for Realtors", four X-marked
+            cards asserting what Linktree and Beacons cannot do. Nothing recorded
+            checking those products (US-648, following US-507); the cards now say
+            what an agent's page does, and the table below says how to read the
+            competitor columns. */}
         <section className="py-20 bg-background/50">
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">
-                  Why Generic Link-in-Bio Tools Fail for Realtors
-                </span>
+                <span className="glass-heading">What a Realtor&rsquo;s Bio Link Should Do</span>
               </h2>
               <p className="text-xl glass-body max-w-3xl mx-auto">
-                Linktree, Beacons, and other generic platforms weren't built for real estate. Here's
-                what you're missing...
+                {COMPETITORS.linktree.name} and {COMPETITORS.beacons.name} are general-purpose link
+                pages, built for anyone with an audience. A page that wins listings and buyers has a
+                narrower job:
               </p>
             </header>
 
@@ -154,58 +157,65 @@ export default function ForRealEstateAgents() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="flex items-start gap-4 mb-4">
-                    <X className="h-6 w-6 text-red-700 flex-shrink-0 mt-1" />
+                    <Check
+                      className="h-6 w-6 text-green-700 flex-shrink-0 mt-1"
+                      aria-hidden="true"
+                    />
                     <div>
                       <h3 className="text-xl font-light text-foreground mb-2">
-                        No Property Showcase
+                        Your Listings, Not Just Links
                       </h3>
                       <p className="glass-body">
-                        Generic tools can't display property listings with photos, pricing,
-                        beds/baths, and MLS details. You're limited to basic links that don't
-                        convert.
+                        Each listing shows its photos, price, beds and baths, status and MLS number
+                        on your page, so a follower sees the property before deciding to enquire.
                       </p>
                     </div>
                   </div>
                 </div>
-
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="flex items-start gap-4 mb-4">
-                    <X className="h-6 w-6 text-red-700 flex-shrink-0 mt-1" />
+                    <Check
+                      className="h-6 w-6 text-green-700 flex-shrink-0 mt-1"
+                      aria-hidden="true"
+                    />
                     <div>
                       <h3 className="text-xl font-light text-foreground mb-2">
-                        Basic Lead Capture
+                        Buyer and Seller Forms
                       </h3>
                       <p className="glass-body">
-                        Generic contact forms don't qualify leads. No buyer vs seller
-                        differentiation, no pre-qualification questions, no home valuation requests.
+                        Separate buyer and seller forms ask the questions you would ask on the
+                        phone: timeline, price range and pre-approval for buyers, the property and
+                        reason for sellers.
                       </p>
                     </div>
                   </div>
                 </div>
-
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="flex items-start gap-4 mb-4">
-                    <X className="h-6 w-6 text-red-700 flex-shrink-0 mt-1" />
+                    <Check
+                      className="h-6 w-6 text-green-700 flex-shrink-0 mt-1"
+                      aria-hidden="true"
+                    />
                     <div>
-                      <h3 className="text-xl font-light text-foreground mb-2">
-                        No Appointment Booking
-                      </h3>
+                      <h3 className="text-xl font-light text-foreground mb-2">Showing Booking</h3>
                       <p className="glass-body">
-                        Without integrated calendar booking, you're playing phone tag with
-                        interested buyers instead of letting them self-schedule showings.
+                        Connect your Calendly link and buyers pick a showing time from your page
+                        instead of trading messages with you.
                       </p>
                     </div>
                   </div>
                 </div>
-
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="flex items-start gap-4 mb-4">
-                    <X className="h-6 w-6 text-red-700 flex-shrink-0 mt-1" />
+                    <Check
+                      className="h-6 w-6 text-green-700 flex-shrink-0 mt-1"
+                      aria-hidden="true"
+                    />
                     <div>
-                      <h3 className="text-xl font-light text-foreground mb-2">No Social Proof</h3>
+                      <h3 className="text-xl font-light text-foreground mb-2">Social Proof</h3>
                       <p className="glass-body">
-                        Can't showcase testimonials, sold properties, or client reviews—missing
-                        crucial trust signals that convert followers into clients.
+                        Client testimonials and your sold properties sit on the same page as your
+                        active listings, where a follower deciding whether to call you can see them.
                       </p>
                     </div>
                   </div>
@@ -370,7 +380,7 @@ export default function ForRealEstateAgents() {
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-4">
-              <span className="glass-heading">Ready to Upgrade from Generic Links?</span>
+              <span className="glass-heading">Ready to Give Your Bio Link a Job?</span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
               Turn social media traffic into qualified leads, with a page built for how agents

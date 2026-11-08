@@ -80,6 +80,38 @@ const FALSE_CLAIMS: Array<{ pattern: RegExp; why: string }> = [
     pattern: /home value expectations/i,
     why: 'the seller form asks property, timeline and reason, not an expected price',
   },
+  // US-648: prose saying what a competitor lacks. The tables stopped doing this
+  // in US-507; the FAQ answers, SEO descriptions and cards around them had not.
+  {
+    pattern:
+      /\b(linktree|beacons|later)(['’]s)?( link in bio| contact forms?)? (can['’]t|cannot|doesn['’]t|don['’]t|has no|lacks?|only offers)\b/i,
+    why: 'a statement that a named competitor lacks a feature, which nothing recorded checking',
+  },
+  {
+    pattern: /not found in generic tools|simply don['’]t offer|features linktree doesn['’]t/i,
+    why: 'a claim that Linktree lacks listings, lead forms and booking',
+  },
+  {
+    pattern: /lack features like|tools are missing|missing from generic/i,
+    why: 'a claim about what general link tools lack',
+  },
+  {
+    pattern: /generic tools can['’]t|generic contact forms don['’]t/i,
+    why: 'a claim about what general link tools cannot do',
+  },
+  {
+    pattern: /falls short|fails if you|tools fail for|is not good for/i,
+    why: 'framing a competitor as failing, rather than saying what each is built for',
+  },
+  {
+    pattern: /basic link in bio|basic link organi[sz]ation|basic link functionality/i,
+    why: "a ranking of a competitor's link page that nobody measured",
+  },
+  { pattern: /industry-leading/i, why: 'a superlative about a competitor with no source' },
+  {
+    pattern: /no (property )?listing (showcase|features)|no way to showcase/i,
+    why: "a cross against a competitor's listing features, which nothing recorded checking",
+  },
 ];
 
 const read = (path: string) => visibleText(readFileSync(join(ROOT, path), 'utf8'));

@@ -31,7 +31,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: 'Can I use Later for real estate link in bio?',
     answer:
-      "Yes, but Later's link in bio has no real estate features such as property listing cards, buyer and seller forms or a lead inbox, so an agent who wants those needs a second tool.",
+      "Yes. Later's Linkin.bio is one feature of a larger scheduling tool and is not built around real estate, so check later.com for what it shows today. AgentBio's page is built around property listing cards, buyer and seller forms and a lead inbox; you can keep Later for scheduling and point the bio link at AgentBio.",
   },
   {
     question: 'Does AgentBio include social media scheduling like Later?',
@@ -83,7 +83,7 @@ export default function VsLater() {
         url: toolUrl,
         name: 'AgentBio vs Later: Real Estate Link in Bio Comparison',
         description:
-          "Compare AgentBio and Later for real estate agents. See why real estate professionals choose AgentBio's specialized features over Later's social media scheduling tools.",
+          'Compare AgentBio and Later for real estate agents. Later schedules social content; AgentBio captures leads from the link in your bio.',
         // The site Organization by @id, not an anonymous one (US-491).
         publisher: publisherOrganization(getBaseUrl()),
       },
@@ -155,17 +155,17 @@ export default function VsLater() {
             <p className="text-base md:text-lg text-gray-700 leading-relaxed">
               <strong>
                 AgentBio is a link in bio platform built specifically for real estate agents, while
-                Later is primarily a social media scheduling tool with a basic link in bio feature.
+                Later is primarily a social media scheduling tool with a link in bio feature.
               </strong>{' '}
               The key difference: AgentBio includes property listing showcases, built-in lead
               capture forms, open house sign-in and Calendly booking, laid out to turn Instagram
-              followers into enquiries. Later's link in bio is a secondary feature focused on
-              driving traffic to scheduled posts rather than capturing leads. AgentBio's lead
-              capture is built around what a real estate enquiry needs: buyer and seller
-              qualification questions, and each new lead can be passed on to your CRM through a
-              Zapier webhook. If your priority is scheduling Instagram content, Later excels. If
-              your priority is converting followers into qualified real estate leads, AgentBio is
-              purpose-built for that goal.
+              followers into enquiries. Later's Linkin.bio is one feature of a much larger
+              publishing tool, built to send followers on from your posts. AgentBio's lead capture
+              is built around what a real estate enquiry needs: buyer and seller qualification
+              questions, and each new lead can be passed on to your CRM through a Zapier webhook. If
+              your priority is scheduling Instagram content, Later excels. If your priority is
+              converting followers into qualified real estate leads, AgentBio is purpose-built for
+              that goal.
             </p>
           </div>
         </section>
@@ -248,22 +248,23 @@ export default function VsLater() {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Basic link in bio page</span>
+                    <span>Link in bio page (Linkin.bio)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <span>Analytics for posts</span>
                   </li>
+                  {/* Was a cross beside "No property listing features" (US-648). */}
                   <li className="flex items-start gap-2">
-                    <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
-                    <span>No property listing features</span>
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>Media library</span>
                   </li>
                 </ul>
 
                 <div className="bg-muted p-4 rounded-lg">
                   <p className="text-sm font-medium">Best For:</p>
                   <p className="text-sm text-muted-foreground">
-                    Agents who want content scheduling with basic link functionality
+                    Agents whose main job is planning and scheduling posts across networks
                   </p>
                 </div>
               </div>
@@ -462,8 +463,8 @@ export default function VsLater() {
                 <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
                   <p className="font-semibold text-purple-600">✓ Choose Later</p>
                   <p className="text-sm mt-1">
-                    Industry-leading scheduling tools, visual calendar, media library, and analytics
-                    for content performance. Perfect for content planning workflow.
+                    Scheduling across several networks, a visual content calendar, a media library
+                    and post analytics are what Later leads with. It is built for exactly this job.
                   </p>
                 </div>
               </div>
@@ -501,8 +502,7 @@ export default function VsLater() {
                   <p className="font-semibold text-primary">✓ Choose AgentBio</p>
                   <p className="text-sm mt-1">
                     Property listing cards display photos, addresses, prices, and link to full
-                    details. Update instantly when properties sell. Later has no listing showcase
-                    features.
+                    details. Mark a property sold and the card updates on your page.
                   </p>
                 </div>
               </div>

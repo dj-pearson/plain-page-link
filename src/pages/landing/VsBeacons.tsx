@@ -83,7 +83,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: 'Can Beacons show real estate listings?',
     answer:
-      "No. Beacons doesn't have property listing gallery features. You can add basic links to listings, but without built-in photo galleries, pricing displays, bed/bath counts, or active/sold status that real estate agents need to properly showcase properties.",
+      'Beacons is built for creators who sell, so check beacons.ai for what its pages can show today. On AgentBio, each listing is a card on your page with its photo gallery, price, beds and baths, Active, Pending or Sold status and MLS number, without linking out to another site.',
   },
 ];
 
@@ -364,41 +364,29 @@ export default function VsBeacons() {
 
         {/* Was "Why Real Estate Agents Switch from Beacons": nothing records
             anyone switching (US-519). */}
+        {/* Was "Where Beacons Falls Short for Real Estate", which said Beacons
+            "can't display" galleries and has "basic contact forms". Nothing
+            recorded checking that (US-648, following US-507); this block now
+            says what Beacons is built for, from COMPETITORS.beacons.builtFor. */}
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
               <header className="text-center mb-12">
                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                  <span className="glass-heading">Where Beacons Falls Short for Real Estate</span>
+                  <span className="glass-heading">Creator Tools and Real Estate Tools</span>
                 </h2>
               </header>
 
               <div className="space-y-12">
                 <div className="space-y-4">
-                  <h3 className="text-2xl font-light text-foreground flex items-center gap-3">
-                    <X className="h-6 w-6 text-red-700" />
-                    The Problem with Beacons for Real Estate
-                  </h3>
-                  <div className="pl-9 space-y-3">
+                  <h3 className="text-2xl font-light text-foreground">What Beacons Is Built For</h3>
+                  <div className="space-y-3">
+                    <p className="glass-body leading-relaxed">{COMPETITORS.beacons.builtFor}</p>
                     <p className="glass-body leading-relaxed">
-                      <strong>No way to showcase property listings:</strong> Beacons can't display
-                      property galleries with photos, pricing, and details. You're limited to
-                      generic links that send visitors to external sites.
-                    </p>
-                    <p className="glass-body leading-relaxed">
-                      <strong>Creator-focused, not agent-focused:</strong> Features like "sell
-                      courses," "fan donations," and "media kits" waste screen space on tools real
-                      estate agents will never use.
-                    </p>
-                    <p className="glass-body leading-relaxed">
-                      <strong>Generic lead capture:</strong> Basic contact forms don't pre-qualify
-                      buyers or sellers. You get low-quality leads without budget, timeline, or
-                      intent information.
-                    </p>
-                    <p className="glass-body leading-relaxed">
-                      <strong>No listing disclosures:</strong> No Equal Housing logo, no license
-                      number display and no place for an MLS number, which most advertising rules
-                      expect you to show.
+                      Its headline features, a store, a media kit, email marketing and tipping, are
+                      creator tools. If you sell courses or work brand deals as well as homes, they
+                      may be exactly what you want. If your bio link exists to win buyers and
+                      sellers, the features below are the ones you will use.
                     </p>
                   </div>
                 </div>
@@ -458,9 +446,7 @@ export default function VsBeacons() {
             <div className="max-w-4xl mx-auto">
               <header className="mb-8">
                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                  <span className="glass-heading">
-                    When Beacons Makes Sense (and When It Doesn't)
-                  </span>
+                  <span className="glass-heading">When to Choose Beacons, and When AgentBio</span>
                 </h2>
               </header>
 
@@ -479,26 +465,27 @@ export default function VsBeacons() {
                   </ul>
                 </div>
 
-                <div className="p-6 rounded-xl bg-red-50 border border-red-200">
-                  <h3 className="text-xl font-semibold text-red-900 mb-4 flex items-center gap-2">
-                    <X className="h-5 w-5" />
-                    Beacons is NOT Good For:
+                {/* Was "Beacons is NOT Good For:" with a cross (US-648). */}
+                <div className="p-6 rounded-xl bg-glass-background border border-glass-border">
+                  <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Check className="h-5 w-5" />
+                    AgentBio is Built For:
                   </h3>
-                  <ul className="space-y-2 text-red-800">
+                  <ul className="space-y-2 glass-body">
                     <li>• Real estate agents showcasing listings</li>
-                    <li>• Capturing qualified buyer/seller leads</li>
+                    <li>• Capturing buyer and seller leads with timeline and pre-approval</li>
                     <li>• Booking showing appointments</li>
                     <li>• Equal Housing, license and MLS number disclosures</li>
-                    <li>• Real estate-specific analytics</li>
+                    <li>• Analytics on which listings visitors open</li>
                   </ul>
                 </div>
               </div>
 
               <div className="mt-8 p-6 rounded-xl bg-glass-background border border-glass-border">
                 <p className="glass-body text-center">
-                  <strong>Bottom Line:</strong> If you're a real estate agent, you need real estate
-                  tools. Beacons' creator features are irrelevant to your business, while AgentBio's
-                  real estate features directly convert followers into clients.
+                  <strong>Bottom Line:</strong> Beacons is built for creators who sell; AgentBio is
+                  built for agents who win clients from their bio link. Pick the one whose features
+                  you will use, or keep both and link from one to the other.
                 </p>
               </div>
             </div>
