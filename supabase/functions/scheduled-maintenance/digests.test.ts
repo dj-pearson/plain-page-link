@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  chosenDigestHour,
   digestKindFor,
   digestSchedule,
   dueCutoffDay,
@@ -467,7 +468,7 @@ describe('scheduled-maintenance wiring (US-331)', () => {
   });
 
   it('agents with a zone get their own local edition (US-433)', () => {
-    expect(index).toMatch(/scheduleFor: \(timeZone\) => digestSchedule\(now, \{[^}]*timeZone \}\)/);
+    expect(index).toMatch(/scheduleFor: \(timeZone, hour\) =>\s*digestSchedule\(now, \{ hour: hour \?\? localHour,[^}]*timeZone \}\)/);
     expect(index).toMatch(/DIGEST_LOCAL_HOUR/);
     expect(index).not.toMatch(/outside the digest window/);
     expect(store).toMatch(/notification_preferences, timezone/);
@@ -548,7 +549,7 @@ describe('runDigests with local editions (US-433)', () => {
       const before = env.sent.length;
       const report = await runDigests(env.store, {
         schedule: digestSchedule(now),
-        scheduleFor: (timeZone) => digestSchedule(now, { timeZone }),
+        scheduleFor: (timeZone, hour) => digestSchedule(now, { hour: hour ?? undefined, timeZone }),
         siteUrl: SITE,
         useRunMarker: true,
       });
@@ -606,5 +607,117 @@ describe('runDigests with local editions (US-433)', () => {
     expect(report.sent).toBe(0);
     expect(env.calls.listClaimed).toBe(0);
     expect(env.runs.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US-518 (US-445): the agent chooses the morning email's hour.
+// ---------------------------------------------------------------------------
+
+describe('chosenDigestHour (US-518)', () => {
+  it('accepts a whole hour from 5 to 10', () => {
+    for (const h of [5, 6, 7, 8, 9, 10]) expect(chosenDigestHour({ digest_hour: h })).toBe(h);
+  });
+
+  it('anything else is no choice', () => {
+    for (const v of [4, 11, 7.5, '8', null, undefined, Number.NaN]) {
+      expect(chosenDigestHour({ digest_hour: v })).toBeNull();
+    }
+    expect(chosenDigestHour(null)).toBeNull();
+    expect(chosenDigestHour('8')).toBeNull();
+    expect(chosenDigestHour({})).toBeNull();
+  });
+});
+
+describe('runDigests at the hour the agent chose (US-518)', () => {
+  const agent = (n: number, timezone: string | null, prefs: Record<string, unknown> | null): DigestProfile => ({
+    id: uid(n),
+    full_name: `Agent ${n}`,
+    notification_preferences: prefs,
+    timezone,
+  });
+  const email = (n: number) => `${uid(n).slice(-4)}@example.com`;
+  const leadAt = (n: number, iso: string): MemoryLead => ({
+    id: `lead-${n}`,
+    user_id: uid(n),
+    name: `Buyer ${n}`,
+    lead_type: 'buyer',
+    created_at: iso,
+  });
+
+  /** Hourly runs from `fromIso`, wired as index.ts wires them; who was sent at which hour. */
+  async function hourly(env: ReturnType<typeof memoryStore>, fromIso: string, hours: number) {
+    const sentAt: Record<string, string> = {};
+    for (let h = 0; h < hours; h++) {
+      const now = new Date(new Date(fromIso).getTime() + h * HOUR);
+      const before = env.sent.length;
+      const report = await runDigests(env.store, {
+        schedule: digestSchedule(now),
+        scheduleFor: (timeZone, hour) => digestSchedule(now, { hour: hour ?? undefined, timeZone }),
+        siteUrl: SITE,
+        useRunMarker: true,
+      });
+      expect(report.errors).toEqual([]);
+      for (const mail of env.sent.slice(before)) sentAt[mail.to] = now.toISOString().slice(11, 16);
+    }
+    return sentAt;
+  }
+
+  it('London agents at 5am, 9am and the default 7am each get it at their own hour, once', async () => {
+    const env = memoryStore({
+      profiles: [
+        agent(1, 'Europe/London', { digest_hour: 5 }),
+        agent(2, 'Europe/London', { digest_hour: 9 }),
+        agent(3, 'Europe/London', null),
+      ],
+      leads: [1, 2, 3].map((n) => leadAt(n, '2026-11-10T02:00:00Z')),
+    });
+    const sentAt = await hourly(env, '2026-11-10T00:00:00Z', 24);
+    expect(sentAt).toEqual({ [email(1)]: '05:00', [email(2)]: '09:00', [email(3)]: '07:00' });
+    expect(env.sent).toHaveLength(3);
+    // Each hour is its own edition; the default keeps the bare zone slot.
+    expect(env.runs.get('2026-11-10|Europe/London@5')).toEqual({ profiles: 1, sent: 1 });
+    expect(env.runs.get('2026-11-10|Europe/London@9')).toEqual({ profiles: 1, sent: 1 });
+    expect(env.runs.get('2026-11-10|Europe/London')).toEqual({ profiles: 1, sent: 1 });
+  });
+
+  it('a chosen hour follows the agent’s zone: 8am in Los Angeles is 16:00Z in November', async () => {
+    const env = memoryStore({
+      profiles: [agent(1, 'America/Los_Angeles', { digest_hour: 8 })],
+      leads: [leadAt(1, '2026-11-10T06:00:00Z')],
+    });
+    expect(await hourly(env, '2026-11-10T00:00:00Z', 24)).toEqual({ [email(1)]: '16:00' });
+  });
+
+  it('is ignored for an agent with no time zone: they keep the UTC edition', async () => {
+    const env = memoryStore({
+      profiles: [agent(1, null, { digest_hour: 5 })],
+      leads: [leadAt(1, '2026-11-10T02:00:00Z')],
+    });
+    expect(await hourly(env, '2026-11-10T00:00:00Z', 24)).toEqual({ [email(1)]: '13:00' });
+    expect(env.runs.get('2026-11-10')).toEqual({ profiles: 1, sent: 1 });
+  });
+
+  it('an hour outside 5 to 10 is the default local hour', async () => {
+    const env = memoryStore({
+      profiles: [agent(1, 'Europe/London', { digest_hour: 3 })],
+      leads: [leadAt(1, '2026-11-10T01:00:00Z')],
+    });
+    expect(await hourly(env, '2026-11-10T00:00:00Z', 24)).toEqual({ [email(1)]: '07:00' });
+  });
+
+  it('moving the hour later after today’s edition went out does not send a second one', async () => {
+    const leads = [leadAt(1, '2026-11-10T02:00:00Z')];
+    const first = memoryStore({ profiles: [agent(1, 'Europe/London', null)], leads });
+    expect(await hourly(first, '2026-11-10T00:00:00Z', 8)).toEqual({ [email(1)]: '07:00' });
+    // Same digest_log, now with 10am chosen.
+    const moved = memoryStore({ profiles: [agent(1, 'Europe/London', { digest_hour: 10 })], leads, log: first.log });
+    expect(await hourly(moved, '2026-11-10T08:00:00Z', 16)).toEqual({});
+    expect(moved.log).toHaveLength(1);
+  });
+
+  it('editionSlot names a chosen hour', () => {
+    expect(editionSlot({ ...SCHEDULE, timeZone: 'Europe/London', chosenHour: 9 })).toBe('Europe/London@9');
+    expect(editionSlot({ ...SCHEDULE, chosenHour: 9 })).toBe('');
   });
 });

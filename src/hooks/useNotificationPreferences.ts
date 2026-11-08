@@ -21,6 +21,14 @@ export type LeadNotificationMode = 'instant' | 'daily_digest' | 'off';
 /** The morning email (US-230): read by scheduled-maintenance/digests.ts. */
 export type DigestMode = 'daily' | 'weekly' | 'off';
 
+/**
+ * The local hours an agent may choose for the morning email (US-518). Mirrors
+ * DIGEST_HOUR_CHOICES in scheduled-maintenance/digests.ts, which ignores any
+ * other value; 7 is the job's default (DIGEST_LOCAL_HOUR).
+ */
+export const DIGEST_HOUR_CHOICES = [5, 6, 7, 8, 9, 10] as const;
+export const DEFAULT_DIGEST_HOUR = 7;
+
 /** How long a new lead may sit unanswered before it counts as overdue. */
 export const DEFAULT_SLA_HOURS = 2;
 
@@ -28,6 +36,8 @@ export interface NotificationPreferences {
   leads: LeadNotificationMode;
   sla_hours: number;
   digest: DigestMode;
+  /** The morning email's local hour (US-518); absent = DEFAULT_DIGEST_HOUR. */
+  digest_hour?: number;
   [key: string]: Json | undefined;
 }
 
@@ -100,7 +110,16 @@ export function useNotificationPreferences() {
     slaHours: preferences.sla_hours,
     leadMode: preferences.leads,
     digestMode: preferences.digest,
+    digestHour: digestHourOf(preferences),
     isLoading,
     update,
   };
+}
+
+/** The stored morning-email hour, or the default when none (or an unusable one) is stored. */
+export function digestHourOf(preferences: { digest_hour?: unknown }): number {
+  const hour = preferences.digest_hour;
+  return typeof hour === 'number' && (DIGEST_HOUR_CHOICES as readonly number[]).includes(hour)
+    ? hour
+    : DEFAULT_DIGEST_HOUR;
 }

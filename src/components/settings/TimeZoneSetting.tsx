@@ -1,5 +1,6 @@
 /**
- * Time zone (US-433). The morning email goes out at 7am on this clock, and
+ * Time zone (US-433). The morning email goes out at 7am on this clock (or the
+ * hour the agent picks under Lead Notifications, US-518), and
  * "due today" means today here. Until the agent saves one, the picker shows
  * this device's zone and says it is not saved yet.
  */
@@ -55,7 +56,8 @@ export function TimeZoneSetting() {
           <div>
             <CardTitle id="timezone-label">Time zone</CardTitle>
             <CardDescription>
-              Your morning email arrives at 7am here, and follow-ups count as due by your own day.
+              Your morning email arrives at the hour you pick (7am unless you change it) on this
+              clock, and follow-ups count as due by your own day.
             </CardDescription>
           </div>
         </div>
