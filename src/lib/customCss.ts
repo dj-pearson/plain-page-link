@@ -31,7 +31,9 @@
  *     (A value can still arrive through var(); `contain: paint` on the
  *     wrapper is what actually keeps a fixed box inside it.)
  *   - Unbalanced braces, brackets or quotes reject the whole stylesheet: a
- *     parser that guesses where a broken rule ends can be steered.
+ *     parser that guesses where a broken rule ends can be steered. A quote
+ *     closed only after a line break counts as unclosed, because that is
+ *     where the browser ends the string (US-536).
  *
  * The same function runs in the dashboard editor, which lists what was removed
  * so the agent sees exactly what visitors will get.
@@ -71,6 +73,17 @@ const PROPERTY_NAME = /^(?:--[A-Za-z0-9_-]+|-?[A-Za-z][A-Za-z0-9-]*)$/;
 
 class Unbalanced extends Error {}
 
+/**
+ * A browser ends a CSS string at an unescaped line break (CSS Syntax 3: a
+ * bad-string token; CR and FF are newlines after preprocessing). The parser
+ * here would read on to the next quote, so `content: "x<LF>} footer {…} b {
+ * c: ";` looked like one declaration and was emitted inside the scoped rule,
+ * while the browser closed that rule at the `}` and applied `footer {…}`
+ * unscoped to the whole document (US-536). Backslash escapes are refused, so
+ * no legitimate string contains one: treat it as an unclosed quote.
+ */
+const STRING_BREAK = /[\n\r\f]/;
+
 /** Remove comments, honouring strings so `content: "/*"` survives. */
 function stripComments(input: string): string {
   let out = '';
@@ -79,6 +92,7 @@ function stripComments(input: string): string {
   while (i < input.length) {
     const ch = input[i];
     if (quote) {
+      if (STRING_BREAK.test(ch)) throw new Unbalanced();
       out += ch;
       if (ch === quote) quote = null;
       i += 1;
@@ -114,6 +128,7 @@ function findTopLevel(text: string, from: number, targets: string): number {
   for (let i = from; i < text.length; i += 1) {
     const ch = text[i];
     if (quote) {
+      if (STRING_BREAK.test(ch)) throw new Unbalanced();
       if (ch === quote) quote = null;
       continue;
     }
@@ -135,6 +150,7 @@ function findBlockEnd(text: string, open: number): number {
   for (let i = open; i < text.length; i += 1) {
     const ch = text[i];
     if (quote) {
+      if (STRING_BREAK.test(ch)) throw new Unbalanced();
       if (ch === quote) quote = null;
       continue;
     }
@@ -391,7 +407,9 @@ export function sanitizeCustomCss(input: string | null | undefined): SanitizedCu
     if (error instanceof Unbalanced) {
       return {
         css: '',
-        removed: ['everything: the CSS has an unclosed brace, bracket, quote or comment'],
+        removed: [
+          'everything: the CSS has an unclosed brace, bracket, quote or comment (a quoted string must close on the same line)',
+        ],
       };
     }
     throw error;
