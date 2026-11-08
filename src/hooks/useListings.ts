@@ -7,6 +7,7 @@ import { applySortOrderChanges, type SortOrderChange } from '@/lib/listingOrder'
 import { LISTING_PHOTO_BUCKET } from '@/lib/images';
 import { listingPhotoUrls, orphanedListingPhotoPaths } from '@/lib/listingPhotoCleanup';
 import { logger } from '@/lib/logger';
+import { OWNER_LISTING_COLUMNS } from '@/lib/listingColumns';
 import type { Database } from '@/integrations/supabase/types';
 
 type ListingRow = Database['public']['Tables']['listings']['Row'];
@@ -75,7 +76,8 @@ export function useListings() {
 
       const { data, error } = await supabase
         .from('listings')
-        .select('*')
+        // Named columns, not '*' (US-342): see OWNER_LISTING_COLUMNS.
+        .select(OWNER_LISTING_COLUMNS)
         .eq('user_id', user.id)
         // Same order the public gallery uses, so a reorder on the dashboard
         // shows the agent exactly what a visitor will see. It ordered by
@@ -144,7 +146,8 @@ export function useListings() {
           user_id: user.id,
           ...listingData,
         })
-        .select()
+        // Named columns, not a bare select() (= '*'): see OWNER_LISTING_COLUMNS.
+        .select(OWNER_LISTING_COLUMNS)
         .single();
 
       if (error) {
@@ -185,7 +188,8 @@ export function useListings() {
         .update(updates)
         .eq('id', id)
         .eq('user_id', user.id)
-        .select()
+        // Named columns, not a bare select() (= '*'): see OWNER_LISTING_COLUMNS.
+        .select(OWNER_LISTING_COLUMNS)
         .single();
 
       if (error) throw error;

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Bed, Bath, Square, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
-import type { Database } from '@/integrations/supabase/types';
+import { LISTINGS_BLOCK_COLUMNS, type ListingsBlockRow } from '@/lib/listingColumns';
 import { formatPrice, parsePrice } from '@/lib/format';
 import { toStringList } from '@/types/profile';
 import { fallBackToOriginal, LISTING_CARD_IMAGE_SIZES, responsiveImage } from '@/lib/images';
@@ -29,9 +29,10 @@ interface ListingsBlockProps {
  * price the agent typed as "$450,000" rendered as "$$450,000" with the leading
  * $ in the template, and a plain "450000" rendered as "$450000", never
  * acquiring the thousands separators the call was there to add. It also typed
- * `state` non-nullable and omitted every other column.
+ * `state` non-nullable and omitted every other column. It now carries exactly
+ * the columns LISTINGS_BLOCK_COLUMNS selects (US-342).
  */
-type Listing = Omit<Database['public']['Tables']['listings']['Row'], 'photos'> & {
+type Listing = Omit<ListingsBlockRow, 'photos'> & {
   photos: string[] | null;
 };
 
@@ -71,7 +72,7 @@ export function ListingsBlock({ config, isEditing = false, userId }: ListingsBlo
       try {
         let query = supabase
           .from('listings')
-          .select('*')
+          .select(LISTINGS_BLOCK_COLUMNS)
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
 
