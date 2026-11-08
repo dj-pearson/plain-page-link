@@ -6,12 +6,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
 import type { OpenHouse } from '@/hooks/useOpenHouses';
 
-const { createMutate, updateMutate, zone } = vi.hoisted(() => ({
+const { createMutate, updateMutate, zone, toastError } = vi.hoisted(() => ({
   createMutate: vi.fn(),
   updateMutate: vi.fn(),
+  toastError: vi.fn(),
   zone: { timeZone: 'America/Chicago' as string | null, detected: 'Asia/Tokyo' as string | null },
 }));
 
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: toastError } }));
 vi.mock('@/hooks/useAgentTimeZone', () => ({
   useAgentTimeZone: () => ({ ...zone, isLoading: false, isKnown: true }),
 }));
@@ -46,6 +48,7 @@ describe('OpenHouseFormDialog time zone (US-628)', () => {
     vi.setSystemTime(new Date('2026-11-08T18:00:00Z'));
     createMutate.mockReset().mockResolvedValue({});
     updateMutate.mockReset().mockResolvedValue({});
+    toastError.mockReset();
     zone.timeZone = 'America/Chicago';
     zone.detected = 'Asia/Tokyo';
   });
@@ -109,5 +112,26 @@ describe('OpenHouseFormDialog time zone (US-628)', () => {
       starts_at: '2026-11-01T19:00:00.000Z',
       private_notes: 'Lockbox 1234',
     });
+  });
+
+  it('says the start has passed when the database refuses it (US-651)', async () => {
+    const onOpenChange = vi.fn();
+    createMutate.mockRejectedValue({
+      code: '23514',
+      message: 'That start time has already passed. Choose a date and time that is still ahead.',
+      details: 'open_house:past_start',
+    });
+    renderWithProviders(
+      <OpenHouseFormDialog open onOpenChange={onOpenChange} defaultListingId="l-1" />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Schedule' }));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'That start time has already passed. Choose a date and time that is still ahead.'
+      )
+    );
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 });

@@ -2900,6 +2900,95 @@ check('a locked lead cannot be backdated, and lead/contact/open-house dates are 
 });
 
 // ---------------------------------------------------------------------------
+// US-651: an open house cannot be scheduled in the past (20261108000651).
+//   The scheduling form refused a start more than 30 minutes ago, but a direct
+//   API call did not, and a past open house still used a slot of
+//   open_houses_per_month and opened the kiosk. Editing one that already
+//   happened, without moving its start, must keep working.
+// ---------------------------------------------------------------------------
+check('an open house cannot be scheduled in the past by a client role', () => {
+  const out = [];
+  const agent = '00000000-0651-4000-8000-0000000a6e01';
+  const listing = '00000000-0651-4000-8000-0000000a6e02';
+  const past = '00000000-0651-4000-8000-0000000a6e03';
+  const as = (sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${agent}'; ${sql}`);
+  /** 'ok', or the DETAIL / first ERROR line of the refusal. */
+  const attempt = (fn) => {
+    try {
+      fn();
+      return 'ok';
+    } catch (e) {
+      const text = String(e.stderr || e.message);
+      const detail = /DETAIL:\s*(\S+)/.exec(text);
+      return detail ? detail[1] : text.split('\n').find((l) => l.includes('ERROR')) || 'error';
+    }
+  };
+  const insert = (id, startExpr) =>
+    `INSERT INTO public.open_houses (id, user_id, listing_id, starts_at, ends_at)
+       VALUES ('${id}', '${agent}', '${listing}', ${startExpr}, ${startExpr} + interval '2 hours');`;
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'pastopen@example.test') ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.profiles (id, username, full_name, is_published)
+         VALUES ('${agent}', 'verifypastopen', 'Past Open', true) ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.user_subscriptions (user_id, plan_id, status, current_period_end)
+         SELECT '${agent}', id, 'active', now() + interval '20 days'
+           FROM public.subscription_plans WHERE name = 'enterprise';
+       INSERT INTO public.listings (id, user_id, address, city, price, status)
+         VALUES ('${listing}', '${agent}', '651 Past Ln', 'Testville', '1', 'active');`);
+
+    const hourAgo = attempt(() => as(insert('00000000-0651-4000-8000-0000000a6e10', `now() - interval '1 hour'`)));
+    if (hourAgo !== 'open_house:past_start')
+      out.push(`an agent's open house starting an hour ago was "${hourAgo}", not refused with open_house:past_start`);
+
+    const anon = attempt(() =>
+      q(`SET ROLE anon; ${insert('00000000-0651-4000-8000-0000000a6e11', `now() - interval '1 day'`)}`)
+    );
+    if (anon === 'ok') out.push('anon inserted an open house that started yesterday');
+
+    const onNow = attempt(() => as(insert('00000000-0651-4000-8000-0000000a6e12', `now() - interval '10 minutes'`)));
+    if (onNow !== 'ok') out.push(`an open house that started 10 minutes ago (inside the grace) was "${onNow}"`);
+
+    const ahead = attempt(() => as(insert('00000000-0651-4000-8000-0000000a6e13', `now() + interval '1 day'`)));
+    if (ahead !== 'ok') out.push(`an open house tomorrow was "${ahead}"`);
+
+    // One that already happened, written by the service role (exempt).
+    const svc = attempt(() => q(`SET ROLE service_role; ${insert(past, `now() - interval '3 days'`)}`));
+    if (svc !== 'ok') out.push(`the service role could not record a past open house ("${svc}")`);
+
+    // Editing it without moving the start: notes, cancelling, a full-row PATCH.
+    const notes = attempt(() => as(`UPDATE public.open_houses SET private_notes = 'went well' WHERE id = '${past}';`));
+    if (notes !== 'ok') out.push(`an agent could not edit the notes of a past open house ("${notes}")`);
+    const same = attempt(() => as(`UPDATE public.open_houses SET starts_at = starts_at, status = 'completed' WHERE id = '${past}';`));
+    if (same !== 'ok') out.push(`a write that left a past starts_at unchanged was "${same}"`);
+
+    // Moving it to another past time is a new past start.
+    const moved = attempt(() =>
+      as(`UPDATE public.open_houses SET starts_at = now() - interval '2 days', ends_at = now() - interval '2 days' + interval '2 hours' WHERE id = '${past}';`)
+    );
+    if (moved !== 'open_house:past_start') out.push(`moving a start to two days ago was "${moved}"`);
+
+    // Moving it into the future is fine.
+    const future = attempt(() =>
+      as(`UPDATE public.open_houses SET starts_at = now() + interval '2 days', ends_at = now() + interval '2 days 2 hours' WHERE id = '${past}';`)
+    );
+    if (future !== 'ok') out.push(`moving a past open house to the day after tomorrow was "${future}"`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.open_houses WHERE user_id = '${agent}';
+         DELETE FROM public.listings WHERE user_id = '${agent}';
+         DELETE FROM public.user_subscriptions WHERE user_id = '${agent}';
+         DELETE FROM public.profiles WHERE id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // US-254: a locked lead's ciphertext is not the browser's to read.
 //   anon and authenticated held table-wide SELECT on leads, so an agent over
 //   the allowance could read a locked lead's encrypted_email, write it into a

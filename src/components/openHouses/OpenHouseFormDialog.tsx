@@ -20,6 +20,7 @@ import { timeZoneLabel } from '@/lib/timeZone';
 import {
   defaultOpenHouseDate,
   isoToWallTime,
+  openHouseSaveErrorMessage,
   pastStartError,
   wallTimeToIso,
 } from '@/lib/openHouseSchedule';
@@ -192,6 +193,13 @@ export function OpenHouseFormDialog({
       }
       onOpenChange(false);
     } catch (error) {
+      // The database refuses a start already past (US-651) or an end before
+      // the start; say which, not "try again".
+      const timesMessage = openHouseSaveErrorMessage(error);
+      if (timesMessage) {
+        toast.error(timesMessage);
+        return;
+      }
       // A month already at the plan's open-house allowance is refused by the
       // database; say that, not "try again".
       toastSaveError(

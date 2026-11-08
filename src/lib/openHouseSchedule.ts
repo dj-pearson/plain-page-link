@@ -182,3 +182,26 @@ export function formatOpenHouseWhen(
       : `${a.clock} ${a.period}–${b.clock} ${b.period}`;
   return `${day} · ${range.trim()}`;
 }
+
+/**
+ * The agent-facing words for an open-house save the database refused for its
+ * times, or null when the refusal is about something else.
+ *
+ * check_open_house_start (20261108000651) refuses a start more than
+ * PAST_START_GRACE_MS in the past with DETAIL `open_house:past_start` — the
+ * form checks first, but its clock can drift from the server's, or the dialog
+ * can sit open past the grace. The open_houses_ends_after_start CHECK refuses
+ * an end at or before the start.
+ */
+export function openHouseSaveErrorMessage(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null;
+  const e = error as { details?: unknown; message?: unknown };
+  const text = [e.details, e.message].filter((v): v is string => typeof v === 'string').join(' ');
+  if (text.includes('open_house:past_start')) {
+    return 'That start time has already passed. Choose a date and time that is still ahead.';
+  }
+  if (text.includes('open_houses_ends_after_start')) {
+    return 'End time must be after the start time.';
+  }
+  return null;
+}
