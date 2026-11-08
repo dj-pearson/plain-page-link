@@ -1325,6 +1325,23 @@ check('subscription entitlement survives a scheduled cancellation', () => {
       out.push(`a payment that failed 2 days ago already reads as "${pastDue}"; there is no grace`);
     }
 
+    // US-605: a failed renewal. Stripe has already rolled into the unpaid
+    // period, so current_period_start is when the paid period ended and
+    // current_period_end is weeks away. Grace runs from the start.
+    q(`UPDATE public.user_subscriptions SET current_period_start = now() - interval '2 days', current_period_end = now() + interval '28 days' WHERE user_id = '${uid}';`);
+    const [renewalFailed] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
+    if (renewalFailed !== 'professional') {
+      out.push(`a renewal that failed 2 days ago already reads as "${renewalFailed}"; there is no grace`);
+    }
+    q(`UPDATE public.user_subscriptions SET current_period_start = now() - interval '10 days', current_period_end = now() + interval '20 days' WHERE user_id = '${uid}';`);
+    const [unpaidPeriod] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
+    if (unpaidPeriod !== 'free') {
+      out.push(
+        `a renewal that failed 10 days ago still reads as "${unpaidPeriod}"; past_due grace is counted from the end of the unpaid period, not the paid one`
+      );
+    }
+    q(`UPDATE public.user_subscriptions SET current_period_start = NULL WHERE user_id = '${uid}';`);
+
     q(`UPDATE public.user_subscriptions SET current_period_end = now() - interval '30 days' WHERE user_id = '${uid}';`);
     const [expired] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
     if (expired !== 'free') {

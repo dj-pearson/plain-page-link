@@ -56,6 +56,35 @@ describe('isEntitled', () => {
     ).toBe(false);
   });
 
+  // US-605: Stripe advances the period before the renewal payment fails, so
+  // current_period_end is the end of the UNPAID period. Grace counted from it
+  // gave a monthly agent ~37 days of paid features without paying.
+  it(`counts past_due grace from the end of the paid period, not the unpaid one`, () => {
+    // Renewal failed 2 days ago: paid period ended at days(-2), unpaid one runs to days(28).
+    expect(
+      isEntitled({ status: 'past_due', current_period_start: days(-2), current_period_end: days(28) }, NOW)
+    ).toBe(true);
+    // Renewal failed 10 days ago and Stripe left it past_due: grace is over,
+    // even though the unpaid period still has 20 days to run.
+    expect(
+      isEntitled({ status: 'past_due', current_period_start: days(-10), current_period_end: days(20) }, NOW)
+    ).toBe(false);
+    expect(
+      isEntitled(
+        {
+          status: 'past_due',
+          current_period_start: days(-PAST_DUE_GRACE_DAYS + 0.5),
+          current_period_end: days(30 - PAST_DUE_GRACE_DAYS),
+        },
+        NOW
+      )
+    ).toBe(true);
+    // An unreadable start falls back to the period end rather than throwing.
+    expect(
+      isEntitled({ status: 'past_due', current_period_start: 'not a date', current_period_end: days(-1) }, NOW)
+    ).toBe(true);
+  });
+
   it('fails closed on anything it cannot reason about', () => {
     expect(isEntitled({ status: 'unpaid', current_period_end: days(20) }, NOW)).toBe(false);
     expect(isEntitled({ status: 'incomplete', current_period_end: days(20) }, NOW)).toBe(false);

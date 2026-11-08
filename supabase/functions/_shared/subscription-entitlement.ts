@@ -21,7 +21,12 @@
  * stated once and tested.
  */
 
-/** Days past current_period_end that a past_due subscription keeps its plan. */
+/**
+ * Days past the end of the last paid period that a past_due subscription
+ * keeps its plan. When a renewal fails Stripe has already rolled into the
+ * unpaid period, so that moment is current_period_start, not
+ * current_period_end (US-605).
+ */
 export const PAST_DUE_GRACE_DAYS = 7;
 
 /** The subset of a Stripe subscription these decisions read. */
@@ -33,6 +38,7 @@ export interface StripeSubscriptionLike {
 /** The subset of a stored user_subscriptions row these decisions read. */
 export interface StoredSubscription {
   status: string | null;
+  current_period_start?: string | null;
   current_period_end?: string | null;
 }
 
@@ -68,9 +74,16 @@ export function isEntitled(subscription: StoredSubscription, now: Date = new Dat
     return periodEnd.getTime() > now.getTime();
   }
 
-  // A failed payment is a dunning problem, not an immediate downgrade.
+  // A failed renewal is a dunning problem, not an immediate downgrade. The
+  // grace runs from the end of the paid period (current_period_start once
+  // Stripe has rolled into the unpaid one); a row without it falls back to
+  // current_period_end, as get_user_plan does.
   if (status === 'past_due') {
-    const graceEnds = periodEnd.getTime() + PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000;
+    const start = subscription.current_period_start
+      ? new Date(subscription.current_period_start)
+      : null;
+    const anchor = start && !Number.isNaN(start.getTime()) ? start : periodEnd;
+    const graceEnds = anchor.getTime() + PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000;
     return graceEnds > now.getTime();
   }
 
