@@ -18,9 +18,11 @@ interface Call {
 
 // vi.mock factories are hoisted above the module body, so anything they close
 // over has to be hoisted with them.
-const { calls, toastSuccess } = vi.hoisted(() => ({
+const { calls, toastSuccess, listResult } = vi.hoisted(() => ({
   calls: [] as Call[],
   toastSuccess: vi.fn(),
+  // What an awaited (non-single) query resolves to; loadUserPages tests set it.
+  listResult: { current: null as null | { data: unknown; error: unknown } },
 }));
 
 vi.mock('sonner', () => ({
@@ -42,7 +44,9 @@ vi.mock('@/integrations/supabase/client', () => {
     chain.maybeSingle = () => Promise.resolve({ data: { id: 'page-1' }, error: null });
     chain.single = () => Promise.resolve({ data: { id: 'page-1' }, error: null });
     chain.then = (resolve: (v: unknown) => unknown) =>
-      Promise.resolve({ data: [{ id: 'page-1' }], error: null }).then(resolve);
+      Promise.resolve(listResult.current ?? { data: [{ id: 'page-1' }], error: null }).then(
+        resolve
+      );
     return chain;
   };
 
@@ -137,5 +141,43 @@ describe('savePage', () => {
     const lookup = calls.find((c) => c.table === 'custom_pages' && c.op === 'select');
     expect(lookup?.filters).toContainEqual(['eq', 'id', 'page-1']);
     expect(lookup?.filters).toContainEqual(['eq', 'user_id', 'agent-1']);
+  });
+});
+
+describe('loadUserPages (US-630)', () => {
+  beforeEach(() => {
+    calls.length = 0;
+    listResult.current = null;
+  });
+
+  it('carries is_active through, so the page list can say which page is live', async () => {
+    listResult.current = {
+      data: [
+        {
+          id: 'page-1',
+          user_id: 'agent-1',
+          slug: 'spring',
+          title: 'Spring',
+          description: null,
+          blocks: [],
+          theme: {},
+          seo: {},
+          published: true,
+          is_active: true,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        },
+      ],
+      error: null,
+    };
+    const pages = await usePageBuilderStore.getState().loadUserPages();
+    expect(pages[0].isActive).toBe(true);
+  });
+
+  it('rethrows a failed query instead of answering "no pages"', async () => {
+    listResult.current = { data: null, error: new Error('permission denied') };
+    await expect(usePageBuilderStore.getState().loadUserPages()).rejects.toThrow(
+      'permission denied'
+    );
   });
 });
