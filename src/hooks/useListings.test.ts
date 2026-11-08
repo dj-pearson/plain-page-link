@@ -33,6 +33,7 @@ vi.mock('@/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { useListings, type ListingUpdate, type NewListing } from './useListings';
 import { logAuditEvent } from '@/lib/audit';
+import { OWNER_LISTING_COLUMNS } from '@/lib/listingColumns';
 
 const listingRow = {
   id: 'l1',
@@ -67,6 +68,13 @@ describe('useListings', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.listings).toHaveLength(1);
     expect(fromMock).toHaveBeenCalledWith('listings');
+  });
+
+  it('reads named columns, not select("*") (US-342)', async () => {
+    const { result } = renderHook(() => useListings(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const builder = fromMock.mock.results[0].value as { select: ReturnType<typeof vi.fn> };
+    expect(builder.select).toHaveBeenCalledWith(OWNER_LISTING_COLUMNS);
   });
 
   it('returns an empty list when unauthenticated', async () => {

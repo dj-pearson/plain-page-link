@@ -31,9 +31,14 @@ const rows = [
   },
 ];
 
+const selected = vi.hoisted(() => ({ columns: [] as string[] }));
+
 vi.mock('@/integrations/supabase/client', () => {
   const query = {
-    select: () => query,
+    select: (cols: string) => {
+      selected.columns.push(cols);
+      return query;
+    },
     eq: () => query,
     order: () => query,
     limit: () => query,
@@ -57,6 +62,7 @@ vi.mock('@/integrations/supabase/client', () => {
 });
 
 import { ListingsBlock } from './ListingsBlock';
+import { LISTINGS_BLOCK_COLUMNS } from '@/lib/listingColumns';
 
 const config = {
   type: 'listings',
@@ -81,5 +87,14 @@ describe('ListingsBlock photos (US-260)', () => {
     for (const img of screen.getAllByRole('img')) {
       expect(img.getAttribute('src')).not.toContain('unsplash');
     }
+  });
+});
+
+describe('ListingsBlock columns (US-342)', () => {
+  it('selects the named card columns, not the whole row', async () => {
+    selected.columns.length = 0;
+    render(<ListingsBlock config={config} userId="agent-1" />);
+    await screen.findByRole('img', { name: '1 Oak St, Provo, UT' });
+    expect(selected.columns).toEqual([LISTINGS_BLOCK_COLUMNS]);
   });
 });
