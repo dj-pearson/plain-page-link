@@ -250,6 +250,70 @@ describe('Profile editor', () => {
     expect(screen.getByText('All changes saved')).toBeInTheDocument();
   });
 
+  describe('link fields (US-290)', () => {
+    async function openSocialTab() {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('tab', { name: 'Social Media' }));
+      return user;
+    }
+
+    it('refuses javascript: next to the field and does not save', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openSocialTab();
+      await user.type(screen.getByLabelText('Instagram URL'), 'javascript:alert(1)');
+
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+      const message = 'Your Instagram link must be a full web address starting with https://.';
+      const field = await screen.findByLabelText('Instagram URL');
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      expect(field).toHaveAccessibleDescription(message);
+      expect(screen.getByRole('alert')).toHaveTextContent(message);
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('brings the tab with the refused field forward', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openSocialTab();
+      await user.type(screen.getByLabelText('YouTube URL'), 'not a link');
+      await user.click(screen.getByRole('tab', { name: 'Basic Info' }));
+      expect(screen.queryByLabelText('YouTube URL')).toBeNull();
+
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+      expect(await screen.findByLabelText('YouTube URL')).toHaveAttribute('aria-invalid', 'true');
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('saves a bare host with https:// in front and shows what was stored', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openSocialTab();
+      await user.type(screen.getByLabelText('Zillow Profile URL'), 'zillow.com/profile/jane');
+
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+      expect(mutateAsync.mock.calls[0][0]).toMatchObject({
+        zillow_url: 'https://zillow.com/profile/jane',
+      });
+      expect(screen.getByLabelText('Zillow Profile URL')).toHaveValue(
+        'https://zillow.com/profile/jane'
+      );
+    });
+
+    it('clears the error once the agent edits the field', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openSocialTab();
+      const field = screen.getByLabelText('TikTok URL');
+      await user.type(field, 'javascript:x');
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+      await waitFor(() => expect(field).toHaveAttribute('aria-invalid', 'true'));
+
+      await user.clear(field);
+      expect(field).not.toHaveAttribute('aria-invalid');
+    });
+  });
+
   describe('leaving with unsaved changes', () => {
     it('warns on unload only once something has changed', async () => {
       const user = userEvent.setup();

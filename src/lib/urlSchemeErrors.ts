@@ -39,11 +39,22 @@ export function urlSchemeErrorFrom(error: unknown): UrlSchemeError | null {
   const match = /check constraint "([a-z_]+)_scheme"/.exec(text);
   if (!match) return null;
   const field = match[1];
+  const message = urlFieldMessage(field);
+  return message ? { field, message } : null;
+}
+
+/**
+ * The sentence shown when the URL in `<table>_<column>` is refused, or null
+ * for a field this module does not know. US-290: the Profile page uses it to
+ * refuse a value before it is sent, in the same words the database refusal
+ * would produce.
+ */
+export function urlFieldMessage(field: string): string | null {
   const label = FIELD_LABELS[field];
   if (!label) return null;
   const allowed =
     field === 'links_url'
       ? 'a web address starting with https://, an email (mailto:) or a phone number (tel:)'
       : 'a full web address starting with https://';
-  return { field, message: `${label} must be ${allowed}.` };
+  return `${label} must be ${allowed}.`;
 }
