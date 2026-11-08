@@ -29,29 +29,18 @@ supabase db push
 
 ### 2. Generate an API Key
 
-**Option A: Via SQL (Quick)**
-
-```sql
--- Generate a secure API key for your user
-INSERT INTO public.api_keys (user_id, name, key_hash, description)
-VALUES (
-  'YOUR_USER_ID_HERE', 
-  'Make.com Webhook',
-  'mk_' || encode(gen_random_bytes(32), 'base64'),  -- Generates a random key
-  'API key for Make.com article generation automation'
-)
-RETURNING key_hash;
-```
-
-**Option B: Via Admin Panel** (Future enhancement)
-- Navigate to Settings → API Keys
-- Click "Generate New API Key"
-- Name it "Make.com Webhook"
-- Copy the generated key
+Create the key in the dashboard: **Dashboard → API Keys** (`/dashboard/api-keys`),
+name it "Make.com Webhook", and copy it. The page calls the `api-keys` edge
+function, which stores only a SHA-256 hash and an 8-character prefix.
 
 **IMPORTANT**: Save the API key securely - it won't be shown again!
 
-Example key format: `mk_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890==`
+Example key format: `ab_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890-_abcde`
+
+Do not insert keys into `api_keys` by hand. `key_hash` must hold the SHA-256 of
+the key, not the key itself, and the validator (`_shared/api-auth.ts`) accepts
+only keys that start with `ab_`. Older instructions here generated `mk_` keys
+by SQL; those never authenticated and should be deleted.
 
 ### 3. Deploy Updated Edge Functions
 
@@ -107,7 +96,7 @@ x-api-key: YOUR_API_KEY_HERE
 │                                          │
 │  Headers:                                │
 │  ├─ Content-Type: application/json      │
-│  └─ x-api-key: mk_YOUR_KEY_HERE         │
+│  └─ x-api-key: ab_YOUR_KEY_HERE         │
 │                                          │
 │  Body type: Raw                          │
 │  Content type: JSON (application/json)  │
