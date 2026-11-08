@@ -4,7 +4,7 @@
  * Applies per-block styling and animation wrappers
  */
 
-import { PageBlock, BlockStyle } from '@/types/pageBuilder';
+import { PageBlock, BlockStyle, blockConfigOf } from '@/types/pageBuilder';
 import { BioBlock } from './blocks/BioBlock';
 import { ListingsBlock } from './blocks/ListingsBlock';
 import { LinkBlock } from './blocks/LinkBlock';
@@ -69,43 +69,44 @@ export function BlockRenderer({
   userId,
 }: BlockRendererProps) {
   const renderBlock = () => {
-    switch (block.type) {
+    // Narrowed on the config's own tag, so each block gets its own config
+    // type without a cast (US-363).
+    const config = blockConfigOf(block);
+    switch (config.type) {
       case 'bio':
-        return <BioBlock config={block.config as any} isEditing={isEditing} />;
+        return <BioBlock config={config} isEditing={isEditing} />;
       case 'listings':
-        return <ListingsBlock config={block.config as any} isEditing={isEditing} userId={userId} />;
+        return <ListingsBlock config={config} isEditing={isEditing} userId={userId} />;
       case 'link':
-        return <LinkBlock config={block.config as any} isEditing={isEditing} />;
+        return <LinkBlock config={config} isEditing={isEditing} />;
       case 'contact':
-        return <ContactBlock config={block.config as any} isEditing={isEditing} userId={userId} />;
+        return <ContactBlock config={config} isEditing={isEditing} userId={userId} />;
       case 'social':
-        return <SocialBlock config={block.config as any} isEditing={isEditing} />;
+        return <SocialBlock config={config} isEditing={isEditing} />;
       case 'video':
-        return <VideoBlock config={block.config as any} isEditing={isEditing} />;
+        return <VideoBlock config={config} isEditing={isEditing} />;
       case 'testimonial':
-        return (
-          <TestimonialBlock config={block.config as any} isEditing={isEditing} userId={userId} />
-        );
+        return <TestimonialBlock config={config} isEditing={isEditing} userId={userId} />;
       case 'spacer':
-        return <SpacerBlock config={block.config as any} isEditing={isEditing} />;
+        return <SpacerBlock config={config} isEditing={isEditing} />;
       case 'text':
-        return <TextBlock config={block.config as any} isEditing={isEditing} />;
+        return <TextBlock config={config} isEditing={isEditing} />;
       case 'image':
-        return <ImageBlock config={block.config as any} isEditing={isEditing} />;
+        return <ImageBlock config={config} isEditing={isEditing} />;
       case 'hero':
-        return <HeroBlock config={block.config as any} isEditing={isEditing} />;
+        return <HeroBlock config={config} isEditing={isEditing} />;
       case 'stats':
-        return <StatsBlock config={block.config as any} isEditing={isEditing} userId={userId} />;
+        return <StatsBlock config={config} isEditing={isEditing} userId={userId} />;
       case 'gallery':
-        return <GalleryBlock config={block.config as any} isEditing={isEditing} />;
+        return <GalleryBlock config={config} isEditing={isEditing} />;
       case 'cta':
-        return <CTABlock config={block.config as any} isEditing={isEditing} />;
+        return <CTABlock config={config} isEditing={isEditing} />;
       case 'divider':
-        return <DividerBlock config={block.config as any} isEditing={isEditing} />;
+        return <DividerBlock config={config} isEditing={isEditing} />;
       default:
         return (
           <div className="p-4 bg-yellow-50 border border-yellow-200 rounded text-center">
-            <p className="text-yellow-800">Unknown block type: {block.type}</p>
+            <p className="text-yellow-800">Unknown block type: {String(block.type)}</p>
           </div>
         );
     }
