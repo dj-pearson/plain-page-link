@@ -259,7 +259,7 @@ export default function VsBeacons() {
                     feature="Property Analytics"
                     agentbio={true}
                     beacons={false}
-                    description="Track which listings get most clicks, views, inquiries"
+                    description="Which listings visitors open most, with views and visitors for each"
                   />
 
                   {/* Core Link-in-Bio Features */}
@@ -357,15 +357,14 @@ export default function VsBeacons() {
           </div>
         </section>
 
-        {/* Why Real Estate Agents Switch from Beacons */}
+        {/* Was "Why Real Estate Agents Switch from Beacons": nothing records
+            anyone switching (US-519). */}
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
               <header className="text-center mb-12">
                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                  <span className="glass-heading">
-                    Why Real Estate Agents Switch from Beacons to AgentBio
-                  </span>
+                  <span className="glass-heading">Where Beacons Falls Short for Real Estate</span>
                 </h2>
               </header>
 
@@ -413,7 +412,7 @@ export default function VsBeacons() {
                     <p className="glass-body leading-relaxed">
                       <strong>Real estate-specific lead forms:</strong> Capture buyer budget,
                       pre-approval status, timeline, and property preferences. Get seller lead info
-                      including home value expectations and reason for selling.
+                      including the property, timeline and reason for selling.
                     </p>
                     <p className="glass-body leading-relaxed">
                       <strong>Showing appointment booking:</strong> Add your Calendly link and
@@ -507,12 +506,10 @@ export default function VsBeacons() {
             <div className="max-w-4xl mx-auto">
               <header className="text-center mb-12">
                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                  <span className="glass-heading">
-                    How to Migrate from Beacons to AgentBio in 10 Minutes
-                  </span>
+                  <span className="glass-heading">How to Migrate from Beacons to AgentBio</span>
                 </h2>
                 <p className="text-xl glass-body">
-                  Switching is easier than you think. Here's the step-by-step process:
+                  There is no automatic import, but there is not much to move:
                 </p>
               </header>
 
@@ -557,7 +554,7 @@ export default function VsBeacons() {
                   <span className="glass-accent">Start Your Free AgentBio Account →</span>
                 </Link>
                 <p className="text-sm text-muted-foreground mt-4">
-                  No credit card required • 5-minute setup • Cancel anytime
+                  No credit card required • Cancel anytime
                 </p>
               </div>
             </div>
@@ -576,7 +573,7 @@ export default function VsBeacons() {
             <div className="max-w-3xl mx-auto space-y-4">
               <FAQItem
                 question="Can I use both Beacons and AgentBio?"
-                answer="You could, but it would confuse your Instagram followers. It's better to use one link-in-bio tool. Since AgentBio includes everything real estate agents need (and Beacons' creator features aren't relevant to real estate), most agents switch entirely to AgentBio."
+                answer="You could, but your Instagram bio holds one link, so followers only ever see one of them. If you sell courses or take tips through Beacons, keep it for that and link to it from your AgentBio page; otherwise one tool is simpler."
               />
               <FAQItem
                 question="Is AgentBio more expensive than Beacons?"
@@ -584,11 +581,11 @@ export default function VsBeacons() {
               />
               <FAQItem
                 question="What happens to my Beacons analytics when I switch?"
-                answer="Beacons analytics stay in your Beacons account. When you switch to AgentBio, you'll start fresh with AgentBio analytics. Most agents find AgentBio analytics more valuable because they track real estate-specific metrics like 'which listings get most clicks' and 'lead form conversion rates.'"
+                answer="Beacons analytics stay in your Beacons account. AgentBio starts counting from the day your page goes live: page views, link clicks, which listings visitors open most, and how many visits became leads."
               />
               <FAQItem
                 question="Can I import my links from Beacons to AgentBio?"
-                answer="There's no automatic import, but recreating your links in AgentBio only takes 5-10 minutes. Since AgentBio is focused on real estate, you'll likely replace generic links with property listings, lead forms, and booking calendars anyway."
+                answer="There's no automatic import, so you recreate your links in AgentBio by hand. Many of them, such as links to listings or a contact page, are replaced by AgentBio's own listings, lead forms and booking."
               />
               <FAQItem
                 question="Does AgentBio have email marketing like Beacons?"
@@ -609,7 +606,7 @@ export default function VsBeacons() {
               </span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Join agents who switched from creator tools to purpose-built real estate software
+              Listings, lead forms and showing booking on the page your Instagram bio links to
             </p>
             <Link
               to="/auth/register"
@@ -618,7 +615,7 @@ export default function VsBeacons() {
               <span className="glass-accent">Create Your AgentBio Account Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
-              No credit card required • Setup in 5 minutes • Cancel anytime
+              No credit card required • Cancel anytime
             </p>
           </div>
         </section>
