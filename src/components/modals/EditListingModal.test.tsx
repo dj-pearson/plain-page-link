@@ -136,3 +136,40 @@ describe('EditListingModal photo uploads (US-461)', () => {
     expect(onDiscardUploads).toHaveBeenCalledWith([NEW_A]);
   });
 });
+
+describe('EditListingModal virtual tour URL (US-517)', () => {
+  function typeTour(value: string) {
+    fireEvent.change(screen.getByLabelText('Virtual Tour URL'), { target: { value } });
+  }
+
+  it('refuses javascript: next to the field and does not submit', () => {
+    const { onSubmit } = setup();
+    typeTour('javascript:x');
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    const input = screen.getByLabelText('Virtual Tour URL');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription(
+      'The virtual tour link must be a full web address starting with https://.'
+    );
+  });
+
+  it('saves a bare host with https://', () => {
+    const { onSubmit } = setup();
+    typeTour('my.matterport.com/show/?m=abc');
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const [data] = onSubmit.mock.calls[0] as [EditListingFormData, string[]];
+    expect(data.virtual_tour_url).toBe('https://my.matterport.com/show/?m=abc');
+  });
+
+  it('clears the error once the agent edits the field', () => {
+    setup();
+    typeTour('javascript:x');
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    typeTour('https://tour.example.com');
+    expect(screen.getByLabelText('Virtual Tour URL')).not.toHaveAttribute('aria-invalid');
+  });
+});

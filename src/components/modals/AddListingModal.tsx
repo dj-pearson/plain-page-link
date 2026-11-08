@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { normalizeVirtualTourUrl, VIRTUAL_TOUR_URL_MESSAGE } from '@/lib/listingUrls';
 
 const listingSchema = z.object({
   address: z.string().min(1, 'Street address is required'),
@@ -71,7 +72,13 @@ const listingSchema = z.object({
   // `videoUrl` stood here beside virtualTourUrl. Both meant "a video of the
   // property", only one had a column, and the form dropped whatever went in
   // this one. Removed rather than given a second column (US-106).
-  virtualTourUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  // z.string().url() accepted "javascript:x" (which the database then refused,
+  // listings_virtual_tour_url_scheme) and refused "my.matterport.com/show?m=1",
+  // which the save turns into an https:// address (US-517).
+  virtualTourUrl: z
+    .string()
+    .optional()
+    .refine((v) => !('error' in normalizeVirtualTourUrl(v)), VIRTUAL_TOUR_URL_MESSAGE),
   isFeatured: z.boolean().optional(),
 });
 
@@ -655,6 +662,9 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                     <Input
                       id="virtualTourUrl"
                       {...register('virtualTourUrl')}
+                      inputMode="url"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       placeholder="https://my.matterport.com/show/?m=..."
                       className="mt-1"
                     />

@@ -31,6 +31,7 @@ import { parseSquareFeet } from '@/lib/format';
 import { logger } from '@/lib/logger';
 import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
 import { todayCalendarDate } from '@/lib/localDate';
+import { describeListingSaveError, normalizeVirtualTourUrl } from '@/lib/listingUrls';
 import { buildImportedListing } from '@/lib/listingImport';
 import { reorderWithinView, sortOrderChanges } from '@/lib/listingOrder';
 import type { EditListingFormData } from '@/components/modals/EditListingModal';
@@ -208,6 +209,11 @@ export default function Listings() {
       // modal treated as success: it closed and reset, so a 6 MB photo against
       // a 5 MB limit made the agent re-enter the whole six-step listing
       // (US-107).
+      // Checked before any upload: a refused virtual tour would otherwise
+      // fail the insert after the photos were already in the bucket (US-517).
+      const tour = normalizeVirtualTourUrl(data.virtualTourUrl);
+      if ('error' in tour) throw new Error(tour.error);
+
       let imageUrls: string[] = [];
       if (data.images && data.images.length > 0) {
         imageUrls = await uploadListingImages(data.images);
@@ -237,7 +243,7 @@ export default function Listings() {
         mls_number: data.mlsNumber || null,
         property_type: data.propertyType || null,
         lot_size_acres: data.lotSize ? parseFloat(data.lotSize) : null,
-        virtual_tour_url: data.virtualTourUrl || null,
+        virtual_tour_url: tour.value || null,
         is_featured: data.isFeatured || false,
         year_built: data.yearBuilt ? Number(data.yearBuilt) : null,
         stories: data.stories ? Number(data.stories) : null,
@@ -279,10 +285,12 @@ export default function Listings() {
       // by the upload hook, so this only reports what it can add.
       toast({
         title: 'Error',
-        description:
+        description: describeListingSaveError(
+          error,
           error instanceof Error && error.message
             ? error.message
-            : 'Failed to add listing. Please try again.',
+            : 'Failed to add listing. Please try again.'
+        ),
         variant: 'destructive',
       });
       throw error;
@@ -436,6 +444,8 @@ export default function Listings() {
         state: data.state || null,
         zip_code: data.zip_code || null,
         lot_size_acres: data.lot_size_acres ?? null,
+        // EditListingModal has normalised it (US-517); anything that still
+        // gets refused is explained by describeListingSaveError below.
         virtual_tour_url: data.virtual_tour_url || null,
         is_featured: data.is_featured ?? false,
         highlights: data.highlights
@@ -457,10 +467,12 @@ export default function Listings() {
       const dropped = uploaded.filter((url) => !saved.has(url));
       if (dropped.length > 0) void discardUnsavedPhotos(dropped);
       setEditingListing(null);
-    } catch {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to update listing. Please try again.',
+        // A refused virtual tour or a plan limit is explained; it used to read
+        // as a transient failure to retry (US-517).
+        description: describeListingSaveError(error, 'Failed to update listing. Please try again.'),
         variant: 'destructive',
       });
     }
