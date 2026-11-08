@@ -226,6 +226,24 @@ export function markNoindex(html: string): string {
 
 const MANIFEST_LINK = /<link\b[^>]*\brel=["']?manifest["']?[^>]*>/gi;
 
+/** index.html's iOS home-screen label, with its own indentation and line break. */
+const APPLE_WEB_APP_TITLE =
+  /[ \t]*<meta\b[^>]*\bname=["']?apple-mobile-web-app-title["']?[^>]*>[ \t]*\r?\n?/gi;
+
+/**
+ * Drop the "AgentBio" apple-mobile-web-app-title meta from an agent's page
+ * (US-569).
+ *
+ * Safari prefers that meta over everything else as the label for Add to Home
+ * Screen, so a buyer saving agentbio.net/jane got an icon called "AgentBio".
+ * useProfileManifest lifts it once React runs; this does the same in the HTML
+ * the parser sees first, so a slow or failed bundle still leaves the label to
+ * the page title, which on the crawler path is the agent's name.
+ */
+export function dropAppleWebAppTitle(html: string): string {
+  return html.replace(APPLE_WEB_APP_TITLE, '');
+}
+
 /**
  * Point the document's web app manifest at the agent's own (US-471).
  *
@@ -234,12 +252,13 @@ const MANIFEST_LINK = /<link\b[^>]*\brel=["']?manifest["']?[^>]*>/gi;
  * crawler HTML is never touched by React, so it went on naming the dashboard
  * app under the agent's URL. Every manifest link is removed and exactly one,
  * naming /:username/manifest.json, goes back in its place (or before </head>
- * if the document had none).
+ * if the document had none). The AgentBio home-screen label goes with it
+ * (dropAppleWebAppTitle, US-569): every caller is serving an agent's page.
  */
 export function linkProfileManifest(html: string, username: string): string {
   const link = `<link rel="manifest" href="${profileManifestPath(username)}" />`;
   let placed = false;
-  const out = html.replace(MANIFEST_LINK, () => {
+  const out = dropAppleWebAppTitle(html).replace(MANIFEST_LINK, () => {
     if (placed) return '';
     placed = true;
     return link;

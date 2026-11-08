@@ -81,6 +81,10 @@ const HUMAN =
 const MANIFEST_LINK = /<link\b[^>]*\brel=["']?manifest["']?[^>]*>/gi;
 const manifestLinks = (html: string) => html.match(MANIFEST_LINK) ?? [];
 const withoutManifestLinks = (html: string) => html.replace(MANIFEST_LINK, '');
+const APPLE_TITLE = /<meta\b[^>]*\bname=["']?apple-mobile-web-app-title["']?[^>]*>/gi;
+const appleTitles = (html: string) => html.match(APPLE_TITLE) ?? [];
+/** The asset server's document minus what an agent's page must not carry (US-553, US-569). */
+const withoutAppMetadata = (html: string) => withoutManifestLinks(html).replace(APPLE_TITLE, '');
 
 const indexResponse = () =>
   new Response(INDEX_HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
@@ -160,6 +164,13 @@ describe('GET /:username', () => {
     expect(html.match(/rel="manifest"/g)).toHaveLength(1);
     expect(html).toContain('<link rel="manifest" href="/jane/manifest.json" />');
     expect(html).not.toContain('href="/manifest.json"');
+  });
+
+  it('drops the AgentBio home-screen label so Safari names the icon after the agent (US-569)', async () => {
+    expect(appleTitles(INDEX_HTML)).toHaveLength(1);
+    const html = await (await call({}).promise).text();
+    expect(appleTitles(html)).toEqual([]);
+    expect(html).toContain('<title>Jane Doe');
   });
 
   it("does not serve the homepage's body or structured data under the agent's URL (US-242)", async () => {
@@ -242,8 +253,10 @@ describe('GET /:username', () => {
     const html = await response.text();
 
     expect(manifestLinks(html)).toEqual(['<link rel="manifest" href="/jane/manifest.json" />']);
-    // Apart from that one link, the document is the asset server's.
-    expect(withoutManifestLinks(html)).toBe(withoutManifestLinks(INDEX_HTML));
+    // The AgentBio home-screen label is gone before any script runs (US-569).
+    expect(appleTitles(html)).toEqual([]);
+    // Apart from those two tags, the document is the asset server's.
+    expect(withoutAppMetadata(html)).toBe(withoutAppMetadata(INDEX_HTML));
     expect(response.status).toBe(200);
     expect(response.headers.get('x-agentbio-prerender')).toBeNull();
     expect(next).toHaveBeenCalledTimes(1);
@@ -613,6 +626,8 @@ describe('/:username/listing/:listingId (US-275)', () => {
     const goneHtml = await gone.text();
     expect(goneHtml.match(/rel="manifest"/g)).toHaveLength(1);
     expect(goneHtml).toContain('<link rel="manifest" href="/jane/manifest.json" />');
+    expect(appleTitles(html)).toEqual([]);
+    expect(appleTitles(goneHtml)).toEqual([]);
   });
 
   it("gives a crawler the listing's card, scoped to the agent, with the page as its URL", async () => {
@@ -647,7 +662,8 @@ describe('/:username/listing/:listingId (US-275)', () => {
     const { promise, next } = callListing({ path: '/jane/listing/abc-123', userAgent: HUMAN });
     const html = await (await promise).text();
     expect(manifestLinks(html)).toEqual(['<link rel="manifest" href="/jane/manifest.json" />']);
-    expect(withoutManifestLinks(html)).toBe(withoutManifestLinks(INDEX_HTML));
+    expect(appleTitles(html)).toEqual([]);
+    expect(withoutAppMetadata(html)).toBe(withoutAppMetadata(INDEX_HTML));
     expect(next).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
