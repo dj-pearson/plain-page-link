@@ -15,6 +15,12 @@ import {
   CONTACTED_STATUSES,
   isLeadStatus,
   leadStatusLabel,
+  IN_PROGRESS_STATUSES,
+  WON_STATUSES,
+  LEAD_STATUS_GROUPS,
+  statusFilterValues,
+  normalizeStatusFilter,
+  summarizeLeadStatuses,
 } from './leadStatus';
 import { LEAD_STATUS_VALUES as EDGE_LEAD_STATUS_VALUES } from '../../supabase/functions/_shared/lead-status';
 import { NODE_CONFIG_SCHEMAS } from '@/types/workflow';
@@ -193,5 +199,63 @@ describe('the lead status vocabulary', () => {
     const patch = buildLeadStatusPatch('nurturing', makeLead({ status: 'contacted' }), NOW);
     expect(patch.closed_at).toBeNull();
     expect(buildLeadStatusPatch('closed', makeLead(), NOW).closed_at).toBe(ISO);
+  });
+});
+
+/**
+ * US-439: the Leads chips counted new / contacted / converted only, so
+ * qualified, nurturing and closed leads were in no count, and a closed deal
+ * was never a win.
+ */
+describe('status groups', () => {
+  it('puts every status in exactly one of new, in progress, won and lost', () => {
+    for (const status of LEAD_STATUS_VALUES) {
+      const homes = [
+        status === 'new',
+        IN_PROGRESS_STATUSES.includes(status),
+        WON_STATUSES.includes(status),
+        status === 'lost',
+      ].filter(Boolean);
+      expect(homes.length, status).toBe(1);
+    }
+  });
+
+  it('treats closed as won and nurturing as in progress', () => {
+    expect(WON_STATUSES).toContain('closed');
+    expect(IN_PROGRESS_STATUSES).toContain('nurturing');
+    // Won agrees with the close-date rules: every win records closed_at.
+    for (const s of WON_STATUSES) expect(CLOSED_STATUSES.has(s)).toBe(true);
+  });
+
+  it('summarises lead_stats by_status into the chip counts', () => {
+    expect(
+      summarizeLeadStatuses({
+        new: 4,
+        contacted: 2,
+        qualified: 1,
+        nurturing: 3,
+        converted: 5,
+        closed: 2,
+        lost: 6,
+      })
+    ).toEqual({ new: 4, inProgress: 6, won: 7, lost: 6 });
+    expect(summarizeLeadStatuses(undefined)).toEqual({ new: 0, inProgress: 0, won: 0, lost: 0 });
+  });
+
+  it('turns a ?status= filter into the statuses it selects', () => {
+    expect(statusFilterValues('all')).toBeUndefined();
+    expect(statusFilterValues(null)).toBeUndefined();
+    expect(statusFilterValues('nurturing')).toEqual(['nurturing']);
+    expect(statusFilterValues('won')).toEqual(['converted', 'closed']);
+    expect(statusFilterValues('in_progress')).toEqual(['contacted', 'qualified', 'nurturing']);
+    // A stale link does not become a filter that matches nothing.
+    expect(statusFilterValues('archived')).toBeUndefined();
+    expect(normalizeStatusFilter('archived')).toBe('all');
+    expect(normalizeStatusFilter('won')).toBe('won');
+    expect(normalizeStatusFilter('closed')).toBe('closed');
+  });
+
+  it('never names a group the same as a status', () => {
+    for (const g of LEAD_STATUS_GROUPS) expect(isLeadStatus(g.value)).toBe(false);
   });
 });

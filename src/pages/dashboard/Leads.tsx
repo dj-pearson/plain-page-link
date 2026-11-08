@@ -32,7 +32,10 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import {
   buildLeadStatusPatch,
   LEAD_STATUSES,
+  LEAD_STATUS_GROUPS,
   leadStatusLabel,
+  normalizeStatusFilter,
+  summarizeLeadStatuses,
   type LeadStatus,
 } from '@/lib/leadStatus';
 import { exportToCSV } from '@/lib/exportUtils';
@@ -87,7 +90,8 @@ export default function Leads() {
   // Persisted on the profile, not in component state: it has to survive a
   // reload and be readable by the overdue-leads job (US-103).
   const [searchParams, setSearchParams] = useSearchParams();
-  const statusFilter = searchParams.get('status') ?? 'all';
+  // A single status or a group (US-439); an unknown value reads as 'all'.
+  const statusFilter = normalizeStatusFilter(searchParams.get('status'));
   const typeFilter = searchParams.get('type') ?? 'all';
   const assignedToMe = searchParams.get('assigned') === 'me';
 
@@ -202,8 +206,9 @@ export default function Leads() {
       return {
         total: 0,
         new: 0,
-        contacted: 0,
-        converted: 0,
+        inProgress: 0,
+        won: 0,
+        lost: 0,
         hot: 0,
         avgResponse: null as number | null,
         needsAttention: 0,
@@ -211,12 +216,12 @@ export default function Leads() {
 
     let respondedCount = 0;
     let respondedTotalMs = 0;
+    const loadedByStatus: Record<string, number> = {};
     const acc = leads.reduce(
       (a, lead) => {
         a.total++;
-        if (lead.status === 'new') a.new++;
-        else if (lead.status === 'contacted') a.contacted++;
-        else if (lead.status === 'converted') a.converted++;
+        const st = lead.status ?? 'new';
+        loadedByStatus[st] = (loadedByStatus[st] ?? 0) + 1;
         const score = leadScores.get(lead.id);
         if (score?.priority === 'hot') a.hot++;
         if (isNeedsAttention(lead)) a.needsAttention++;
@@ -227,11 +232,14 @@ export default function Leads() {
         }
         return a;
       },
-      { total: 0, new: 0, contacted: 0, converted: 0, hot: 0, needsAttention: 0 }
+      { total: 0, hot: 0, needsAttention: 0 }
     );
 
+    // US-439: the chips are status groups, so qualified, nurturing and closed
+    // leads are counted — they used to fall out of every number on the page.
     const loaded = {
       ...acc,
+      ...summarizeLeadStatuses(loadedByStatus),
       avgResponse: respondedCount > 0 ? respondedTotalMs / respondedCount : null,
     };
     // US-225: every count except "hot" comes from lead_stats(), over all of the
@@ -242,9 +250,7 @@ export default function Leads() {
     return {
       ...loaded,
       total: serverStats.total,
-      new: serverStats.byStatus.new ?? 0,
-      contacted: serverStats.byStatus.contacted ?? 0,
-      converted: serverStats.byStatus.converted ?? 0,
+      ...summarizeLeadStatuses(serverStats.byStatus),
       needsAttention: serverStats.needsAttention,
       avgResponse: serverStats.avgResponseMs,
     };
@@ -615,41 +621,43 @@ export default function Leads() {
         </button>
         <button
           type="button"
-          onClick={() => setFilter('status', statusFilter === 'contacted' ? 'all' : 'contacted')}
-          aria-pressed={statusFilter === 'contacted'}
+          onClick={() =>
+            setFilter('status', statusFilter === 'in_progress' ? 'all' : 'in_progress')
+          }
+          aria-pressed={statusFilter === 'in_progress'}
+          title="Contacted, qualified or nurturing"
           className="text-left"
         >
           <Card
             className={cn(
               'hover:shadow-md transition-shadow h-full',
-              statusFilter === 'contacted' && 'ring-2 ring-primary'
+              statusFilter === 'in_progress' && 'ring-2 ring-primary'
             )}
           >
             <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
               <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                {leadStats.contacted}
+                {leadStats.inProgress}
               </div>
-              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Contacted</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">In progress</div>
             </CardContent>
           </Card>
         </button>
         <button
           type="button"
-          onClick={() => setFilter('status', statusFilter === 'converted' ? 'all' : 'converted')}
-          aria-pressed={statusFilter === 'converted'}
+          onClick={() => setFilter('status', statusFilter === 'won' ? 'all' : 'won')}
+          aria-pressed={statusFilter === 'won'}
+          title="Converted or closed"
           className="text-left"
         >
           <Card
             className={cn(
               'hover:shadow-md transition-shadow h-full',
-              statusFilter === 'converted' && 'ring-2 ring-primary'
+              statusFilter === 'won' && 'ring-2 ring-primary'
             )}
           >
             <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-              <div className="text-xl sm:text-2xl font-bold text-primary">
-                {leadStats.converted}
-              </div>
-              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Converted</div>
+              <div className="text-xl sm:text-2xl font-bold text-primary">{leadStats.won}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Won</div>
             </CardContent>
           </Card>
         </button>
@@ -687,6 +695,30 @@ export default function Leads() {
               className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base min-h-[44px]"
             />
           </div>
+          {/* US-439: the chips only reach new / in progress / won, so every
+              status (qualified, nurturing, closed and lost among them) is
+              filterable here. Same URL param as the chips. */}
+          <Select value={statusFilter} onValueChange={(v) => setFilter('status', v)}>
+            <SelectTrigger
+              className="w-[150px] min-h-[44px] flex-shrink-0"
+              aria-label="Filter by status"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {LEAD_STATUS_GROUPS.map((g) => (
+                <SelectItem key={g.value} value={g.value}>
+                  {g.label}
+                </SelectItem>
+              ))}
+              {LEAD_STATUSES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {/* Type filter — pushed into the query, not applied client-side. */}
           <Select value={typeFilter} onValueChange={(v) => setFilter('type', v)}>
             <SelectTrigger

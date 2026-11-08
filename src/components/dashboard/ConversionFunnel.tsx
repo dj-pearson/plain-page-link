@@ -10,6 +10,10 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { WON_STATUSES } from '@/lib/leadStatus';
+
+const WON: ReadonlySet<string> = new Set(WON_STATUSES);
+const QUALIFIED_STAGE: ReadonlySet<string> = new Set(['qualified', 'nurturing', ...WON_STATUSES]);
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
@@ -89,10 +93,9 @@ export function ConversionFunnel() {
     const visitors = data?.visitors ?? 0;
     const total = leads.length;
     const contacted = leads.filter((l) => l.status !== 'new' && l.status !== 'lost').length;
-    const qualified = leads.filter((l) =>
-      ['qualified', 'nurturing', 'converted', 'closed'].includes(l.status)
-    ).length;
-    const converted = leads.filter((l) => ['converted', 'closed'].includes(l.status)).length;
+    // US-439: the groups come from leadStatus.ts, the one vocabulary.
+    const qualified = leads.filter((l) => QUALIFIED_STAGE.has(l.status)).length;
+    const converted = leads.filter((l) => WON.has(l.status)).length;
 
     return [
       { label: 'Visitors', value: visitors },

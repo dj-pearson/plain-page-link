@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { encryptPIIBatch, decryptLeadContacts } from '@/lib/pii';
 import { LEAD_COLUMNS } from '@/lib/leadColumns';
+import { normalizeStatusFilter, statusFilterValues } from '@/lib/leadStatus';
 import type { Lead, LeadReadRow } from '@/types/lead';
 
 /**
@@ -53,7 +54,12 @@ export interface LeadFilters {
 /** The list's filters as a query; shared by the paged list and the export. */
 function leadsQuery(
   userId: string,
-  filters: { status?: string; leadType?: string; search?: string; assignedToMe?: boolean }
+  filters: {
+    statuses?: readonly string[];
+    leadType?: string;
+    search?: string;
+    assignedToMe?: boolean;
+  }
 ) {
   // US-226: my leads AND the ones assigned to me. RLS always allowed the
   // assignee to read them; this query filtered on user_id alone, so a lead the
@@ -64,7 +70,10 @@ function leadsQuery(
     .select(LEAD_COLUMNS)
     .or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
   if (filters.assignedToMe) query = query.eq('assigned_to', userId);
-  if (filters.status) query = query.eq('status', filters.status);
+  // One status or a group of them (US-439: "In progress", "Won").
+  const statuses = filters.statuses;
+  if (statuses?.length === 1) query = query.eq('status', statuses[0]);
+  else if (statuses?.length) query = query.in('status', [...statuses]);
   if (filters.leadType) query = query.eq('lead_type', filters.leadType);
   // Name only: email and phone are ciphertext since US-086, so an ilike
   // against them would match nothing.
@@ -89,7 +98,7 @@ export async function fetchAllLeads(
   filters: LeadFilters = {}
 ): Promise<{ leads: Lead[]; truncated: boolean }> {
   const normalized = {
-    status: filters.status && filters.status !== 'all' ? filters.status : undefined,
+    statuses: statusFilterValues(filters.status),
     leadType: filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined,
     search: filters.search?.trim() || undefined,
     assignedToMe: filters.assignedToMe,
@@ -114,7 +123,8 @@ export function useLeads(filters: LeadFilters = {}) {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
-  const status = filters.status && filters.status !== 'all' ? filters.status : undefined;
+  const status = normalizeStatusFilter(filters.status);
+  const statuses = statusFilterValues(status);
   const leadType = filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined;
   const search = filters.search?.trim() || undefined;
   const assignedToMe = filters.assignedToMe || undefined;
@@ -140,7 +150,7 @@ export function useLeads(filters: LeadFilters = {}) {
       // visit (US-104).
       const from = (pageParam as number) * LEADS_PAGE_SIZE;
       const { data, error } = await leadsQuery(user.id, {
-        status,
+        statuses,
         leadType,
         search,
         assignedToMe,
