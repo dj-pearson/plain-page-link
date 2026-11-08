@@ -41,6 +41,15 @@ interface LimitMeta {
   enforced: boolean;
   /** The matching field in pricing-plans.ts, for "which plan has more". */
   configKey: keyof PlanLimits;
+  /**
+   * False for a quota the database meters but whose feature does not exist
+   * yet. Such a key is never shown to the agent as a meter, a nudge or a
+   * downgrade line: "0 automated emails a month" on the Free plan read as a
+   * reason to upgrade for something no plan delivers (US-297). Flip it to
+   * true in the same change that makes the feature work (for emails, US-136).
+   * Defaults to true.
+   */
+  ships?: boolean;
 }
 
 export const LIMIT_META: Record<PlanLimitKey, LimitMeta> = {
@@ -92,12 +101,18 @@ export const LIMIT_META: Record<PlanLimitKey, LimitMeta> = {
     enforced: true,
     configKey: 'aiListingDescriptions',
   },
+  // The quotas below are metered by consume_plan_quota so the features cannot
+  // ship unmetered, not because any of them is sold: workflow email steps do
+  // not send (US-224, US-136), there is no SMS provider (US-103), and the
+  // reports, staging and video tours are not built. planCardCopy.ts keeps
+  // them off the pricing cards for the same reason.
   emails_per_month: {
     label: 'automated emails',
     singular: 'automated email',
     monthly: true,
     enforced: true,
     configKey: 'emailsPerMonth',
+    ships: false,
   },
   sms_per_month: {
     label: 'automated texts',
@@ -105,6 +120,7 @@ export const LIMIT_META: Record<PlanLimitKey, LimitMeta> = {
     monthly: true,
     enforced: true,
     configKey: 'smsPerMonth',
+    ships: false,
   },
   market_reports_per_month: {
     label: 'market reports',
@@ -112,6 +128,7 @@ export const LIMIT_META: Record<PlanLimitKey, LimitMeta> = {
     monthly: true,
     enforced: true,
     configKey: 'marketReports',
+    ships: false,
   },
   cma_reports_per_month: {
     label: 'CMA reports',
@@ -119,6 +136,7 @@ export const LIMIT_META: Record<PlanLimitKey, LimitMeta> = {
     monthly: true,
     enforced: true,
     configKey: 'cmaReports',
+    ships: false,
   },
   virtual_staging_photos_per_month: {
     label: 'virtually staged photos',
@@ -126,6 +144,7 @@ export const LIMIT_META: Record<PlanLimitKey, LimitMeta> = {
     monthly: true,
     enforced: true,
     configKey: 'virtualStagingPhotos',
+    ships: false,
   },
   video_tours_per_month: {
     label: 'video tours',
@@ -133,10 +152,19 @@ export const LIMIT_META: Record<PlanLimitKey, LimitMeta> = {
     monthly: true,
     enforced: true,
     configKey: 'videoTours',
+    ships: false,
   },
 };
 
-/** Shown as meters on the dashboard, in this order. */
+/** Whether the feature behind this limit exists, so the agent may be told about it. */
+export function limitShips(key: PlanLimitKey): boolean {
+  return LIMIT_META[key].ships !== false;
+}
+
+/**
+ * Shown as meters on the dashboard, in this order. Only shipped limits: a
+ * test holds every entry to limitShips.
+ */
 export const METERED_KEYS: PlanLimitKey[] = [
   'listings',
   'contacts',
@@ -147,7 +175,6 @@ export const METERED_KEYS: PlanLimitKey[] = [
   'sold_properties',
   'workflows',
   'ai_listing_descriptions_per_month',
-  'emails_per_month',
 ];
 
 /** The share of a limit at which the dashboard starts nudging. */
