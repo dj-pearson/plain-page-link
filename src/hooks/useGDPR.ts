@@ -15,6 +15,7 @@ import {
   EXPORT_REQUEST_LIST_LIMIT,
   IMMEDIATE_EXPORT_TIMEOUT_MS,
   describeQueueError,
+  describeResendError,
   hasExportInFlight,
   shouldOfferQueuedExport,
   type ExportRequestRow,
@@ -105,6 +106,34 @@ export function useGDPR() {
       toast({
         title: 'Could not request export',
         description: describeQueueError(error),
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Email a fresh link to a completed export that has not expired (US-404).
+  // The server sends it; the link never comes back to the browser.
+  const resendExportLinkMutation = useMutation({
+    mutationFn: async (requestId: string): Promise<{ expiresAt?: string }> => {
+      return await callEdgeFunction<{ expiresAt?: string }>('gdpr-export', {
+        method: 'POST',
+        auth: true,
+        body: { action: 'resend_link', requestId },
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Link sent',
+        description:
+          'We have emailed you a fresh download link. Check your spam folder if it does not arrive.',
+      });
+    },
+    onError: (error: unknown) => {
+      // A 410 means the file is gone: refresh so the row reads Expired.
+      queryClient.invalidateQueries({ queryKey: ['exportRequests'] });
+      toast({
+        title: 'Could not send the link',
+        description: describeResendError(error),
         variant: 'destructive',
       });
     },
@@ -288,6 +317,11 @@ export function useGDPR() {
     isExportRequestsLoading,
     exportRequestsError: exportRequestsError ? 'Could not load your export requests.' : undefined,
     hasExportInFlight: hasExportInFlight(exportRequests),
+    resendExportLink: resendExportLinkMutation.mutate,
+    /** The request whose link is being re-sent, if any. */
+    resendingExportId: resendExportLinkMutation.isPending
+      ? (resendExportLinkMutation.variables ?? null)
+      : null,
 
     // Deletion status
     deletionStatus,

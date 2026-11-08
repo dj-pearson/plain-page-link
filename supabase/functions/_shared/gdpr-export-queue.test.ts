@@ -11,10 +11,14 @@ import {
   EXPORT_BUCKET,
   EXPORT_LINK_TTL_SECONDS,
   GIVE_UP_AFTER_MS,
+  MIN_RESEND_LINK_SECONDS,
   processExportQueue,
   purgeExpiredExports,
+  resendExportLink,
   STALE_PROCESSING_MS,
   type ExportQueueStore,
+  type ExportResendStore,
+  type HeldExport,
   type QueuedExport,
 } from './gdpr-export-queue.ts';
 import { ExportIncompleteError, type CollectedSections } from './gdpr-export.ts';
@@ -192,6 +196,99 @@ describe('purgeExpiredExports', () => {
   });
 });
 
+describe('resendExportLink (US-404)', () => {
+  const ID = '11111111-1111-4111-8111-111111111111';
+  const EXPIRES = new Date(NOW.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
+  function resendStore(held: HeldExport | null, overrides: Partial<ExportResendStore> = {}) {
+    return {
+      findOwnExport: vi.fn(async () => held),
+      getSubject: vi.fn(async (id: string) => ({ id, email: 'ann@example.com', created_at: '2026-01-01T00:00:00Z' })),
+      signedUrl: vi.fn(async (path: string) => `https://api.example/sign/${path}?token=fresh`),
+      sendEmail: vi.fn(async () => ({ ok: true })),
+      audit: vi.fn(async () => undefined),
+      ...overrides,
+    };
+  }
+  const held = (over: Partial<HeldExport> = {}): HeldExport => ({
+    id: ID,
+    userId: 'user-1',
+    status: 'completed',
+    path: `user-1/${ID}.json`,
+    expiresAt: EXPIRES,
+    ...over,
+  });
+  const run = (store: ExportResendStore, requestId: unknown = ID, userId = 'user-1') =>
+    resendExportLink(store, { requestId, userId, now: NOW, siteUrl: SITE });
+
+  it('signs a fresh link that expires with the file and emails it to the account address', async () => {
+    const store = resendStore(held());
+    const outcome = await run(store);
+
+    expect(outcome).toEqual({ ok: true, expiresAt: EXPIRES });
+    expect(store.findOwnExport).toHaveBeenCalledWith(ID, 'user-1');
+    expect(store.signedUrl).toHaveBeenCalledWith(`user-1/${ID}.json`, 3 * 24 * 60 * 60);
+    const email = store.sendEmail.mock.calls[0][0] as { to: string; body: string };
+    expect(email.to).toBe('ann@example.com');
+    expect(email.body).toContain('token=fresh');
+    expect(email.body).toContain(new Date(EXPIRES).toUTCString());
+    expect(store.audit).toHaveBeenCalledWith('user-1', 'success', { request_id: ID, link_resent: true });
+  });
+
+  it("someone else's export reads as not found and sends nothing", async () => {
+    const store = resendStore(held({ userId: 'someone-else' }));
+    expect(await run(store)).toMatchObject({ ok: false, status: 404 });
+    expect(store.signedUrl).not.toHaveBeenCalled();
+    expect(store.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed id without a lookup', async () => {
+    const store = resendStore(held());
+    expect(await run(store, "x' or 1=1")).toMatchObject({ ok: false, status: 404 });
+    expect(await run(store, null)).toMatchObject({ ok: false, status: 404 });
+    expect(store.findOwnExport).not.toHaveBeenCalled();
+  });
+
+  it('an export that is not built yet is a 409', async () => {
+    const store = resendStore(held({ status: 'processing', path: null, expiresAt: null }));
+    expect(await run(store)).toMatchObject({ ok: false, status: 409 });
+    expect(store.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('an expired, purged or nearly expired export is a 410', async () => {
+    for (const over of [
+      { expiresAt: new Date(NOW.getTime() - 1000).toISOString() },
+      { path: null },
+      { expiresAt: null },
+      { expiresAt: new Date(NOW.getTime() + (MIN_RESEND_LINK_SECONDS - 1) * 1000).toISOString() },
+    ]) {
+      const store = resendStore(held(over));
+      expect(await run(store)).toMatchObject({ ok: false, status: 410 });
+      expect(store.signedUrl).not.toHaveBeenCalled();
+    }
+  });
+
+  it('an account with no email is told so', async () => {
+    const store = resendStore(held(), { getSubject: vi.fn(async () => ({ id: 'user-1', email: undefined })) });
+    expect(await run(store)).toMatchObject({ ok: false, status: 422 });
+  });
+
+  it('an email that did not send is reported, not claimed as sent', async () => {
+    const store = resendStore(held(), { sendEmail: vi.fn(async () => ({ ok: false, error: 'smtp down' })) });
+    expect(await run(store)).toMatchObject({ ok: false, status: 502 });
+    expect(store.audit).not.toHaveBeenCalled();
+  });
+
+  it('a failed audit write does not turn a sent email into an error', async () => {
+    const store = resendStore(held(), {
+      audit: vi.fn(async () => {
+        throw new Error('audit down');
+      }),
+    });
+    expect(await run(store)).toMatchObject({ ok: true });
+  });
+});
+
 describe('export email and storage', () => {
   it('keys each file under the subject id, one per request', () => {
     expect(exportObjectPath({ id: 'r', userId: 'u' })).toBe('u/r.json');
@@ -201,6 +298,15 @@ describe('export email and storage', () => {
     const email = exportReadyEmail('a@b.c', 'https://x/y?a=1&b="2"', NOW, SITE);
     expect(email.html).toContain('href="https://x/y?a=1&amp;b=&quot;2&quot;"');
     expect(email.body).toContain(NOW.toUTCString());
+  });
+
+  it('the gdpr-export function routes resend_link to resendExportLink under its own rate limit', () => {
+    const src = readFileSync(join(process.cwd(), 'supabase/functions/gdpr-export/index.ts'), 'utf8');
+    expect(src).toMatch(/action === 'resend_link'/);
+    expect(src).toMatch(/'gdpr-export-resend'/);
+    expect(src).toMatch(/userId: user\.id/);
+    // The link goes only in the email: the response carries no URL.
+    expect(src).not.toMatch(/signedUrl|link:/);
   });
 
   it('the bucket is created private by a migration and no storage policy opens it', () => {

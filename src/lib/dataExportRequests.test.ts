@@ -14,7 +14,9 @@ import {
   describeExportFailure,
   describeExportRequest,
   describeQueueError,
+  describeResendError,
   hasExportInFlight,
+  MIN_RESEND_LINK_MS,
   shouldOfferQueuedExport,
   type ExportRequestRow,
 } from './dataExportRequests';
@@ -150,5 +152,39 @@ describe('describeQueueError', () => {
   });
   it('anything else is generic', () => {
     expect(describeQueueError(new Error('x'))).toMatch(/could not queue/);
+  });
+});
+
+describe('resending an export link (US-404)', () => {
+  it('only a completed export whose file is still held can be re-sent', () => {
+    const live = row({ status: 'completed', file_expires_at: '2026-11-08T10:00:00Z' });
+    expect(describeExportRequest(live, NOW).canResend).toBe(true);
+    expect(
+      describeExportRequest(
+        row({ status: 'completed', file_expires_at: '2026-11-02T10:00:00Z' }),
+        NOW
+      ).canResend
+    ).toBe(false);
+    // Closed by an immediate download: there is no file.
+    expect(describeExportRequest(row({ status: 'completed' }), NOW).canResend).toBe(false);
+    for (const status of ['pending', 'processing', 'failed', 'cancelled']) {
+      expect(describeExportRequest(row({ status }), NOW).canResend).toBe(false);
+    }
+  });
+
+  it('a link about to expire is not offered (the server refuses under five minutes)', () => {
+    const soon = new Date(NOW.getTime() + MIN_RESEND_LINK_MS - 1000).toISOString();
+    expect(
+      describeExportRequest(row({ status: 'completed', file_expires_at: soon }), NOW).canResend
+    ).toBe(false);
+  });
+
+  it('explains each refusal in words', () => {
+    expect(describeResendError(err(410))).toMatch(/expired/);
+    expect(describeResendError(err(409))).toMatch(/not been sent yet/);
+    expect(describeResendError(err(422))).toMatch(/no email address/);
+    expect(describeResendError(err(429))).toMatch(/spam folder/);
+    expect(describeResendError(err(404))).toMatch(/not found/);
+    expect(describeResendError(new Error('x'))).toMatch(/could not send/);
   });
 });

@@ -144,3 +144,45 @@ describe('useGDPR export requests', () => {
     expect(result.current.offerQueuedExport).toBe(false);
   });
 });
+
+describe('useGDPR resend export link (US-404)', () => {
+  const ID = '11111111-1111-4111-8111-111111111111';
+
+  it('asks the server to email the link again; the link never comes back', async () => {
+    const { result } = renderHook(() => useGDPR(), { wrapper });
+    callMock.mockResolvedValueOnce({ success: true, expiresAt: '2026-11-10T00:00:00Z' });
+
+    await act(async () => {
+      result.current.resendExportLink(ID);
+    });
+
+    await waitFor(() =>
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Link sent' }))
+    );
+    expect(callMock).toHaveBeenCalledWith('gdpr-export', {
+      method: 'POST',
+      auth: true,
+      body: { action: 'resend_link', requestId: ID },
+    });
+  });
+
+  it('explains an expired export in words', async () => {
+    const { result } = renderHook(() => useGDPR(), { wrapper });
+    callMock.mockRejectedValueOnce(
+      new ErrorClass('gone', { functionName: 'gdpr-export', status: 410 })
+    );
+
+    await act(async () => {
+      result.current.resendExportLink(ID);
+    });
+
+    await waitFor(() =>
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Could not send the link',
+          description: expect.stringMatching(/expired/),
+        })
+      )
+    );
+  });
+});
