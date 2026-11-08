@@ -3,7 +3,8 @@
  * (US-346, US-356).
  *
  * The BlogPosting publisher gave /Cover.png — the 1536x1024 social banner — as
- * its logo while the Organization node gave /logo.png, and PageSEO named the
+ * its logo while the Organization node gave /logo.png, and PageSEO (deleted in
+ * US-502 as unused) named the
  * Organization and WebSite `${origin}#organization` / `#website` where every
  * other component wrote `${origin}/#…`. JSON-LD compares ids as strings, so a
  * page could carry an Organization and a publisher reference that did not
@@ -17,7 +18,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import PrivacyPolicy from '@/pages/legal/PrivacyPolicy';
 import { ArticleSEO } from '@/components/blog/ArticleSEO';
-import { PageSEO } from '@/components/seo/PageSEO';
+import { BlogListSEO } from '@/components/blog/BlogListSEO';
+import VsLater from '@/pages/landing/VsLater';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl } from './seo.config';
 import { ORGANIZATION_LOGO } from './og-image';
@@ -90,21 +92,60 @@ describe('the article publisher', () => {
   });
 });
 
-describe('PageSEO', () => {
-  const nodes = jsonLdOf(<PageSEO title="T" description="D" url="/x" />);
+describe('the blog index (US-502)', () => {
+  const nodes = jsonLdOf(<BlogListSEO totalArticles={0} />);
   const byType = (type: string) => nodes.find((node) => node['@type'] === type) as Node;
 
   it('declares the Organization and WebSite under the shared ids', () => {
+    // The WebSite was '@id': origin, and the Organization had no @id at all, so
+    // /blog described a second AgentBio that matched no other page.
     expect(byType('Organization')['@id']).toBe(organizationId(origin));
+    expect(byType('Organization')).toEqual(generateEnhancedOrganizationSchema());
     expect(byType('WebSite')['@id']).toBe(websiteId(origin));
+  });
+
+  it('names the Organization as the Blog publisher, with its logo rather than the banner', () => {
+    const blog = byType('Blog');
+    expect(blog.publisher).toEqual(publisherOrganization(origin));
+    expect(blog.isPartOf).toEqual({ '@id': websiteId(origin) });
   });
 
   it('points every reference at a node id that exists on the page', () => {
     const declared = new Set(nodes.map((node) => node['@id']));
-    const webPage = byType('WebPage');
-    expect(declared).toContain((webPage.publisher as Node)['@id']);
-    expect(declared).toContain((webPage.isPartOf as Node)['@id']);
+    expect(declared).toContain((byType('Blog').publisher as Node)['@id']);
+    expect(declared).toContain((byType('Blog').isPartOf as Node)['@id']);
     expect(declared).toContain((byType('WebSite').publisher as Node)['@id']);
+  });
+
+  it('never gives the social banner as a logo', () => {
+    const logos = nodes.flatMap((node) => [node.logo, (node.publisher as Node | undefined)?.logo]);
+    expect(JSON.stringify(logos)).not.toContain('Cover');
+  });
+});
+
+/** Every Organization object anywhere inside a JSON-LD value. */
+function organizationsIn(value: unknown): Node[] {
+  if (Array.isArray(value)) return value.flatMap(organizationsIn);
+  if (!value || typeof value !== 'object') return [];
+  const node = value as Node;
+  const nested = Object.values(node).flatMap(organizationsIn);
+  return node['@type'] === 'Organization' ? [node, ...nested] : nested;
+}
+
+describe('every AgentBio Organization on /vs/later (US-491)', () => {
+  const nodes = jsonLdOf(
+    <MemoryRouter>
+      <VsLater />
+    </MemoryRouter>
+  );
+  const organizations = organizationsIn(nodes).filter((org) => org.name === 'AgentBio');
+
+  it('is the site Organization, by id', () => {
+    // The WebPage publisher was an inline { '@type': 'Organization', name }.
+    expect(organizations.length).toBeGreaterThan(1);
+    for (const organization of organizations) {
+      expect(organization['@id']).toBe(organizationId(origin));
+    }
   });
 });
 
@@ -136,6 +177,19 @@ describe('the source', () => {
     const offenders = files(join(process.cwd(), 'src'))
       .filter((file) => !file.endsWith(join('config', 'site-entities.ts')))
       .filter((file) => /\/#(organization|website)\b/.test(readFileSync(file, 'utf8')));
+    expect(offenders).toEqual([]);
+  });
+
+  it('never writes an anonymous AgentBio Organization (US-491, US-502)', () => {
+    // { '@type': 'Organization', name: 'AgentBio' } with no @id is a second
+    // AgentBio to a consumer. Pricing's offer seller, the /vs/later publisher
+    // and the article author fallback were written this way; use
+    // publisherOrganization() or a { '@id': organizationId() } reference.
+    const anonymous =
+      /\{\s*'@type': 'Organization',\s*name: (?:'AgentBio'|siteName),?\s*(?:url: \w+,?\s*)?\}/;
+    const offenders = files(join(process.cwd(), 'src')).filter((file) =>
+      anonymous.test(readFileSync(file, 'utf8'))
+    );
     expect(offenders).toEqual([]);
   });
 

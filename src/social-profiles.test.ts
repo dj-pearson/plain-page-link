@@ -77,7 +77,6 @@ describe('every place that names a social account', () => {
   const sources: [string, string][] = [
     ['the footer', read('src', 'components', 'layout', 'PublicFooter.tsx')],
     ['lib/seo.ts', read('src', 'lib', 'seo.ts')],
-    ['PageSEO.tsx', read('src', 'components', 'seo', 'PageSEO.tsx')],
     ['seo.config.ts', read('src', 'config', 'seo.config.ts')],
     ['llms.txt', read('public', 'llms.txt')],
   ];

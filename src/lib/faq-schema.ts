@@ -72,25 +72,6 @@ export const generateCombinedSchema = (
 };
 
 /**
- * Generate speakable schema for voice search and Google Assistant
- * Identifies content that is most suitable for text-to-speech
- */
-export const generateSpeakableSchema = (
-  cssSelectors: string[],
-  url: string
-): Record<string, unknown> => {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    speakable: {
-      '@type': 'SpeakableSpecification',
-      cssSelector: cssSelectors,
-    },
-    url: url,
-  };
-};
-
-/**
  * Predefined FAQ sets for common feature pages
  */
 export const FEATURE_FAQS = {

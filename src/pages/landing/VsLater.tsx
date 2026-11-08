@@ -8,6 +8,7 @@ import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl, getCanonicalUrl, getOgImageUrl } from '@/config/seo.config';
 import { PRICING_PLANS } from '@/config/pricing-plans';
+import { publisherOrganization } from '@/config/site-entities';
 import { COMPETITORS } from '@/config/competitors';
 
 export default function VsLater() {
@@ -40,10 +41,8 @@ export default function VsLater() {
         name: 'AgentBio vs Later: Real Estate Link in Bio Comparison',
         description:
           "Compare AgentBio and Later for real estate agents. See why real estate professionals choose AgentBio's specialized features over Later's social media scheduling tools.",
-        publisher: {
-          '@type': 'Organization',
-          name: 'AgentBio',
-        },
+        // The site Organization by @id, not an anonymous one (US-491).
+        publisher: publisherOrganization(getBaseUrl()),
       },
       {
         '@type': 'FAQPage',
