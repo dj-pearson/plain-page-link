@@ -212,14 +212,20 @@ describe('subscription and invoice events', () => {
     expect((await handleStripeEvent(event('customer.subscription.deleted', subscription()), { ...d, db: bad.db as never })).status).toBe(500);
   });
 
-  it('invoice.payment_failed marks past_due and sends the dunning email', async () => {
+  it('invoice.payment_failed stores past_due from Stripe and sends the dunning email', async () => {
     const { db, calls } = fakeDb();
     const res = await handleStripeEvent(
       event('invoice.payment_failed', { id: 'in_1', subscription: 'sub_1', amount_due: 4900 }),
-      { ...d, db: db as never }
+      { ...d, db: db as never, retrieveSubscription: vi.fn(async () => subscription('past_due') as never) }
     );
     expect(res.status).toBe(200);
-    expect(calls.find((c) => c.table === 'user_subscriptions' && c.op === 'update')?.payload).toEqual({ status: 'past_due' });
+    expect(calls.find((c) => c.table === 'user_subscriptions' && c.op === 'update')?.payload).toMatchObject({
+      status: 'past_due',
+    });
+    expect(calls.find((c) => c.table === 'subscriptions' && c.op === 'update')?.payload).toMatchObject({
+      status: 'past_due',
+    });
+    expect(calls.some((c) => c.table === 'notifications' && c.op === 'insert')).toBe(true);
     expect(d.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'agent@example.test' }));
   });
 
@@ -227,9 +233,20 @@ describe('subscription and invoice events', () => {
     const { db } = fakeDb({ failOn: 'notifications.insert' });
     const res = await handleStripeEvent(
       event('invoice.payment_failed', { id: 'in_1', subscription: 'sub_1', amount_due: 4900 }),
-      { ...d, db: db as never }
+      { ...d, db: db as never, retrieveSubscription: vi.fn(async () => subscription('past_due') as never) }
     );
     expect(res.status).toBe(200);
+    expect(d.sendEmail).toHaveBeenCalled();
+  });
+
+  it('invoice.payment_failed: a failed status write is a 500', async () => {
+    const { db } = fakeDb({ failOn: 'user_subscriptions.update' });
+    const res = await handleStripeEvent(
+      event('invoice.payment_failed', { id: 'in_1', subscription: 'sub_1', amount_due: 4900 }),
+      { ...d, db: db as never, retrieveSubscription: vi.fn(async () => subscription('past_due') as never) }
+    );
+    expect(res.status).toBe(500);
+    expect(d.sendEmail).not.toHaveBeenCalled();
   });
 
   it('invoice.paid: a failed status write is a 500', async () => {
@@ -358,16 +375,62 @@ describe('event order (US-251)', () => {
     expect(write(calls, 'user_subscriptions')).toHaveLength(0);
   });
 
-  it('invoice.payment_failed never moves a canceled row to past_due', async () => {
+  it('invoice.payment_failed after deleted leaves the row canceled and sends no dunning', async () => {
     const { db, calls } = fakeDb();
+    const sendEmail = vi.fn(async () => ({ success: true }));
+    const res = await handleStripeEvent(
+      event('invoice.payment_failed', { id: 'in_1', subscription: 'sub_1', amount_due: 4900 }),
+      deps(db, { retrieveSubscription: retrieving(canceled()), sendEmail })
+    );
+    expect(res.status).toBe(200);
+    expect(write(calls, 'user_subscriptions')).toEqual([expect.objectContaining({ status: 'canceled' })]);
+    expect(write(calls, 'subscriptions')).toEqual([expect.objectContaining({ status: 'cancelled', plan_name: 'free' })]);
+    expect(calls.some((c) => c.table === 'notifications')).toBe(false);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  /**
+   * US-593: the failure of a first attempt can be delivered after the retry
+   * that paid it. The handler used to write past_due regardless, so a paid-up
+   * agent was left in dunning, sent a Payment Failed notice and emailed to fix their card.
+   */
+  it('invoice.payment_failed after the invoice was paid keeps the row active and sends no dunning', async () => {
+    const { db, calls } = fakeDb();
+    const sendEmail = vi.fn(async () => ({ success: true }));
+    const res = await handleStripeEvent(
+      event('invoice.payment_failed', { id: 'in_1', subscription: 'sub_1', amount_due: 4900 }),
+      deps(db, { retrieveSubscription: retrieving(subscription('active')), sendEmail })
+    );
+    expect(res.status).toBe(200);
+    expect(write(calls, 'user_subscriptions')).toEqual([
+      expect.objectContaining({ status: 'active', plan_id: 'plan-pro' }),
+    ]);
+    expect(write(calls, 'subscriptions')).toEqual([expect.objectContaining({ status: 'active' })]);
+    expect(calls.some((c) => c.table === 'notifications')).toBe(false);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('invoice.payment_failed while Stripe reports unpaid stores past_due and dunns', async () => {
+    const { db, calls } = fakeDb();
+    const sendEmail = vi.fn(async () => ({ success: true }));
     await handleStripeEvent(
       event('invoice.payment_failed', { id: 'in_1', subscription: 'sub_1', amount_due: 4900 }),
-      deps(db)
+      deps(db, { retrieveSubscription: retrieving(subscription('unpaid')), sendEmail })
     );
-    const us = calls.find((c) => c.table === 'user_subscriptions' && c.op === 'update');
-    const flat = calls.find((c) => c.table === 'subscriptions' && c.op === 'update');
-    expect(us?.filters).toContainEqual(['!status', 'canceled']);
-    expect(flat?.filters).toContainEqual(['!status', 'cancelled']);
+    expect(write(calls, 'user_subscriptions')).toEqual([expect.objectContaining({ status: 'past_due' })]);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('invoice.payment_failed: a failed Stripe lookup is a 500 and writes nothing', async () => {
+    const { db, calls } = fakeDb();
+    const sendEmail = vi.fn(async () => ({ success: true }));
+    const res = await handleStripeEvent(
+      event('invoice.payment_failed', { id: 'in_1', subscription: 'sub_1', amount_due: 4900 }),
+      deps(db, { retrieveSubscription: vi.fn(async () => Promise.reject(new Error('stripe down'))), sendEmail })
+    );
+    expect(res.status).toBe(500);
+    expect(write(calls, 'user_subscriptions')).toHaveLength(0);
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 });
 
