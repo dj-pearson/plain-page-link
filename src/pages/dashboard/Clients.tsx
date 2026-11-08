@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { AlertCircle, ChevronRight, Plus, RefreshCw, Search, Users } from 'lucide-react';
@@ -14,10 +14,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { ContactFormDialog } from '@/components/clients/ContactFormDialog';
-import { ContactDetail } from '@/components/clients/ContactDetail';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
-import { UpgradeModal } from '@/components/UpgradeModal';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
 import {
   RELATIONSHIPS,
@@ -30,6 +29,27 @@ import {
 import { daysBetween, isTouchDue } from '@/lib/keyDates';
 
 const ALL = 'all';
+
+/*
+ * The add form, the contact detail and the upgrade prompt load when they are
+ * first opened, not with the page (US-431, the US-412 pattern). The form and
+ * the detail (which embeds the same form for editing) put react-hook-form and
+ * zod (form-vendor, 23 KB gzip) on the route of an agent who came to look at
+ * their list. Hovering or focusing what opens them warms the chunk.
+ */
+const loadContactFormDialog = () => import('@/components/clients/ContactFormDialog');
+const loadContactDetail = () => import('@/components/clients/ContactDetail');
+const ContactFormDialog = lazy(() =>
+  loadContactFormDialog().then((m) => ({ default: m.ContactFormDialog }))
+);
+const ContactDetail = lazy(() => loadContactDetail().then((m) => ({ default: m.ContactDetail })));
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+
+/** A failed prefetch is retried by the click that needs the chunk. */
+const preloadContactForm = () => void loadContactFormDialog().catch(() => undefined);
+const preloadContactDetail = () => void loadContactDetail().catch(() => undefined);
 
 /** "Sam · Emma, Leo": the partner, then everyone else in the household. */
 export function householdSummary(household: HouseholdMember[]): string {
@@ -76,6 +96,8 @@ export default function Clients() {
   const [adding, setAdding] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { canAdd, planName } = usePlanUsage();
+  const addForm = useMountOnFirstOpen(adding);
+  const upgradeModal = useMountOnFirstOpen(upgradeOpen);
 
   // The database refuses a client past the plan's limit; asking first means
   // the agent meets the upgrade prompt before filling in a long form, not after.
@@ -128,7 +150,12 @@ export default function Clients() {
             checked in.
           </p>
         </div>
-        <Button onClick={startAdding} className="self-start sm:self-auto">
+        <Button
+          onClick={startAdding}
+          onPointerEnter={preloadContactForm}
+          onFocus={preloadContactForm}
+          className="self-start sm:self-auto"
+        >
           <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
           Add client
         </Button>
@@ -163,7 +190,12 @@ export default function Clients() {
             birthdays and home anniversaries worth a card, and how often you want to check in. We
             will tell you when someone is due.
           </p>
-          <Button className="mt-6" onClick={startAdding}>
+          <Button
+            className="mt-6"
+            onClick={startAdding}
+            onPointerEnter={preloadContactForm}
+            onFocus={preloadContactForm}
+          >
             <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
             Add your first client
           </Button>
@@ -249,6 +281,8 @@ export default function Clients() {
                     <button
                       type="button"
                       onClick={() => openContact(c.id)}
+                      onPointerEnter={preloadContactDetail}
+                      onFocus={preloadContactDetail}
                       className="flex min-h-[44px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none"
                     >
                       <div className="min-w-0 flex-1 space-y-1">
@@ -281,22 +315,42 @@ export default function Clients() {
         </>
       )}
 
-      <ContactFormDialog open={adding} onOpenChange={setAdding} onSaved={openContact} />
-      <UpgradeModal
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
-        feature="contacts"
-        currentPlan={planName}
-      />
+      {addForm.mounted && (
+        <LazyModal
+          onClose={() => {
+            setAdding(false);
+            addForm.unmount();
+          }}
+        >
+          <ContactFormDialog open={adding} onOpenChange={setAdding} onSaved={openContact} />
+        </LazyModal>
+      )}
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setUpgradeOpen(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={upgradeOpen}
+            onOpenChange={setUpgradeOpen}
+            feature="contacts"
+            currentPlan={planName}
+          />
+        </LazyModal>
+      )}
 
       {selectedId && (
-        <ContactDetail
-          contactId={selectedId}
-          open
-          onOpenChange={(open) => {
-            if (!open) closeContact();
-          }}
-        />
+        <LazyModal onClose={closeContact}>
+          <ContactDetail
+            contactId={selectedId}
+            open
+            onOpenChange={(open) => {
+              if (!open) closeContact();
+            }}
+          />
+        </LazyModal>
       )}
     </div>
   );

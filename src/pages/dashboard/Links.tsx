@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { lazy, useState, useMemo, useCallback } from 'react';
 import {
   Plus,
   Edit,
@@ -33,20 +33,38 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
-import { AddLinkModal } from '@/components/modals/AddLinkModal';
-import { EditLinkModal } from '@/components/modals/EditLinkModal';
 import type { LinkFormData } from '@/components/modals/AddLinkModal';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
 import { useToast } from '@/hooks/use-toast';
 import { useLinks, type Link } from '@/hooks/useLinks';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
-import { UpgradeModal } from '@/components/UpgradeModal';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { byPosition, moveAndRenumber } from '@/lib/linkOrder';
 import { sanitizeUrl } from '@/utils/sanitize';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+
+/*
+ * The add, edit and upgrade dialogs load when they are first opened, not with
+ * the page (US-431, the US-412 pattern). The add and edit forms put
+ * react-hook-form and zod (form-vendor, 23 KB gzip) on the route of an agent
+ * who came to reorder or toggle links. Hovering or focusing Add Link warms the
+ * add form; hovering or focusing a row's edit button warms the edit form.
+ */
+const loadAddLinkModal = () => import('@/components/modals/AddLinkModal');
+const loadEditLinkModal = () => import('@/components/modals/EditLinkModal');
+const AddLinkModal = lazy(() => loadAddLinkModal().then((m) => ({ default: m.AddLinkModal })));
+const EditLinkModal = lazy(() => loadEditLinkModal().then((m) => ({ default: m.EditLinkModal })));
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+
+/** A failed prefetch is retried by the click that needs the chunk. */
+const preloadAddLink = () => void loadAddLinkModal().catch(() => undefined);
+const preloadEditLink = () => void loadEditLinkModal().catch(() => undefined);
 
 const getIconComponent = (iconName: string) => {
   const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -81,6 +99,9 @@ export default function Links() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<Link | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const addModal = useMountOnFirstOpen(isAddModalOpen);
+  const editModal = useMountOnFirstOpen(isEditModalOpen);
+  const upgradeModal = useMountOnFirstOpen(showUpgradeModal);
   const { toast } = useToast();
   const {
     links,
@@ -231,6 +252,8 @@ export default function Links() {
         </div>
         <button
           onClick={handleAddClick}
+          onPointerEnter={preloadAddLink}
+          onFocus={preloadAddLink}
           className="inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 active:scale-95 transition-all font-medium min-h-[44px] w-full sm:w-auto justify-center shadow-sm"
         >
           <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -310,6 +333,8 @@ export default function Links() {
               </p>
               <button
                 onClick={handleAddClick}
+                onPointerEnter={preloadAddLink}
+                onFocus={preloadAddLink}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 active:scale-95 transition-all font-medium text-sm"
               >
                 <Plus className="h-4 w-4" />
@@ -396,6 +421,8 @@ export default function Links() {
                   <div className="flex items-center gap-0.5 flex-shrink-0">
                     <button
                       onClick={() => handleEditLink(link)}
+                      onPointerEnter={preloadEditLink}
+                      onFocus={preloadEditLink}
                       className="p-2 hover:bg-accent rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                       aria-label="Edit link"
                     >
@@ -426,25 +453,53 @@ export default function Links() {
         </div>
       )}
 
-      {/* Add Link Modal */}
-      <AddLinkModal open={isAddModalOpen} onOpenChange={setIsAddModalOpen} onSave={handleAddLink} />
+      {addModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsAddModalOpen(false);
+            addModal.unmount();
+          }}
+        >
+          <AddLinkModal
+            open={isAddModalOpen}
+            onOpenChange={setIsAddModalOpen}
+            onSave={handleAddLink}
+          />
+        </LazyModal>
+      )}
 
-      {/* Edit Link Modal */}
-      <EditLinkModal
-        open={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
-        link={editingLink}
-        onSave={handleUpdateLink}
-      />
+      {editModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsEditModalOpen(false);
+            editModal.unmount();
+          }}
+        >
+          <EditLinkModal
+            open={isEditModalOpen}
+            onOpenChange={setIsEditModalOpen}
+            link={editingLink}
+            onSave={handleUpdateLink}
+          />
+        </LazyModal>
+      )}
 
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        open={showUpgradeModal}
-        onOpenChange={setShowUpgradeModal}
-        feature="links"
-        currentPlan={subscription?.plan_name || 'Free'}
-        requiredPlan="Starter"
-      />
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowUpgradeModal(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={showUpgradeModal}
+            onOpenChange={setShowUpgradeModal}
+            feature="links"
+            currentPlan={subscription?.plan_name || 'Free'}
+            requiredPlan="Starter"
+          />
+        </LazyModal>
+      )}
     </div>
   );
 }
