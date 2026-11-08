@@ -2094,6 +2094,7 @@ const DEFINER_CALLABLE = new Map([
   ['increment_link_clicks', { anon: true, why: 'the only writer of links.click_count; throttled' }],
   ['increment_article_view', { anon: true, why: 'blog view counter; published rows only, throttled (US-262)' }],
   ['profile_shows_branding',{ anon: true, why: 'public profile; returns a boolean' }],
+  ['public_profile_custom_css', { anon: true, why: 'public profile; published-or-owner and customThemes plans only (US-514)' }],
   ['public_agent_response_hours', { anon: true, why: 'public profile; aggregate only' }],
   // authenticated only: each checks auth.uid() or admin itself.
   ['get_plan_usage', { why: 'reads auth.uid() only' }],
@@ -3768,6 +3769,90 @@ check("a signed-in user cannot read another agent's private profile columns or p
       q(`DELETE FROM public.user_roles WHERE user_id IN ('${owner}', '${other}', '${admin}');
          DELETE FROM public.profiles WHERE id IN ('${owner}', '${other}', '${admin}');
          DELETE FROM auth.users WHERE id IN ('${owner}', '${other}', '${admin}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// 8d. Custom CSS reaches a published page on a plan that has it, and nowhere
+//     else (US-514). The column stays private; public_profile_custom_css is the
+//     visitor's only read, and the trigger keeps a free agent from setting it.
+// ---------------------------------------------------------------------------
+check('custom CSS is served only for published, entitled pages and only entitled owners can set it', () => {
+  const out = [];
+  const paid = '00000000-dead-beef-0000-000000051401';
+  const free = '00000000-dead-beef-0000-000000051402';
+  const as = (role, sub, sql) =>
+    q(`SET ROLE ${role}; ${sub ? `SET request.jwt.claim.sub = '${sub}';` : ''} ${sql}`);
+  const attempt = (fn) => {
+    try {
+      fn();
+      return 'ok';
+    } catch (e) {
+      return String(e.stderr || e.message);
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${paid}', 'us514paid@example.test'), ('${free}', 'us514free@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.profiles (id, username, is_published) VALUES
+         ('${paid}', 'us514paid', true), ('${free}', 'us514free', true)
+         ON CONFLICT (id) DO UPDATE SET is_published = true;
+       DELETE FROM public.user_subscriptions WHERE user_id IN ('${paid}', '${free}');
+       INSERT INTO public.user_subscriptions (user_id, plan_id, status, current_period_end)
+         SELECT '${paid}', id, 'active', now() + interval '20 days'
+         FROM public.subscription_plans WHERE name = 'starter';`);
+
+    const setPaid = attempt(() =>
+      as('authenticated', paid, `UPDATE public.profiles SET custom_css = 'h1 { color: red }' WHERE id = '${paid}';`)
+    );
+    if (setPaid !== 'ok') out.push(`a starter agent could not save custom CSS: ${setPaid.split('\n')[0]}`);
+
+    const setFree = attempt(() =>
+      as('authenticated', free, `UPDATE public.profiles SET custom_css = 'h1 { color: red }' WHERE id = '${free}';`)
+    );
+    if (!setFree.includes('Custom CSS is part of the paid plans'))
+      out.push('a free agent could save custom CSS');
+    if (attempt(() => as('authenticated', free, `UPDATE public.profiles SET custom_css = '' WHERE id = '${free}';`)) !== 'ok')
+      out.push('a free agent could not clear custom CSS');
+
+    const tooLong = attempt(() =>
+      as('authenticated', paid, `UPDATE public.profiles SET custom_css = repeat('a', 10001) WHERE id = '${paid}';`)
+    );
+    if (!tooLong.includes('limited to 10,000')) out.push('custom CSS over 10,000 characters was accepted');
+
+    const [served] = as('anon', null, `SELECT coalesce(public.public_profile_custom_css('${paid}'), '<null>');`);
+    if (served !== 'h1 { color: red }') out.push(`a visitor got "${served}" for a published starter page`);
+
+    const [inPage] = as('anon', null, `SELECT coalesce(public.get_public_profile_page('us514paid') ->> 'customCss', '<null>');`);
+    if (inPage !== 'h1 { color: red }') out.push(`get_public_profile_page returned customCss "${inPage}"`);
+
+    // Stored CSS on a free plan (a downgrade) is not served.
+    q(`UPDATE public.profiles SET custom_css = 'p { color: blue }' WHERE id = '${free}';`);
+    const [freeServed] = as('anon', null, `SELECT coalesce(public.public_profile_custom_css('${free}'), '<null>');`);
+    if (freeServed !== '<null>') out.push('custom CSS was served for an agent whose plan lacks customThemes');
+
+    // Unpublished: not for visitors, still for the owner's preview.
+    q(`UPDATE public.profiles SET is_published = false WHERE id = '${paid}';`);
+    const [hidden] = as('anon', null, `SELECT coalesce(public.public_profile_custom_css('${paid}'), '<null>');`);
+    if (hidden !== '<null>') out.push('custom CSS was served for an unpublished page');
+    const [preview] = as('authenticated', paid, `SELECT coalesce(public.public_profile_custom_css('${paid}'), '<null>');`);
+    if (preview !== 'h1 { color: red }') out.push("the owner's preview did not get their custom CSS");
+
+    // The column itself stays private.
+    if (attempt(() => as('anon', null, `SELECT custom_css FROM public.profiles WHERE id = '${free}';`)) === 'ok')
+      out.push('anon could select profiles.custom_css directly');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.user_subscriptions WHERE user_id IN ('${paid}', '${free}');
+         DELETE FROM public.profiles WHERE id IN ('${paid}', '${free}');
+         DELETE FROM auth.users WHERE id IN ('${paid}', '${free}');`);
     } catch {
       /* best effort */
     }

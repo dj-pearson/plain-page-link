@@ -46,6 +46,27 @@ export const profileShowsBrandingQueryOptions = (agentId: string | null | undefi
     staleTime: 10 * 60 * 1000,
   });
 
+/**
+ * The agent's custom CSS as stored (US-514), or null when there is none, the
+ * page is not published, or the plan lacks customThemes — the database decides
+ * all three. Untrusted: render it only through sanitizeCustomCss. Seeded from
+ * get_public_profile_page's payload like the branding flag.
+ */
+export const profileCustomCssQueryOptions = (agentId: string | null | undefined) =>
+  queryOptions({
+    queryKey: ['profile-custom-css', agentId ?? null] as const,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.rpc('public_profile_custom_css', {
+        _user_id: agentId as string,
+      });
+      // The page renders with its theme alone rather than fail.
+      if (error) return null;
+      return typeof data === 'string' && data.trim() ? data : null;
+    },
+    enabled: !!agentId,
+    staleTime: 5 * 60 * 1000,
+  });
+
 /** Upcoming public open houses for a profile page. */
 export const publicOpenHousesQueryOptions = (agentId: string | null | undefined) =>
   queryOptions({

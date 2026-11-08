@@ -24,6 +24,7 @@ import { logger } from '@/lib/logger';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { CustomCssEditor } from '@/components/theme/CustomCssEditor';
 
 const AVAILABLE_FONTS = [
   'Inter',
@@ -662,6 +663,9 @@ export default function Theme() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Custom CSS (US-514): saved on its own, not with the theme. */}
+          <CustomCssEditor />
         </TabsContent>
       </Tabs>
 

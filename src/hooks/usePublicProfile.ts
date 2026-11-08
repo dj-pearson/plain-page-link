@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import {
   agentFactRowsFromPublicPage,
   agentPageFactsQueryOptions,
+  profileCustomCssQueryOptions,
   profileShowsBrandingQueryOptions,
   publicOpenHousesQueryOptions,
   type PublicOpenHouse,
@@ -63,6 +64,11 @@ interface RawPublicProfilePage {
 /** What get_public_profile_page returns: the raw page plus the two side reads. */
 interface PublicProfilePageRpcResult extends RawPublicProfilePage {
   showsBranding: boolean | null;
+  /**
+   * The agent's custom CSS (US-514): null when there is none to apply,
+   * absent on a database that predates 20261108000514.
+   */
+  customCss?: string | null;
   /** Null when the agent hides listings: the section never renders then. */
   openHouses: PublicOpenHouse[] | null;
 }
@@ -213,6 +219,13 @@ function seedSideQueries(client: QueryClient, page: PublicProfilePageRpcResult) 
   if (Array.isArray(page.openHouses)) {
     client.setQueryData(publicOpenHousesQueryOptions(agentId).queryKey, page.openHouses);
   }
+  // Absent (an older database): leave it to the hook's own read.
+  if (page.customCss === null || typeof page.customCss === 'string') {
+    client.setQueryData(
+      profileCustomCssQueryOptions(agentId).queryKey,
+      page.customCss && page.customCss.trim() ? page.customCss : null
+    );
+  }
 }
 
 /**
@@ -307,6 +320,7 @@ async function fetchPublicProfilePageByTables(
   // joined, so the hooks never issue a second request on mount.
   void client.prefetchQuery(profileShowsBrandingQueryOptions(profile.id));
   void client.prefetchQuery(publicOpenHousesQueryOptions(profile.id));
+  void client.prefetchQuery(profileCustomCssQueryOptions(profile.id));
 
   // Fetch all related data in parallel instead of sequential
   const [
