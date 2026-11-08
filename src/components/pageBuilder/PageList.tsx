@@ -11,7 +11,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Eye, Edit, Trash2, Globe, CheckCircle2, ExternalLink, Sparkles } from 'lucide-react';
+import {
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  Globe,
+  CheckCircle2,
+  ExternalLink,
+  Sparkles,
+  AlertCircle,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +37,9 @@ export function PageList() {
   const { setPage, loadUserPages, setAsActivePage } = usePageBuilderStore();
   const [pages, setPages] = useState<PageConfig[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed load is not "no pages". Showing the empty state for it told an
+  // agent with a live page to create their first one.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [activating, setActivating] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
 
@@ -38,9 +51,10 @@ export function PageList() {
     try {
       const userPages = await loadUserPages();
       setPages(userPages);
+      setLoadFailed(false);
     } catch (error) {
       logger.error('Failed to load pages', error as Error);
-      toast.error('Failed to load pages');
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -141,7 +155,26 @@ export function PageList() {
         </Button>
       </div>
 
-      {pages.length === 0 ? (
+      {loadFailed ? (
+        <Card className="p-12 text-center" role="alert">
+          <div className="max-w-md mx-auto">
+            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" aria-hidden="true" />
+            <h3 className="text-lg font-semibold mb-2">Your pages could not be loaded</h3>
+            <p className="text-muted-foreground mb-6">
+              Nothing has changed on your public page. Check your connection and try again.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLoading(true);
+                void loadPages();
+              }}
+            >
+              Try again
+            </Button>
+          </div>
+        </Card>
+      ) : pages.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="max-w-md mx-auto">
             <Globe className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -158,7 +191,10 @@ export function PageList() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pages.map((page) => {
-            const isActive = (page as any).is_active || false;
+            const isActive = page.isActive === true;
+            // The public profile renders the active page only while it is
+            // published (usePublicProfile filters on both).
+            const isLive = isActive && page.published;
             return (
               <Card key={page.id} className="p-6 space-y-4">
                 <div className="space-y-2">
@@ -167,10 +203,10 @@ export function PageList() {
                       <h3 className="font-semibold text-lg truncate">{page.title}</h3>
                       <p className="text-sm text-muted-foreground truncate">/{page.slug}</p>
                     </div>
-                    {isActive && (
+                    {isLive && (
                       <Badge variant="default" className="gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Active
+                        <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                        Live on your page
                       </Badge>
                     )}
                   </div>
@@ -181,6 +217,12 @@ export function PageList() {
                     </Badge>
                     <Badge variant="outline">{page.blocks.length} blocks</Badge>
                   </div>
+                  {isActive && !page.published && (
+                    <p className="text-sm text-muted-foreground">
+                      This is your active page, but it is a draft, so your public page does not show
+                      it. Publish it to put it live.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2">

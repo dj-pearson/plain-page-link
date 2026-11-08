@@ -281,6 +281,12 @@ export interface PageConfig {
   theme: PageTheme;
   seo: PageSEO;
   published: boolean;
+  /**
+   * custom_pages.is_active: the page the public profile renders (when it is
+   * also published). Read-only here — savePage never writes it; only
+   * setAsActivePage does. Absent on a page created in this session.
+   */
+  isActive?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

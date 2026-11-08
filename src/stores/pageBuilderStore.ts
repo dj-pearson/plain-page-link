@@ -137,6 +137,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         theme: objectFromJson(data.theme, EMPTY_THEME),
         seo: objectFromJson(data.seo, EMPTY_SEO),
         published: data.published,
+        isActive: data.is_active,
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at),
       };
@@ -175,12 +176,16 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         theme: objectFromJson(d.theme, EMPTY_THEME),
         seo: objectFromJson(d.seo, EMPTY_SEO),
         published: d.published,
+        isActive: d.is_active,
         createdAt: new Date(d.created_at),
         updatedAt: new Date(d.updated_at),
       }));
     } catch (error) {
+      // Rethrown, not `return []`. An empty list here rendered "No pages yet —
+      // Create your first page" to an agent whose pages had simply failed to
+      // load, inviting them to build a duplicate of the page that is live.
       logger.error('Failed to load user pages', error as Error);
-      return [];
+      throw error;
     }
   },
 
