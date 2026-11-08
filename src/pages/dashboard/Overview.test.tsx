@@ -112,4 +112,36 @@ describe('Overview', () => {
     await userEvent.click(screen.getByRole('button', { name: /retry loading links/i }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
+
+  // US-602
+  it('opens the page behind each stat card', () => {
+    renderWithProviders(<Overview />);
+
+    const href = (label: string) => screen.getByText(label).closest('a')?.getAttribute('href');
+    expect(href('Profile Views')).toBe('/dashboard/analytics');
+    expect(href('Leads (30d)')).toBe('/dashboard/leads');
+    expect(href('Link Clicks')).toBe('/dashboard/links');
+    expect(href('Conversion Rate')).toBe('/dashboard/analytics');
+  });
+
+  it('labels and groups recent lead statuses instead of colouring a lost lead green', () => {
+    analytics.current = {
+      ...base,
+      recentLeads: [
+        {
+          id: 'l1',
+          name: 'Nora Nurture',
+          email: 'n@example.com',
+          phone: null,
+          status: 'nurturing',
+        },
+        { id: 'l2', name: 'Lou Lost', email: 'l@example.com', phone: null, status: 'lost' },
+      ],
+    };
+    renderWithProviders(<Overview />);
+
+    expect(screen.getByText('Nurturing')).toHaveAttribute('data-tone', 'in_progress');
+    expect(screen.queryByText('nurturing')).not.toBeInTheDocument();
+    expect(screen.getByText('Lost')).toHaveAttribute('data-tone', 'lost');
+  });
 });
