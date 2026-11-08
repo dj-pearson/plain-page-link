@@ -51,7 +51,11 @@ import {
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 import { encryptSecret, decryptSecret } from '../_shared/encryption.ts';
 import { contactsCopiedFromLockedLeads } from './contactLock.ts';
-import { matchContactsForLead, type UnhashedContactRow } from './contactMatch.ts';
+import { matchContactsForLead, HASH_BATCH } from './contactMatch.ts';
+import {
+  hashUnhashedContacts,
+  supabaseContactHashStore,
+} from '../_shared/contact-lookup-hashes.ts';
 
 // One page of leads decrypts 2 fields x 50 rows. 200 leaves headroom without
 // letting a single request pin a worker on PBKDF2 — each value is a separate
@@ -68,7 +72,8 @@ type Op =
   | 'decrypt_leads'
   | 'decrypt_contacts'
   | 'decrypt_profile'
-  | 'match_contacts_for_lead';
+  | 'match_contacts_for_lead'
+  | 'index_contacts';
 
 export default async (req: Request) => {
   const origin = req.headers.get('origin');
@@ -125,10 +130,11 @@ export default async (req: Request) => {
       op !== 'decrypt_leads' &&
       op !== 'decrypt_contacts' &&
       op !== 'decrypt_profile' &&
-      op !== 'match_contacts_for_lead'
+      op !== 'match_contacts_for_lead' &&
+      op !== 'index_contacts'
     ) {
       return errorResponse(
-        "op must be 'encrypt', 'decrypt_leads', 'decrypt_contacts', 'decrypt_profile' or 'match_contacts_for_lead'",
+        "op must be 'encrypt', 'decrypt_leads', 'decrypt_contacts', 'decrypt_profile', 'match_contacts_for_lead' or 'index_contacts'",
         'REQUEST_VALIDATION_FAILED',
         req,
         400
@@ -160,6 +166,50 @@ export default async (req: Request) => {
       return successResponse({ phone }, req);
     }
 
+    // Shared by match_contacts_for_lead and index_contacts: the fingerprint
+    // key, a decrypt that turns anything unopenable into "nothing to hash",
+    // and the service-role reads/writes of contacts' lookup columns.
+    const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY');
+    const decryptForHash = async (value: string | null): Promise<string | null> => {
+      if (!value) return null;
+      try {
+        const plain = (await decryptSecret(value)) ?? null;
+        // A value that will not open (corrupt, rotated key) has nothing to
+        // fingerprint.
+        return plain && !plain.startsWith('enc:v1:') ? plain : null;
+      } catch {
+        return null;
+      }
+    };
+    const hashStore = supabaseContactHashStore(supabase);
+
+    // ---------------------------------------------------------------------
+    // index_contacts — fingerprint the caller's contacts that have none yet
+    // (US-640), newest edits first, so the contact the dashboard just
+    // created or edited is hashed within that one request.
+    // scheduled-maintenance covers the rest of the sphere in the background.
+    // `complete: false` means more remain; the client need not wait for them.
+    // ---------------------------------------------------------------------
+    if (op === 'index_contacts') {
+      if (!hashSecret) {
+        return errorResponse('Indexing is not configured', 'MATCH_UNAVAILABLE', req, 503);
+      }
+      const result = await hashUnhashedContacts(
+        { hashSecret, decrypt: decryptForHash, ...hashStore },
+        user.id,
+        HASH_BATCH
+      );
+      if (result.failed > 0) {
+        console.error(
+          `[pii-crypto] index_contacts: ${result.failed} not saved: ${result.errors.slice(0, 3).join('; ')}`
+        );
+      }
+      return successResponse(
+        { hashed: result.hashed, failed: result.failed, complete: result.complete },
+        req
+      );
+    }
+
     // ---------------------------------------------------------------------
     // match_contacts_for_lead — which of the caller's contacts this lead
     // already is (US-629), by keyed fingerprint. Hashes a batch of the
@@ -171,7 +221,6 @@ export default async (req: Request) => {
       if (typeof leadId !== 'string' || !UUID_RE.test(leadId)) {
         return errorResponse('leadId must be a uuid', 'REQUEST_VALIDATION_FAILED', req, 400);
       }
-      const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY');
       if (!hashSecret) {
         return errorResponse('Matching is not configured', 'MATCH_UNAVAILABLE', req, 503);
       }
@@ -179,17 +228,7 @@ export default async (req: Request) => {
       const result = await matchContactsForLead(
         {
           hashSecret,
-          decrypt: async (value) => {
-            if (!value) return null;
-            try {
-              const plain = (await decryptSecret(value)) ?? null;
-              // A value that will not open (corrupt, rotated key) has nothing
-              // to fingerprint.
-              return plain && !plain.startsWith('enc:v1:') ? plain : null;
-            } catch {
-              return null;
-            }
-          },
+          decrypt: decryptForHash,
           loadLead: async (id) => {
             const { data, error } = await supabase
               .from('leads')
@@ -209,26 +248,7 @@ export default async (req: Request) => {
             if (error) return true;
             return ((data ?? []) as string[]).includes(id);
           },
-          loadUnhashedContacts: async (userId, limit) => {
-            const { data, error } = await supabase
-              .from('contacts')
-              .select('id, encrypted_email, encrypted_phone, updated_at')
-              .eq('user_id', userId)
-              .is('lookup_hashed_at', null)
-              .limit(limit);
-            if (error) throw error;
-            return (data ?? []) as UnhashedContactRow[];
-          },
-          saveContactHashes: async (row, hashes) => {
-            // Only if the contact is as it was read: an edit in between
-            // clears the hashes by trigger and must not be overwritten.
-            const { error } = await supabase
-              .from('contacts')
-              .update({ ...hashes, lookup_hashed_at: new Date().toISOString() })
-              .eq('id', row.id)
-              .eq('updated_at', row.updated_at);
-            if (error) throw error;
-          },
+          ...hashStore,
           findCandidates: async (userId, hashes) => {
             const clauses = [
               hashes.email_hash ? `email_hash.eq.${hashes.email_hash}` : null,

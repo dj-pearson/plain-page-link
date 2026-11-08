@@ -18,6 +18,11 @@ import { processDueDeletions, supabaseDeletionStore } from '../_shared/account-d
 import { createSubscriptionApi } from '../_shared/stripe-subscriptions.ts';
 import { decryptSecret } from '../_shared/encryption.ts';
 import {
+  hashContactBacklog,
+  summarizeContactHashReport,
+  supabaseContactHashStore,
+} from '../_shared/contact-lookup-hashes.ts';
+import {
   processExportQueue,
   purgeExpiredExports,
   summarizeExportQueueReport,
@@ -274,6 +279,42 @@ serve(async (req) => {
         // says some subject is still waiting for their data.
         if (report.errors.length > 0) {
           throw new Error(`${summary}: ${report.errors.join('; ').slice(0, 500)}`);
+        }
+        return summary;
+      })
+    );
+
+    // ---------------------------------------------------------------------
+    // 2c. Contact lookup fingerprints (US-640). The duplicate-client check
+    //     compares contacts.email_hash/phone_hash, which only code holding
+    //     PII_ENCRYPTION_KEY can compute. New and edited contacts are hashed
+    //     by pii-crypto when the dashboard saves them; this works through
+    //     every contact that is still unhashed (existing ones, saves whose
+    //     follow-up call failed), a bounded number per run.
+    // ---------------------------------------------------------------------
+    results.push(
+      await run('contact_lookup_hashes', async () => {
+        const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY');
+        if (!hashSecret) return 'skipped: PII_ENCRYPTION_KEY is not set';
+        const report = await hashContactBacklog({
+          hashSecret,
+          decrypt: async (value) => {
+            if (!value) return null;
+            try {
+              const plain = (await decryptSecret(value)) ?? null;
+              // Unopenable (corrupt, rotated key): nothing to fingerprint.
+              return plain && !plain.startsWith('enc:v1:') ? plain : null;
+            } catch {
+              return null;
+            }
+          },
+          ...supabaseContactHashStore(supabase),
+        });
+        const summary = summarizeContactHashReport(report);
+        // Unsaved rows stay unhashed and are retried next run; reported
+        // failed so the 207 shows it.
+        if (report.failed > 0) {
+          throw new Error(`${summary}: ${report.errors.slice(0, 10).join('; ').slice(0, 500)}`);
         }
         return summary;
       })

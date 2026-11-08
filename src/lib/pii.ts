@@ -254,3 +254,19 @@ export async function findContactsMatchingLead(leadId: string): Promise<ContactM
   }
   return matches;
 }
+
+/**
+ * Asks pii-crypto to fingerprint the caller's contacts that have none yet
+ * (US-640), newest edits first, so a contact just created or edited is
+ * hashed within this one request and the next lead conversion can find it.
+ *
+ * Fire-and-forget: never throws, and resolves to whether pii-crypto answered.
+ * A miss is harmless: scheduled-maintenance hashes whatever is left, and the
+ * duplicate check still hashes a batch itself before matching.
+ */
+export async function indexOwnContacts(): Promise<boolean> {
+  const { data, error } = await invokePiiCrypto<{ hashed: number; complete: boolean }>({
+    op: 'index_contacts',
+  });
+  return !error && !!data;
+}

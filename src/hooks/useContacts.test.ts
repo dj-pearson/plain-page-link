@@ -20,12 +20,75 @@ vi.mock('@/stores/useAuthStore', () => ({
     select({ user: { id: 'agent-1' } }),
 }));
 
+const indexOwnContacts = vi.fn(async () => true);
+
 vi.mock('@/lib/pii', () => ({
   encryptPIIBatch: vi.fn(async (values: (string | null)[]) => values),
   decryptContactDetails: vi.fn(async () => new Map()),
+  indexOwnContacts: () => indexOwnContacts(),
 }));
 
-import { useContactInteractions } from './useContacts';
+import { useContactInteractions, useContacts } from './useContacts';
+
+describe('useContacts fingerprints contacts as they are written (US-640)', () => {
+  beforeEach(() => {
+    fromMock.mockClear();
+    indexOwnContacts.mockClear();
+    queryResult = { data: { id: 'contact-1' }, error: null };
+  });
+
+  function renderContacts() {
+    const client = createTestQueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    return renderHook(() => useContacts(), { wrapper });
+  }
+
+  it('indexes right after a contact is created', async () => {
+    const { result } = renderContacts();
+    await act(async () => {
+      await result.current.createContact.mutateAsync({
+        first_name: 'Dana',
+        relationship: 'past_client',
+        email: 'dana@example.com',
+      });
+    });
+    expect(indexOwnContacts).toHaveBeenCalledTimes(1);
+  });
+
+  it('indexes after an edit that rewrites email or phone (the trigger cleared the hashes)', async () => {
+    const { result } = renderContacts();
+    await act(async () => {
+      await result.current.updateContact.mutateAsync({
+        id: 'contact-1',
+        input: { phone: '(512) 555-0142' },
+      });
+    });
+    expect(indexOwnContacts).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not index after an edit that leaves email and phone alone', async () => {
+    const { result } = renderContacts();
+    await act(async () => {
+      await result.current.updateContact.mutateAsync({
+        id: 'contact-1',
+        input: { lead_id: 'lead-1' },
+      });
+    });
+    expect(indexOwnContacts).not.toHaveBeenCalled();
+  });
+
+  it('does not index when the write fails', async () => {
+    queryResult = { data: null, error: { message: 'denied' } };
+    const { result } = renderContacts();
+    await act(async () => {
+      await result.current.createContact
+        .mutateAsync({ first_name: 'Dana', relationship: 'past_client' })
+        .catch(() => undefined);
+    });
+    expect(indexOwnContacts).not.toHaveBeenCalled();
+  });
+});
 
 describe('useContactInteractions.deleteInteraction (US-610)', () => {
   beforeEach(() => {
