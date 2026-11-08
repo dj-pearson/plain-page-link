@@ -6,7 +6,7 @@
 
 import { PageBlock, BlockStyle, blockConfigOf } from '@/types/pageBuilder';
 import { BioBlock } from './blocks/BioBlock';
-import { ListingsBlock } from './blocks/ListingsBlock';
+import { ListingsBlock, type ListingsBlockHref } from './blocks/ListingsBlock';
 import { LinkBlock } from './blocks/LinkBlock';
 import { ContactBlock } from './blocks/ContactBlock';
 import { SocialBlock } from './blocks/SocialBlock';
@@ -27,6 +27,8 @@ interface BlockRendererProps {
   isSelected?: boolean;
   onSelect?: () => void;
   userId?: string;
+  /** Where a listing card opens on the public page; absent in the editor. */
+  listingHref?: ListingsBlockHref;
 }
 
 function getBlockStyleCSS(style?: BlockStyle): React.CSSProperties {
@@ -67,6 +69,7 @@ export function BlockRenderer({
   isSelected = false,
   onSelect,
   userId,
+  listingHref,
 }: BlockRendererProps) {
   const renderBlock = () => {
     // Narrowed on the config's own tag, so each block gets its own config
@@ -76,7 +79,14 @@ export function BlockRenderer({
       case 'bio':
         return <BioBlock config={config} isEditing={isEditing} />;
       case 'listings':
-        return <ListingsBlock config={config} isEditing={isEditing} userId={userId} />;
+        return (
+          <ListingsBlock
+            config={config}
+            isEditing={isEditing}
+            userId={userId}
+            listingHref={listingHref}
+          />
+        );
       case 'link':
         return <LinkBlock config={config} isEditing={isEditing} />;
       case 'contact':

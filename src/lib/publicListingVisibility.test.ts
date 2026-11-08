@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   selectAvailableListings,
+  reachableListingHref,
   selectListingForPage,
   selectSoldListings,
 } from './publicListingVisibility';
@@ -93,5 +94,26 @@ describe('selectListingForPage (US-275)', () => {
   it('treats missing settings as the defaults (shown)', () => {
     expect(selectListingForPage(all, 'a', null)?.id).toBe('a');
     expect(selectListingForPage(all, 's', null)?.id).toBe('s');
+  });
+});
+
+describe('reachableListingHref (US-589)', () => {
+  it('links an available listing to its page', () => {
+    expect(reachableListingHref('jane', {})(l('a', 'active'))).toBe('/jane/listing/a');
+    expect(reachableListingHref('jane', null)(l('p', 'pending'))).toBe('/jane/listing/p');
+  });
+
+  it('does not link what the listing page would refuse', () => {
+    expect(
+      reachableListingHref('jane', { show_sold_properties: false })(l('s', 'sold'))
+    ).toBeNull();
+    expect(reachableListingHref('jane', { show_listings: false })(l('a', 'active'))).toBeNull();
+    expect(reachableListingHref('jane', {})(l('d', 'draft'))).toBeNull();
+  });
+
+  it('links a sold listing while sold properties are shown', () => {
+    expect(reachableListingHref('jane', { show_sold_properties: true })(l('s', 'sold'))).toBe(
+      '/jane/listing/s'
+    );
   });
 });

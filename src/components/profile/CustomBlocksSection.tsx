@@ -1,4 +1,5 @@
 import { BlockRenderer } from '@/components/pageBuilder/BlockRenderer';
+import type { ListingsBlockHref } from '@/components/pageBuilder/blocks/ListingsBlock';
 import type { PageBlock } from '@/types/pageBuilder';
 import { blockHasDestination } from '@/lib/blockLinkTarget';
 
@@ -9,6 +10,8 @@ interface CustomBlocksSectionProps {
   userId: string;
   /** The page's title, used as the section heading when it has one. */
   title?: string | null;
+  /** The listing page a listings block's card opens, or null for none. */
+  listingHref?: ListingsBlockHref;
 }
 
 /**
@@ -30,7 +33,12 @@ interface CustomBlocksSectionProps {
  * that is not a list of blocks renders nothing rather than throwing on the
  * public page.
  */
-export function CustomBlocksSection({ blocks, userId, title }: CustomBlocksSectionProps) {
+export function CustomBlocksSection({
+  blocks,
+  userId,
+  title,
+  listingHref,
+}: CustomBlocksSectionProps) {
   const list: PageBlock[] = Array.isArray(blocks) ? (blocks as PageBlock[]) : [];
 
   const visible = list
@@ -52,7 +60,12 @@ export function CustomBlocksSection({ blocks, userId, title }: CustomBlocksSecti
       <div className="flex flex-col gap-8">
         {visible.map((block) => (
           <div key={block.id} data-block-type={block.type}>
-            <BlockRenderer block={block} isEditing={false} userId={userId} />
+            <BlockRenderer
+              block={block}
+              isEditing={false}
+              userId={userId}
+              listingHref={listingHref}
+            />
           </div>
         ))}
       </div>

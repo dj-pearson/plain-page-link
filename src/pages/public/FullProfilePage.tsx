@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
@@ -22,7 +22,12 @@ import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
 import { useProfileCustomCss } from '@/hooks/useProfileCustomCss';
 import { SEOHead } from '@/components/SEOHead';
 import { PROFILE_MAIN_STYLE, useProfileTheme } from '@/hooks/useProfileTheme';
-import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
+import {
+  selectAvailableListings,
+  reachableListingHref,
+  selectSoldListings,
+} from '@/lib/publicListingVisibility';
+import type { ListingsBlockHref } from '@/components/pageBuilder/blocks/ListingsBlock';
 import { formatResponseTime } from '@/lib/responseTime';
 import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { parsePrice } from '@/lib/format';
@@ -101,6 +106,16 @@ export default function FullProfilePage() {
     (listing: PublicProfileListing) =>
       listingPagePath(data?.profile?.username ?? normalizeUsername(slug), listing.id),
     [data?.profile?.username, slug]
+  );
+
+  /**
+   * The same page for a card in a page-builder listings block, but only when
+   * that page would show the listing: a sold home while the agent hides sold
+   * properties is not linked, so a visitor never taps through to "not found".
+   */
+  const blockListingHref = useMemo<ListingsBlockHref>(
+    () => reachableListingHref(data?.profile?.username ?? normalizeUsername(slug), data?.settings),
+    [data?.profile?.username, data?.settings, slug]
   );
 
   // One page, one view (US-115). This used to run alongside a redirect to
@@ -554,6 +569,7 @@ export default function FullProfilePage() {
                       blocks={customPage.blocks}
                       userId={profile.id}
                       title={customPage.title}
+                      listingHref={blockListingHref}
                     />
                   </Suspense>
                 </LazyLoadErrorBoundary>

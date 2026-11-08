@@ -10,6 +10,7 @@
 // Relative, not '@/': functions/_lib/profile-sitemap.ts imports this module, and
 // the Pages Functions bundle does not resolve the Vite alias.
 import { isPublicListingStatus } from './listingStatus';
+import { listingPagePath } from './listingShare';
 
 /** Available statuses, in the order a visitor should meet them. */
 export const AVAILABLE_STATUS_ORDER = ['active', 'pending', 'under_contract'] as const;
@@ -61,4 +62,24 @@ export function selectListingForPage<T extends HasStatus & { id: string }>(
     return settings?.show_sold_properties === false ? null : listing;
   }
   return selectAvailableListings([listing]).length > 0 ? listing : null;
+}
+
+/**
+ * A function giving the listing page a card on the profile may link to, or
+ * null when that page would refuse the listing (US-589).
+ *
+ * For cards outside the profile's own galleries — a page-builder listings
+ * block — which the agent can fill with any of their public listings. A sold
+ * home while sold properties are hidden, or anything while listings are
+ * hidden, has no page (selectListingForPage), so its card is not a link to
+ * "not found".
+ */
+export function reachableListingHref(
+  username: string,
+  settings: ListingPageSettings | null | undefined
+): (listing: HasStatus & { id: string }) => string | null {
+  return (listing) =>
+    selectListingForPage([listing], listing.id, settings)
+      ? listingPagePath(username, listing.id)
+      : null;
 }
