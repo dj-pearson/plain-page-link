@@ -78,6 +78,7 @@ import Leads from './Leads';
 
 /** A `leads` select that resolves to the given rows, and records the columns asked for. */
 const eqCalls: [string, unknown][] = [];
+const inCalls: [string, unknown][] = [];
 
 const stubLeadsQuery = (
   rows: LeadRow[],
@@ -99,7 +100,11 @@ const stubLeadsQuery = (
   });
   // `range` is what useLeads pages with since US-104; without it the chain
   // returns undefined and the page renders its error card.
-  for (const m of ['order', 'in', 'is', 'limit', 'range', 'ilike', 'or']) {
+  builder.in = vi.fn((col: string, values: unknown) => {
+    inCalls.push([col, values]);
+    return builder;
+  });
+  for (const m of ['order', 'is', 'limit', 'range', 'ilike', 'or']) {
     builder[m] = vi.fn(() => builder);
   }
   builder.then = (resolve: (v: unknown) => unknown) =>
@@ -115,6 +120,8 @@ describe('Leads page', () => {
     selected = [];
     updates = [];
     eqCalls.length = 0;
+    inCalls.length = 0;
+    window.history.replaceState(null, '', '/');
     decrypted.email = undefined;
     fromMock.mockReset();
     rpcMock.mockReset();
@@ -267,9 +274,73 @@ describe('Leads page', () => {
       fromMock.mockClear();
       eqCalls.length = 0;
 
-      await userEvent.click(screen.getByRole('button', { name: /contacted/i }));
+      await userEvent.click(screen.getByRole('button', { name: /in progress/i }));
 
-      await waitFor(() => expect(eqCalls).toContainEqual(['status', 'contacted']));
+      // US-439: the chip is a group, so nurturing and qualified leads are in it.
+      await waitFor(() =>
+        expect(inCalls).toContainEqual(['status', ['contacted', 'qualified', 'nurturing']])
+      );
     });
+
+    it('treats closed as won on the Won chip', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+      inCalls.length = 0;
+
+      await userEvent.click(screen.getByRole('button', { name: /won/i }));
+
+      await waitFor(() => expect(inCalls).toContainEqual(['status', ['converted', 'closed']]));
+    });
+
+    it('filters by a single status from a link, including the ones no chip covers', async () => {
+      window.history.replaceState(null, '', '/?status=nurturing');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      expect(eqCalls).toContainEqual(['status', 'nurturing']);
+      expect(screen.getByRole('combobox', { name: /filter by status/i })).toHaveTextContent(
+        'Nurturing'
+      );
+    });
+
+    it('ignores a status the vocabulary does not have, rather than showing nothing', async () => {
+      window.history.replaceState(null, '', '/?status=archived');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      expect(eqCalls.some(([col]) => col === 'status')).toBe(false);
+      expect(screen.getByRole('combobox', { name: /filter by status/i })).toHaveTextContent(
+        'All statuses'
+      );
+    });
+  });
+
+  // US-439: the chips read byStatus.new/.contacted/.converted only, so
+  // qualified, nurturing and closed leads were in no count on the page.
+  it('counts nurturing as in progress and closed as won', async () => {
+    rpcMock.mockImplementation(async (fn: string) =>
+      fn === 'lead_stats'
+        ? {
+            data: {
+              total: 19,
+              by_status: {
+                new: 1,
+                contacted: 2,
+                qualified: 3,
+                nurturing: 4,
+                converted: 5,
+                closed: 6,
+              },
+              needs_attention: 0,
+            },
+            error: null,
+          }
+        : { data: 'activity-1', error: null }
+    );
+    renderWithProviders(<Leads />);
+
+    const inProgress = await screen.findByRole('button', { name: /in progress/i });
+    await waitFor(() => expect(inProgress).toHaveTextContent('9'));
+    expect(screen.getByRole('button', { name: /won/i })).toHaveTextContent('11');
   });
 });

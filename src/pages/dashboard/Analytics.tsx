@@ -48,6 +48,7 @@ import {
   type AnalyticsData,
 } from '@/lib/analytics';
 import { logger } from '@/lib/logger';
+import { summarizeLeadStatuses } from '@/lib/leadStatus';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { UpgradeModal } from '@/components/UpgradeModal';
 
@@ -85,7 +86,12 @@ export default function Analytics() {
   );
   const { stats: leadStats } = useLeadStats({ since: rangeStart });
   const { rows: campaignRows } = useCampaignConversion(rangeStart);
-  const convertedInRange = leadStats?.byStatus.converted ?? 0;
+  // US-439: a closed deal is a win too. Counting byStatus.converted alone left
+  // every lead the agent moved on to 'closed' out of conversions, and dropped
+  // nurturing leads out of the qualified stage.
+  const convertedInRange = leadStats ? summarizeLeadStatuses(leadStats.byStatus).won : 0;
+  const qualifiedInRange =
+    (leadStats?.byStatus.qualified ?? 0) + (leadStats?.byStatus.nurturing ?? 0) + convertedInRange;
 
   /**
    * The funnel, the source breakdown and the insights, moved here from
@@ -103,10 +109,10 @@ export default function Analytics() {
         visitors: stats.uniqueVisitors,
         engaged: totalContactTaps + totalLinkClicks,
         contacted: stats.totalLeads,
-        qualified: (leadStats?.byStatus.qualified ?? 0) + convertedInRange,
+        qualified: qualifiedInRange,
         converted: convertedInRange,
       }),
-    [stats, leadStats, convertedInRange, totalContactTaps, totalLinkClicks]
+    [stats, qualifiedInRange, convertedInRange, totalContactTaps, totalLinkClicks]
   );
 
   const leadSources = useMemo(() => {
