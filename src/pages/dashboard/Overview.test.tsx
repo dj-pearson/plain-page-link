@@ -31,6 +31,7 @@ vi.mock('@/components/dashboard/ConversionFunnel', () => ({ ConversionFunnel: ()
 vi.mock('@/components/dashboard/DueFollowUps', () => ({ DueFollowUps: () => null }));
 vi.mock('@/components/dashboard/ComingUp', () => ({ ComingUp: () => null }));
 vi.mock('@/components/dashboard/PlanUsageCard', () => ({ PlanUsageCard: () => null }));
+vi.mock('@/components/dashboard/TimeZonePrompt', () => ({ TimeZonePrompt: () => null }));
 
 import Overview from './Overview';
 
