@@ -18,6 +18,8 @@ import {
 } from '../_shared/marketing-unsubscribe.ts';
 import { safeHtmlText } from '../_shared/public-email.ts';
 import { maskEmail } from '../_shared/log-redaction.ts';
+import { LISTING_DRIP, LISTING_DRIP_DAY } from '../_shared/listing-drip.ts';
+import { isFinalDripEmail, isPastDripWindow, nextDueDripEmail } from '../_shared/drip-schedule.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'noreply@agentbio.net';
@@ -38,14 +40,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 // register page never reads. None of it was measured or real. Every CTA also
 // pointed at /register, which is a reserved username: it rendered the 404 page.
 // src/marketing-claims.test.ts now scans this file.
-const EMAIL_SCHEDULE = {
-  2: { subject: 'The most common listing description mistake', dayNumber: 1 },
-  3: { subject: 'Power words that make buyers take action', dayNumber: 2 },
-  4: { subject: 'How to choose the right description style for your listing', dayNumber: 3 },
-  6: { subject: 'Four things to check before your listing goes live', dayNumber: 5 },
-  7: { subject: 'Your listing checklist: Beyond the description', dayNumber: 6 },
-  8: { subject: 'What AgentBio does with the listings you write', dayNumber: 7 },
-};
+//
+// US-479: the subjects and send days now live in _shared/listing-drip.ts. This
+// used to look the email up by the exact day count since capture,
+// keyed a day later than the database's schedule and with nothing due on day 1
+// or day 5. A day the job did not run, or a failed send, lost that email for
+// good, and a second run on the same day sent it again. Each capture now gets
+// the earliest due email it has not been sent (_shared/drip-schedule.ts).
 
 const REGISTER_URL = `${SITE_URL}/auth/register`;
 
@@ -101,12 +102,38 @@ serve(async (req) => {
 
     // Process each pending email
     for (const capture of pendingEmails) {
-      const daysSinceCapture = capture.days_since_capture;
-      const scheduleInfo = EMAIL_SCHEDULE[daysSinceCapture];
-
-      if (!scheduleInfo) continue;
+      const daysSinceCapture = Number(capture.days_since_capture) || 0;
 
       try {
+        // get_pending_listing_emails() has no upper age bound, and no cron ever
+        // called this function, so every historical capture still has unsent
+        // rows. Past the drip window (dripLookbackDays, the same one the bio
+        // sender queries) a capture is closed off instead of being sent a
+        // nurture email months after sign-up, or retried on every run.
+        if (isPastDripWindow(LISTING_DRIP_DAY, daysSinceCapture)) {
+          const { error: closeError } = await supabase
+            .from('listing_email_captures')
+            .update({ email_sequence_completed: true })
+            .eq('id', capture.id);
+          if (closeError) throw new Error(`Could not close stale sequence: ${closeError.message}`);
+          continue;
+        }
+
+        const { data: sentRows, error: sentError } = await supabase
+          .from('listing_email_sequences')
+          .select('sequence_number')
+          .eq('email_capture_id', capture.id)
+          .not('sent_at', 'is', null);
+        if (sentError) throw new Error(`Could not read sent emails: ${sentError.message}`);
+
+        const sequenceNumber = nextDueDripEmail(
+          LISTING_DRIP_DAY,
+          daysSinceCapture,
+          (sentRows ?? []).map((r: { sequence_number: number }) => r.sequence_number)
+        );
+        if (sequenceNumber === undefined) continue;
+        const scheduleInfo = LISTING_DRIP[sequenceNumber];
+
         // US-425: an address that opted out (from either tool) gets nothing
         // more, and its sequence is ended so it is not picked up again.
         if (await isSuppressed(supabase, String(capture.email), secret)) {
@@ -127,7 +154,7 @@ serve(async (req) => {
           unsubscribe,
           email: capture.email,
           firstName: safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
-          sequenceNumber: scheduleInfo.dayNumber,
+          sequenceNumber,
           subject: scheduleInfo.subject,
           captureId: capture.id,
         });
@@ -140,7 +167,7 @@ serve(async (req) => {
               sent_at: new Date().toISOString(),
             })
             .eq('email_capture_id', capture.id)
-            .eq('sequence_number', scheduleInfo.dayNumber);
+            .eq('sequence_number', sequenceNumber);
 
           // Update last_email_sent_at on capture
           await supabase
@@ -152,8 +179,8 @@ serve(async (req) => {
 
           sentCount++;
 
-          // If this was email 7, mark sequence as complete
-          if (scheduleInfo.dayNumber === 7) {
+          // If this was the last email, mark sequence as complete
+          if (isFinalDripEmail(LISTING_DRIP_DAY, sequenceNumber)) {
             await supabase
               .from('listing_email_captures')
               .update({

@@ -14,7 +14,8 @@ import { sendEmail } from '../_shared/email.ts'
 import { maskEmail } from '../_shared/log-redaction.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { safeHtmlText } from '../_shared/public-email.ts';
-import { BIO_DRIP_DAY, BIO_DRIP_SEQUENCE_NUMBERS, bioDripEmail, type BioDripSequenceNumber } from '../_shared/bio-drip-emails.ts';
+import { BIO_DRIP_DAY, bioDripEmail, isBioDripSequenceNumber } from '../_shared/bio-drip-emails.ts';
+import { dripLookbackDays, isFinalDripEmail, nextDueDripEmail, wholeDaysSince } from '../_shared/drip-schedule.ts';
 
 /**
  * Cron job to send scheduled Instagram Bio Analyzer emails
@@ -48,9 +49,10 @@ serve(async (req) => {
       throw new Error('PII_ENCRYPTION_KEY is not set; refusing to send drip email without an unsubscribe link')
     }
 
-    // Get email captures from last 7 days that need sequences sent
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    // US-479: this used to look back exactly 7 days, while email 7 is due on
+    // day 7, so email 7 never sent (US-449). The window now runs past the last
+    // due day, with grace for a missed run or a failed send.
+    const since = new Date(Date.now() - dripLookbackDays(BIO_DRIP_DAY) * 86_400_000)
 
     const { data: captures, error: capturesError } = await supabase
       .from('instagram_bio_email_captures')
@@ -61,7 +63,7 @@ serve(async (req) => {
           overall_score
         )
       `)
-      .gte('created_at', sevenDaysAgo.toISOString())
+      .gte('created_at', since.toISOString())
       .eq('email_sequence_started', true)
       .eq('email_sequence_completed', false)
 
@@ -71,9 +73,7 @@ serve(async (req) => {
 
     for (const capture of captures || []) {
       // Check which emails need to be sent
-      const daysSinceCapture = Math.floor(
-        (Date.now() - new Date(capture.created_at).getTime()) / (1000 * 60 * 60 * 24)
-      )
+      const daysSinceCapture = wholeDaysSince(capture.created_at)
 
       // Get already sent emails
       const { data: sentEmails } = await supabase
@@ -85,11 +85,9 @@ serve(async (req) => {
       const sentNumbers = sentEmails?.map(e => e.sequence_number) || []
 
       // The earliest email that is due and not yet sent.
-      const sequenceToSend: BioDripSequenceNumber | undefined = BIO_DRIP_SEQUENCE_NUMBERS.find(
-        (n) => daysSinceCapture >= BIO_DRIP_DAY[n] && !sentNumbers.includes(n)
-      )
+      const sequenceToSend = nextDueDripEmail(BIO_DRIP_DAY, daysSinceCapture, sentNumbers)
 
-      if (sequenceToSend !== undefined) {
+      if (sequenceToSend !== undefined && isBioDripSequenceNumber(sequenceToSend)) {
         try {
           // US-425: an address that opted out (from either tool) gets nothing
           // more, and its sequence is ended so it is not picked up again.
@@ -138,8 +136,8 @@ serve(async (req) => {
 
           emailsSent++
 
-          // If email 7 sent, mark sequence as complete
-          if (sequenceToSend === 7) {
+          // If the last email sent, mark sequence as complete
+          if (isFinalDripEmail(BIO_DRIP_DAY, sequenceToSend)) {
             await supabase
               .from('instagram_bio_email_captures')
               .update({ email_sequence_completed: true })
