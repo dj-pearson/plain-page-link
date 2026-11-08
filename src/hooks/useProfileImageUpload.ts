@@ -5,8 +5,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { validateUpload } from '@/lib/fileValidation';
-import { APP_ICON_SIZES, appIconObjectName } from '@/lib/avatarAppIcon';
-import { renderAppIcons } from '@/lib/renderAppIcons';
+import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
 
 /** The profile columns that hold a single uploaded image. */
 export type ProfileImageColumn = 'avatar_url' | 'brokerage_logo';
@@ -29,41 +28,6 @@ export interface ProfileImageUploadConfig {
    * (US-481), which the agent's page manifest lists. The avatar only.
    */
   appIcons?: boolean;
-}
-
-/**
- * Render and store the home-screen icons for a just-uploaded avatar, returning
- * the object names stored. Best effort: the photo is what the agent asked
- * for, so a browser that cannot draw it, or an icon upload that fails, costs
- * only the icon (the manifest then keeps the platform icon) and never the
- * upload.
- */
-async function uploadAppIcons(
-  bucket: ProfileImageUploadConfig['bucket'],
-  userId: string,
-  objectName: string,
-  file: File
-): Promise<string[]> {
-  try {
-    const icons = await renderAppIcons(file);
-    const stored: string[] = [];
-    for (const size of APP_ICON_SIZES) {
-      const icon = icons.get(size);
-      if (!icon) continue;
-      const name = appIconObjectName(objectName, size);
-      const { error } = await supabase.storage.from(bucket).upload(`${userId}/${name}`, icon, {
-        cacheControl: '3600',
-        contentType: 'image/png',
-        upsert: true,
-      });
-      if (error) throw error;
-      stored.push(name);
-    }
-    return stored;
-  } catch (error) {
-    logger.warn('Could not make the home-screen icon from this photo', { error });
-    return [];
-  }
 }
 
 /**
@@ -113,7 +77,9 @@ export function useProfileImageUpload(config: ProfileImageUploadConfig) {
 
       // Before the profile points at the photo, so the manifest never sees
       // the new avatar_url without its icons when the icons could be made.
-      const iconNames = appIcons ? await uploadAppIcons(bucket, user.id, objectName, file) : [];
+      const iconNames = appIcons
+        ? await storeAvatarAppIcons(bucket, user.id, objectName, file)
+        : [];
 
       const {
         data: { publicUrl },

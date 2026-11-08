@@ -10,6 +10,7 @@ import {
 import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
 import { buildOnboardingProfileUpdate } from '@/lib/onboardingProfile';
+import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
@@ -66,13 +67,20 @@ export default function OnboardingWizardPage() {
           // storage policies key on it. This used to be `avatars/<uid>-<ts>`,
           // whose first segment was the literal string 'avatars', which an
           // owner-scoped policy rejects.
-          const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+          const objectName = `avatar-${Date.now()}.${fileExt}`;
+          const filePath = `${user.id}/${objectName}`;
 
           const { error: uploadError } = await supabase.storage
             .from('avatars')
             .upload(filePath, wizardData.profileBasics.photo);
 
           if (uploadError) throw uploadError;
+
+          // US-493: the installed page's home-screen icons, named after the
+          // photo, stored before the profile points at it — the same as a
+          // dashboard upload (US-481). Best effort and never throws: a
+          // browser that cannot draw the photo keeps the photo.
+          await storeAvatarAppIcons('avatars', user.id, objectName, wizardData.profileBasics.photo);
 
           const {
             data: { publicUrl },
