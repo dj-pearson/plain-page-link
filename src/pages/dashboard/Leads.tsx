@@ -74,6 +74,7 @@ import {
   planBulkAssign,
   summarizeBulkAssign,
 } from '@/lib/leadAssignee';
+import { planBulkDelete, summarizeBulkDelete, summarizeBulkStatus } from '@/lib/leadBulkActions';
 
 /*
  * Every dialog on this page is closed on first render, so none of them ships
@@ -394,14 +395,21 @@ export default function Leads() {
       // ['conversion-funnel'] by prefix. This used to hit supabase directly and
       // refetch only ['leads'], so Overview kept contradicting this page for up
       // to five minutes (US-104).
-      await bulkUpdateStatus.mutateAsync({
+      const updated = await bulkUpdateStatus.mutateAsync({
         ids: Array.from(selectedLeadIds),
         patch: { ...buildLeadStatusPatch(newStatus) },
       });
 
+      // US-588: what the server changed, not the size of the selection.
+      const summary = summarizeBulkStatus(
+        selectedLeadIds.size,
+        updated.length,
+        leadStatusLabel(newStatus)
+      );
       toast({
-        title: 'Status updated',
-        description: `Updated ${selectedLeadIds.size} lead(s) to ${newStatus}`,
+        title: summary.title,
+        description: summary.description,
+        variant: summary.partial ? 'destructive' : undefined,
       });
       setSelectedLeadIds(new Set());
     } catch (error) {
@@ -457,11 +465,24 @@ export default function Leads() {
   };
 
   const handleBulkDelete = async () => {
-    if (selectedLeadIds.size === 0) return;
+    if (selectedLeadIds.size === 0 || !user?.id) return;
+    // US-588: leads another agent assigned to the viewer are theirs to keep;
+    // say so up front and in the result, instead of reporting them deleted.
+    const plan = planBulkDelete(selectedLeadIds, leads ?? [], user.id);
+    if (plan.toDelete.length === 0) {
+      toast({
+        title: 'No leads deleted',
+        description: summarizeBulkDelete(plan, 0).description,
+        variant: 'destructive',
+      });
+      return;
+    }
 
+    const kept =
+      plan.notOwned > 0 ? ` ${plan.notOwned} assigned to you by another agent will be kept.` : '';
     if (
       !confirm(
-        `Are you sure you want to delete ${selectedLeadIds.size} lead(s)? This action cannot be undone.`
+        `Are you sure you want to delete ${plan.toDelete.length} lead(s)? This action cannot be undone.${kept}`
       )
     ) {
       return;
@@ -469,11 +490,13 @@ export default function Leads() {
 
     setIsBulkActing(true);
     try {
-      await bulkDelete.mutateAsync(Array.from(selectedLeadIds));
+      const deleted = await bulkDelete.mutateAsync(plan.toDelete);
 
+      const summary = summarizeBulkDelete(plan, deleted.length);
       toast({
-        title: 'Leads deleted',
-        description: `Deleted ${selectedLeadIds.size} lead(s)`,
+        title: summary.title,
+        description: summary.description,
+        variant: summary.partial ? 'destructive' : undefined,
       });
       setSelectedLeadIds(new Set());
     } catch (error) {
