@@ -139,9 +139,13 @@ export default function Leads() {
   const setSlaHours = (hours: number) => updatePreferences.mutate({ sla_hours: hours });
   // US-534: the chips and the Needs-attention badge count what the list shows
   // under the assignee filters ("Assigned to me" is the same filter on my id).
+  // US-557: and under the type filter and the name search. Status is not
+  // passed: the chips are the status breakdown.
   const { stats: serverStats } = useLeadStats({
     slaHours,
     assignee: assignedToMe ? (user?.id ?? null) : assigneeFilter,
+    leadType: typeFilter,
+    search: searchQuery,
   });
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
 

@@ -9441,7 +9441,13 @@ export type Database = {
         Returns: boolean;
       };
       lead_stats: {
-        Args: { p_assignee?: string; p_since?: string; p_sla_hours?: number };
+        Args: {
+          p_assignee?: string;
+          p_lead_type?: string;
+          p_search?: string;
+          p_since?: string;
+          p_sla_hours?: number;
+        };
         Returns: Json;
       };
       list_public_open_houses: {

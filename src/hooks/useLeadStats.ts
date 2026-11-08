@@ -14,6 +14,9 @@ import { useAuthStore } from '@/stores/useAuthStore';
  * the Leads list shows under that filter instead — the caller's own leads and
  * the ones assigned to them, held by that person — so the status chips and the
  * Needs-attention badge stop describing leads the list is not showing.
+ *
+ * US-557: `leadType` and `search` narrow the counts the same way the list's
+ * type filter and name search do. Blank or 'all' means no filter.
  */
 export interface LeadStats {
   total: number;
@@ -46,12 +49,22 @@ export const useLeadStats = ({
   since,
   slaHours = 24,
   assignee = null,
-}: { since?: Date; slaHours?: number; assignee?: string | null } = {}) => {
+  leadType = null,
+  search = null,
+}: {
+  since?: Date;
+  slaHours?: number;
+  assignee?: string | null;
+  leadType?: string | null;
+  search?: string | null;
+} = {}) => {
   const user = useAuthStore((s) => s.user);
   const sinceIso = since ? since.toISOString().slice(0, 10) : null;
+  const type = leadType && leadType !== 'all' ? leadType : null;
+  const term = search?.trim() || null;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['lead-stats', user?.id, sinceIso, slaHours, assignee],
+    queryKey: ['lead-stats', user?.id, sinceIso, slaHours, assignee, type, term],
     enabled: !!user?.id,
     staleTime: 60 * 1000,
     queryFn: async () => {
@@ -59,6 +72,8 @@ export const useLeadStats = ({
         p_since: sinceIso ?? undefined,
         p_sla_hours: slaHours,
         p_assignee: assignee ?? undefined,
+        p_lead_type: type ?? undefined,
+        p_search: term ?? undefined,
       });
       if (error) throw error;
       return parseLeadStats(data);
