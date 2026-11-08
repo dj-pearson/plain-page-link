@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -33,6 +34,8 @@ import {
   type ContactRelationship,
 } from '@/hooks/useContacts';
 import { TOUCH_FREQUENCIES } from '@/lib/keyDates';
+import { findContactsMatchingDetails, type ContactMatchForDetails } from '@/lib/pii';
+import { logger } from '@/lib/logger';
 
 export interface ContactFormDialogProps {
   open: boolean;
@@ -167,6 +170,52 @@ function toInput(values: FormValues, leadId: string | null | undefined): Contact
   };
 }
 
+const sameEmail = (a: string | null | undefined, b: string | null | undefined) =>
+  (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
+const samePhone = (a: string | null | undefined, b: string | null | undefined) =>
+  (a ?? '').replace(/\D/g, '') === (b ?? '').replace(/\D/g, '');
+
+/**
+ * US-670: whether saving should first look for another client with the same
+ * email or phone. A new client with either detail, or an edit that changes
+ * one; an edit to the notes of a known duplicate is not asked about again.
+ */
+export function needsDuplicateCheck(
+  input: Pick<ContactInput, 'email' | 'phone'>,
+  original?: Pick<Contact, 'email' | 'phone'> | null
+): boolean {
+  if (!input.email && !input.phone) return false;
+  if (!original) return true;
+  return (
+    (!!input.email && !sameEmail(input.email, original.email)) ||
+    (!!input.phone && !samePhone(input.phone, original.phone))
+  );
+}
+
+const MATCHED_ON_TEXT: Record<ContactMatchForDetails['matched_on'], string> = {
+  email: 'this email',
+  phone: 'this phone number',
+  email_and_phone: 'this email and phone number',
+};
+
+const MATCHED_ON_SHORT: Record<ContactMatchForDetails['matched_on'], string> = {
+  email: 'same email',
+  phone: 'same phone',
+  email_and_phone: 'same email and phone',
+};
+
+function matchName(m: ContactMatchForDetails): string {
+  return [m.first_name, m.last_name].filter(Boolean).join(' ');
+}
+
+/** "Dana Reyes already has this email", or a heading for several. */
+export function duplicateHeadline(matches: ContactMatchForDetails[]): string {
+  if (matches.length === 1) {
+    return `${matchName(matches[0])} already has ${MATCHED_ON_TEXT[matches[0].matched_on]}`;
+  }
+  return 'These clients already have this email or phone number';
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-3">
@@ -232,6 +281,7 @@ function ContactForm({ contact, initial, onSaved, onClose }: ContactFormProps) {
     register,
     control,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -240,8 +290,52 @@ function ContactForm({ contact, initial, onSaved, onClose }: ContactFormProps) {
 
   const { fields, append, remove } = useFieldArray({ control, name: 'household' });
 
+  // US-670: other clients with the email or phone about to be saved, and the
+  // input waiting on the agent's "Save anyway".
+  const [checking, setChecking] = useState(false);
+  const [duplicates, setDuplicates] = useState<{
+    matches: ContactMatchForDetails[];
+    input: ContactInput;
+  } | null>(null);
+
+  // A warning about details the agent has since changed no longer applies.
+  useEffect(() => {
+    const subscription = watch((_values, { name }) => {
+      if (name === 'email' || name === 'phone') setDuplicates(null);
+    });
+    return () => subscription.unsubscribe();
+  }, [watch]);
+
   const onSubmit = async (values: FormValues) => {
     const input = toInput(values, leadId);
+    setDuplicates(null);
+    if (needsDuplicateCheck(input, contact)) {
+      setChecking(true);
+      let found: ContactMatchForDetails[] = [];
+      try {
+        found = await findContactsMatchingDetails({
+          email: input.email,
+          phone: input.phone,
+          excludeContactId: contact?.id ?? null,
+        });
+      } catch (error) {
+        // Save without the check rather than refuse to save.
+        logger.warn('Duplicate-client check failed; saving without it', {
+          action: 'match_contacts_for_details',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        setChecking(false);
+      }
+      if (found.length > 0) {
+        setDuplicates({ matches: found, input });
+        return;
+      }
+    }
+    await save(input);
+  };
+
+  const save = async (input: ContactInput) => {
     try {
       if (contact) {
         await updateContact.mutateAsync({ id: contact.id, input });
@@ -260,6 +354,9 @@ function ContactForm({ contact, initial, onSaved, onClose }: ContactFormProps) {
       toastSaveError(error, 'Could not save. Please try again.', planName);
     }
   };
+
+  const saving = createContact.isPending || updateContact.isPending;
+  const busy = isSubmitting || saving;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
@@ -551,12 +648,76 @@ function ContactForm({ contact, initial, onSaved, onClose }: ContactFormProps) {
         </div>
       </Section>
 
+      {duplicates && (
+        <div
+          role="alert"
+          aria-labelledby="contact-duplicate-heading"
+          className="space-y-3 rounded-xl border border-border bg-muted p-4 text-sm"
+        >
+          <p id="contact-duplicate-heading" className="font-medium text-foreground">
+            {duplicateHeadline(duplicates.matches)}
+          </p>
+          <ul className="space-y-2">
+            {duplicates.matches.map((m) => (
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-foreground">
+                  {matchName(m)}
+                  {duplicates.matches.length > 1 && (
+                    <span className="text-muted-foreground">
+                      {' '}
+                      ({MATCHED_ON_SHORT[m.matched_on]})
+                    </span>
+                  )}
+                </span>
+                <Button asChild variant="outline" size="sm" className="min-h-[44px] sm:min-h-0">
+                  <Link to={`/dashboard/clients?client=${m.id}`} onClick={onClose}>
+                    Open {m.first_name}
+                  </Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">
+            {isEdit
+              ? 'Saving anyway keeps both records.'
+              : 'Saving anyway adds a separate client record.'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="min-h-[44px] sm:min-h-0"
+              onClick={() => void save(duplicates.input)}
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : 'Save anyway'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="min-h-[44px] sm:min-h-0"
+              onClick={() => setDuplicates(null)}
+              disabled={saving}
+            >
+              Keep editing
+            </Button>
+          </div>
+        </div>
+      )}
+
       <DialogFooter className="gap-2">
-        <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+        <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : isEdit ? 'Save changes' : 'Add client'}
+        <Button type="submit" disabled={busy || !!duplicates}>
+          {checking
+            ? 'Checking…'
+            : isSubmitting || saving
+              ? 'Saving…'
+              : isEdit
+                ? 'Save changes'
+                : 'Add client'}
         </Button>
       </DialogFooter>
     </form>

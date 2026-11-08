@@ -106,10 +106,22 @@ export async function matchContactsForLead(
   const hashing = await hashUnhashedContacts(deps, callerId, batch);
 
   const candidates = await deps.findCandidates(callerId, leadHashes);
+  return {
+    status: 'ok',
+    matches: rankMatches(candidates, leadHashes),
+    complete: hashing.complete,
+  };
+}
+
+/**
+ * The candidates that really share the email or phone in `hashes`, strongest
+ * match first, at most MAX_MATCHES. Shared by both match ops.
+ */
+export function rankMatches(candidates: CandidateRow[], hashes: ContactHashes): ContactMatch[] {
   const matches: ContactMatch[] = [];
   for (const c of candidates) {
-    const byEmail = !!leadHashes.email_hash && c.email_hash === leadHashes.email_hash;
-    const byPhone = !!leadHashes.phone_hash && c.phone_hash === leadHashes.phone_hash;
+    const byEmail = !!hashes.email_hash && c.email_hash === hashes.email_hash;
+    const byPhone = !!hashes.phone_hash && c.phone_hash === hashes.phone_hash;
     if (!byEmail && !byPhone) continue;
     matches.push({
       id: c.id,
@@ -122,10 +134,120 @@ export async function matchContactsForLead(
   // An email match is stronger than a shared household number.
   const rank = { email_and_phone: 0, email: 1, phone: 2 } as const;
   matches.sort((a, b) => rank[a.matched_on] - rank[b.matched_on]);
+  return matches.slice(0, MAX_MATCHES);
+}
 
+// ---------------------------------------------------------------------------
+// US-670 (US-641): the same check for details the agent types in by hand.
+// ---------------------------------------------------------------------------
+
+/** Longest email (RFC 5321) and a generous phone; anything longer is refused. */
+export const MAX_EMAIL_LENGTH = 320;
+export const MAX_PHONE_LENGTH = 40;
+
+export interface DetailsCandidateRow extends CandidateRow {
+  encrypted_email: string | null;
+  encrypted_phone: string | null;
+}
+
+export interface DetailsMatchDeps extends ContactHashDeps {
+  findCandidates(userId: string, hashes: ContactHashes): Promise<DetailsCandidateRow[]>;
+  /**
+   * Ids of the rows holding a copy of one of the caller's locked leads'
+   * ciphertext (contactLock.ts). Throws when it cannot tell.
+   */
+  copiedFromLockedLeads(userId: string, rows: DetailsCandidateRow[]): Promise<Set<string>>;
+}
+
+export interface DetailsInput {
+  email: string | null;
+  phone: string | null;
+  /** The contact being edited, which trivially matches itself. */
+  excludeContactId: string | null;
+}
+
+export interface DetailsMatchResult {
+  matches: ContactMatch[];
+  complete: boolean;
+}
+
+/**
+ * Which of the caller's own contacts already have this email or phone.
+ *
+ * Not an oracle: the plaintext is the caller's own typing, and only the
+ * caller's contacts are compared, which they can already open with
+ * decrypt_contacts. The exception is a contact holding a copy of a locked
+ * lead's ciphertext (US-254), which decrypt_contacts refuses; it is never
+ * reported here either, or typing guesses would confirm the locked lead's
+ * details. If that check cannot be made, nothing is reported: a missed
+ * duplicate warning costs less than a leak.
+ */
+export async function matchContactsForDetails(
+  deps: DetailsMatchDeps,
+  callerId: string,
+  input: DetailsInput,
+  batch = HASH_BATCH
+): Promise<DetailsMatchResult> {
+  const hashes = await lookupHashes(input.email, input.phone, deps.hashSecret);
+  if (!hashes.email_hash && !hashes.phone_hash) {
+    return { matches: [], complete: true };
+  }
+
+  // The contact just saved elsewhere, or one never hashed, is fingerprinted
+  // here first, a bounded batch per call, as for a lead.
+  const hashing = await hashUnhashedContacts(deps, callerId, batch);
+  const candidates = (await deps.findCandidates(callerId, hashes)).filter(
+    (c) => c.id !== input.excludeContactId
+  );
+  if (candidates.length === 0) {
+    return { matches: [], complete: hashing.complete };
+  }
+
+  let copied: Set<string>;
+  try {
+    copied = await deps.copiedFromLockedLeads(callerId, candidates);
+  } catch {
+    return { matches: [], complete: true };
+  }
   return {
-    status: 'ok',
-    matches: matches.slice(0, MAX_MATCHES),
+    matches: rankMatches(
+      candidates.filter((c) => !copied.has(c.id)),
+      hashes
+    ),
     complete: hashing.complete,
   };
+}
+
+export type DetailsBodyResult = { ok: true; input: DetailsInput } | { ok: false; message: string };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function optionalText(value: unknown, max: number, name: string): string | null | Error {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') return new Error(`${name} must be a string`);
+  const trimmed = value.trim();
+  if (trimmed.length > max) return new Error(`${name} is too long`);
+  return trimmed || null;
+}
+
+/** Validates the request body of match_contacts_for_details. */
+export function parseDetailsBody(body: {
+  email?: unknown;
+  phone?: unknown;
+  excludeContactId?: unknown;
+}): DetailsBodyResult {
+  const email = optionalText(body.email, MAX_EMAIL_LENGTH, 'email');
+  if (email instanceof Error) return { ok: false, message: email.message };
+  const phone = optionalText(body.phone, MAX_PHONE_LENGTH, 'phone');
+  if (phone instanceof Error) return { ok: false, message: phone.message };
+  if (!email && !phone) return { ok: false, message: 'email or phone is required' };
+
+  const exclude = body.excludeContactId;
+  if (exclude === undefined || exclude === null) {
+    return { ok: true, input: { email, phone, excludeContactId: null } };
+  }
+  if (typeof exclude !== 'string' || !UUID_RE.test(exclude)) {
+    return { ok: false, message: 'excludeContactId must be a uuid' };
+  }
+  return { ok: true, input: { email, phone, excludeContactId: exclude } };
 }

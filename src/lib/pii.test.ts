@@ -6,6 +6,7 @@ import {
   decryptLeadContacts,
   decryptOwnProfilePhone,
   findContactsMatchingLead,
+  findContactsMatchingDetails,
   indexOwnContacts,
 } from './pii';
 
@@ -83,7 +84,7 @@ vi.mock('@/integrations/supabase/client', () => ({
           };
         }
 
-        if (body.op === 'match_contacts_for_lead') {
+        if (body.op === 'match_contacts_for_lead' || body.op === 'match_contacts_for_details') {
           const reply = matchReplies.length > 1 ? matchReplies.shift() : matchReplies[0];
           return { data: reply ?? null, error: null };
         }
@@ -264,6 +265,63 @@ describe('findContactsMatchingLead (US-629)', () => {
   it('throws when pii-crypto cannot answer, so the caller can decide', async () => {
     failNextCall = true;
     await expect(findContactsMatchingLead('lead-1')).rejects.toThrow();
+  });
+});
+
+describe('findContactsMatchingDetails (US-670)', () => {
+  const dana = {
+    id: 'c1',
+    first_name: 'Dana',
+    last_name: 'Reyes',
+    lead_id: null,
+    matched_on: 'email',
+  };
+
+  it('sends the trimmed details and the contact being edited', async () => {
+    matchReplies = [{ matches: [dana], complete: true }];
+    expect(
+      await findContactsMatchingDetails({
+        email: ' dana@example.com ',
+        phone: '',
+        excludeContactId: 'c9',
+      })
+    ).toEqual([dana]);
+    expect(invocations).toEqual([
+      {
+        op: 'match_contacts_for_details',
+        body: {
+          op: 'match_contacts_for_details',
+          email: 'dana@example.com',
+          phone: null,
+          excludeContactId: 'c9',
+        },
+      },
+    ]);
+  });
+
+  it('asks nothing when there is no email or phone', async () => {
+    expect(await findContactsMatchingDetails({ email: ' ', phone: null })).toEqual([]);
+    expect(invocations).toHaveLength(0);
+  });
+
+  it('asks again while fingerprinting, but stops at a match or after three rounds', async () => {
+    matchReplies = [
+      { matches: [], complete: false },
+      { matches: [dana], complete: false },
+      { matches: [], complete: true },
+    ];
+    expect(await findContactsMatchingDetails({ email: 'dana@example.com' })).toEqual([dana]);
+    expect(invocations).toHaveLength(2);
+
+    invocations = [];
+    matchReplies = [{ matches: [], complete: false }];
+    expect(await findContactsMatchingDetails({ email: 'dana@example.com' })).toEqual([]);
+    expect(invocations).toHaveLength(3);
+  });
+
+  it('throws when pii-crypto cannot answer, so the form can save without it', async () => {
+    failNextCall = true;
+    await expect(findContactsMatchingDetails({ phone: '512 555 0142' })).rejects.toThrow();
   });
 });
 

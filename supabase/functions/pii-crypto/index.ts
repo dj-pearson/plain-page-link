@@ -51,7 +51,12 @@ import {
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 import { encryptSecret, decryptSecret } from '../_shared/encryption.ts';
 import { contactsCopiedFromLockedLeads } from './contactLock.ts';
-import { matchContactsForLead, HASH_BATCH } from './contactMatch.ts';
+import {
+  matchContactsForLead,
+  matchContactsForDetails,
+  parseDetailsBody,
+  HASH_BATCH,
+} from './contactMatch.ts';
 import {
   hashUnhashedContacts,
   supabaseContactHashStore,
@@ -73,6 +78,7 @@ type Op =
   | 'decrypt_contacts'
   | 'decrypt_profile'
   | 'match_contacts_for_lead'
+  | 'match_contacts_for_details'
   | 'index_contacts';
 
 export default async (req: Request) => {
@@ -122,6 +128,9 @@ export default async (req: Request) => {
       leadIds?: unknown;
       contactIds?: unknown;
       leadId?: unknown;
+      email?: unknown;
+      phone?: unknown;
+      excludeContactId?: unknown;
     };
     const op = body.op;
 
@@ -131,10 +140,11 @@ export default async (req: Request) => {
       op !== 'decrypt_contacts' &&
       op !== 'decrypt_profile' &&
       op !== 'match_contacts_for_lead' &&
+      op !== 'match_contacts_for_details' &&
       op !== 'index_contacts'
     ) {
       return errorResponse(
-        "op must be 'encrypt', 'decrypt_leads', 'decrypt_contacts', 'decrypt_profile', 'match_contacts_for_lead' or 'index_contacts'",
+        "op must be 'encrypt', 'decrypt_leads', 'decrypt_contacts', 'decrypt_profile', 'match_contacts_for_lead', 'match_contacts_for_details' or 'index_contacts'",
         'REQUEST_VALIDATION_FAILED',
         req,
         400
@@ -208,6 +218,59 @@ export default async (req: Request) => {
         { hashed: result.hashed, failed: result.failed, complete: result.complete },
         req
       );
+    }
+
+    // ---------------------------------------------------------------------
+    // match_contacts_for_details — which of the caller's contacts already
+    // have the email or phone the agent is typing into the client form
+    // (US-670), so a second record for one person is caught before it is
+    // saved. The caller's own plaintext, compared only with the caller's own
+    // contacts; see matchContactsForDetails for why that is not an oracle.
+    // ---------------------------------------------------------------------
+    if (op === 'match_contacts_for_details') {
+      const parsed = parseDetailsBody(body);
+      if (!parsed.ok) {
+        return errorResponse(parsed.message, 'REQUEST_VALIDATION_FAILED', req, 400);
+      }
+      if (!hashSecret) {
+        return errorResponse('Matching is not configured', 'MATCH_UNAVAILABLE', req, 503);
+      }
+      const result = await matchContactsForDetails(
+        {
+          hashSecret,
+          decrypt: decryptForHash,
+          ...hashStore,
+          findCandidates: async (userId, hashes) => {
+            const clauses = [
+              hashes.email_hash ? `email_hash.eq.${hashes.email_hash}` : null,
+              hashes.phone_hash ? `phone_hash.eq.${hashes.phone_hash}` : null,
+            ].filter(Boolean);
+            const { data, error } = await supabase
+              .from('contacts')
+              .select(
+                'id, first_name, last_name, lead_id, email_hash, phone_hash, encrypted_email, encrypted_phone'
+              )
+              .eq('user_id', userId)
+              .or(clauses.join(','))
+              .limit(20);
+            if (error) throw error;
+            return data ?? [];
+          },
+          copiedFromLockedLeads: (userId, rows) =>
+            contactsCopiedFromLockedLeads(
+              { rpc: (fn, args) => supabase.rpc(fn, args) },
+              userId,
+              rows,
+              // Fail closed: matchContactsForDetails then reports nothing.
+              (lockError) => {
+                throw lockError;
+              }
+            ),
+        },
+        user.id,
+        parsed.input
+      );
+      return successResponse({ matches: result.matches, complete: result.complete }, req);
     }
 
     // ---------------------------------------------------------------------
