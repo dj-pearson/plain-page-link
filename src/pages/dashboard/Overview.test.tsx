@@ -9,13 +9,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
 
-const { analytics, refetchMock } = vi.hoisted(() => ({
+const { analytics, refetchMock, linksState } = vi.hoisted(() => ({
   analytics: { current: {} as Record<string, unknown> },
   refetchMock: vi.fn(),
+  linksState: { current: { links: [] as unknown[], isError: false, refetch: vi.fn() } },
 }));
 
 vi.mock('@/hooks/useAnalytics', () => ({ useAnalytics: () => analytics.current }));
-vi.mock('@/hooks/useLinks', () => ({ useLinks: () => ({ links: [] }) }));
+vi.mock('@/hooks/useLinks', () => ({ useLinks: () => linksState.current }));
 vi.mock('@/hooks/useProfile', () => ({
   useProfile: () => ({
     profile: { username: 'jane', full_name: 'Jane Doe', created_at: '2025-01-01T00:00:00Z' },
@@ -47,6 +48,7 @@ describe('Overview', () => {
   beforeEach(() => {
     refetchMock.mockReset();
     analytics.current = { ...base };
+    linksState.current = { links: [], isError: false, refetch: vi.fn() };
   });
 
   it('shows an error card with Retry instead of zeros when analytics fail', async () => {
@@ -95,5 +97,19 @@ describe('Overview', () => {
     // No "Welcome to <plan>" modal built from a plan the webhook has not set yet.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     window.history.pushState({}, '', '/');
+  });
+
+  // US-590
+  it('says links did not load instead of offering "Add your first link" and 0 clicks', async () => {
+    const refetch = vi.fn();
+    linksState.current = { links: [], isError: true, refetch };
+    renderWithProviders(<Overview />);
+
+    expect(screen.getByText(/your links did not load/i)).toBeInTheDocument();
+    expect(screen.queryByText(/add your first link/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Link Clicks').nextElementSibling).toHaveTextContent('—');
+
+    await userEvent.click(screen.getByRole('button', { name: /retry loading links/i }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

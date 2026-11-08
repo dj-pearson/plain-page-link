@@ -23,16 +23,34 @@ import {
   isReminderDue,
   upcomingKeyDates,
 } from '@/lib/keyDates';
+import { SectionLoadError } from './SectionLoadError';
 
 /** How far ahead to look. Each date's own reminder lead time decides emphasis. */
 const WINDOW_DAYS = 30;
 
 export function ComingUp() {
-  const { keyDates, isLoading: datesLoading } = useKeyDates();
-  const { data: due = [], isLoading: dueLoading } = useContactsDueForTouch(5);
-  const { openHouses, isLoading: ohLoading } = useOpenHouses();
+  const {
+    keyDates,
+    isLoading: datesLoading,
+    error: datesError,
+    refetch: refetchDates,
+  } = useKeyDates();
+  const {
+    data: due = [],
+    isLoading: dueLoading,
+    isError: dueFailed,
+    refetch: refetchDue,
+  } = useContactsDueForTouch(5);
+  const { openHouses, isLoading: ohLoading, error: ohError, refetch: refetchOh } = useOpenHouses();
 
   if (datesLoading || dueLoading || ohLoading) return null;
+
+  // US-590: each failed source used to read as "nothing coming up", and with
+  // all three failed the block vanished. Name what did not load, keep what did.
+  const failed: { label: string; retry: () => unknown }[] = [];
+  if (ohError) failed.push({ label: 'open houses', retry: refetchOh });
+  if (datesError) failed.push({ label: 'client dates', retry: refetchDates });
+  if (dueFailed) failed.push({ label: 'clients due for a touch', retry: refetchDue });
 
   const upcoming = upcomingKeyDates(keyDates, new Date(), WINDOW_DAYS).slice(0, 6);
   const now = Date.now();
@@ -40,7 +58,9 @@ export function ComingUp() {
     .filter((o) => o.status === 'scheduled' && new Date(o.ends_at).getTime() > now)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))[0];
 
-  if (upcoming.length === 0 && due.length === 0 && !nextOpenHouse) return null;
+  if (failed.length === 0 && upcoming.length === 0 && due.length === 0 && !nextOpenHouse) {
+    return null;
+  }
 
   return (
     <Card>
@@ -48,6 +68,14 @@ export function ComingUp() {
         <CardTitle className="text-base sm:text-lg">Coming up</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
+        {failed.length > 0 && (
+          <SectionLoadError
+            message={`Your ${joinLabels(failed.map((f) => f.label))} did not load.`}
+            onRetry={() => failed.forEach((f) => void f.retry())}
+            retryLabel="Retry loading what is coming up"
+          />
+        )}
+
         {nextOpenHouse && nextOpenHouse.listings && (
           <div>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
@@ -145,4 +173,10 @@ export function ComingUp() {
       </CardContent>
     </Card>
   );
+}
+
+/** "a", "a and b", "a, b and c". */
+function joinLabels(labels: string[]): string {
+  if (labels.length <= 1) return labels.join('');
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
 }
