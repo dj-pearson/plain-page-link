@@ -12,10 +12,15 @@
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { format, isSameYear } from 'date-fns';
 import { CalendarPlus, ChevronDown, MapPin } from 'lucide-react';
 import { formatOpenHouseAddress, usePublicOpenHouses } from '@/hooks/useOpenHouses';
 import { downloadIcs, googleCalendarUrl, type CalendarEvent } from '@/lib/openHouseCalendar';
+import {
+  formatOpenHouseWhen,
+  needsZoneLabel,
+  openHouseLocalDate,
+  visitorOpenHouseTimeZone,
+} from '@/lib/openHouseSchedule';
 import { fallBackToOriginal, sizedImage, type SizedImage } from '@/lib/images';
 import { formatPrice, parsePrice } from '@/lib/format';
 import { toStringList } from '@/types/profile';
@@ -39,6 +44,8 @@ interface UpcomingOpenHouse {
   listingId: string | null;
   startsAt: Date;
   endsAt: Date;
+  /** The agent's zone (US-669), else the visitor's: what the times are shown in. */
+  timeZone: string;
   publicNotes: string | null;
   address: string;
   fullAddress: string;
@@ -61,6 +68,7 @@ function toUpcoming(row: Record<string, unknown>): UpcomingOpenHouse | null {
     listingId: str(row.listing_id),
     startsAt: new Date(starts),
     endsAt: new Date(ends),
+    timeZone: visitorOpenHouseTimeZone(row.time_zone),
     publicNotes: str(row.public_notes),
     address,
     fullAddress: formatOpenHouseAddress({
@@ -76,13 +84,19 @@ function toUpcoming(row: Record<string, unknown>): UpcomingOpenHouse | null {
   };
 }
 
-function formatWhen(start: Date, end: Date): string {
-  const day = format(start, isSameYear(start, new Date()) ? 'EEE, MMM d' : 'EEE, MMM d, yyyy');
-  const time =
-    format(start, 'a') === format(end, 'a')
-      ? `${format(start, 'h:mm')}–${format(end, 'h:mm a')}`
-      : `${format(start, 'h:mm a')}–${format(end, 'h:mm a')}`;
-  return `${day} · ${time}`;
+/**
+ * The time at the property, in the agent's zone (US-669). It was formatted in
+ * the visitor's zone, so someone in Denver read a Chicago 1–3 PM open house as
+ * 12–2. A visitor whose clock differs also gets the zone's name ("CST").
+ */
+function formatWhen(oh: UpcomingOpenHouse): string {
+  return formatOpenHouseWhen(
+    oh.startsAt.toISOString(),
+    oh.endsAt.toISOString(),
+    oh.timeZone,
+    new Date(),
+    { zoneLabel: needsZoneLabel(oh.timeZone, oh.startsAt) }
+  );
 }
 
 const actionClass =
@@ -240,9 +254,7 @@ export function UpcomingOpenHouses({
             <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 sm:p-5">
               <div>
                 <p className="text-base font-semibold text-foreground">
-                  <time dateTime={oh.startsAt.toISOString()}>
-                    {formatWhen(oh.startsAt, oh.endsAt)}
-                  </time>
+                  <time dateTime={oh.startsAt.toISOString()}>{formatWhen(oh)}</time>
                 </p>
                 <p className="mt-1 text-foreground">{oh.fullAddress}</p>
                 {oh.price && <p className="mt-0.5 font-medium text-foreground">{oh.price}</p>}
@@ -256,7 +268,7 @@ export function UpcomingOpenHouses({
               <div className="mt-auto flex flex-wrap gap-2">
                 <AddToCalendar
                   event={calendarEvent(oh)}
-                  filename={`open-house-${oh.startsAt.toISOString().slice(0, 10)}.ics`}
+                  filename={`open-house-${openHouseLocalDate(oh.startsAt.toISOString(), oh.timeZone)}.ics`}
                 />
 
                 <a

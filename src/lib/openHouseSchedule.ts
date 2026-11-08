@@ -9,6 +9,7 @@
  * IANA zone (profiles.timezone, US-433) and an ISO instant, using only Intl —
  * no date-fns-tz.
  */
+import { detectBrowserTimeZone, isValidTimeZone } from '@/lib/timeZone';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -142,20 +143,34 @@ export function pastStartError(
   return null;
 }
 
-/** "Sat, Nov 14 · 1:00–3:00 PM" in `timeZone`, the year added when it is not this year. */
+export interface OpenHouseWhenOptions {
+  /** "Saturday, November 14" rather than "Sat, Nov 14" (the kiosk). */
+  long?: boolean;
+  /**
+   * Append the zone's short name ("CST"), for a visitor whose own zone is not
+   * the agent's — see needsZoneLabel.
+   */
+  zoneLabel?: boolean;
+}
+
+/**
+ * "Sat, Nov 14 · 1:00–3:00 PM" in `timeZone`, the year added when it is not
+ * this year. With `zoneLabel`, "… 1:00–3:00 PM CST".
+ */
 export function formatOpenHouseWhen(
   startsAt: string,
   endsAt: string,
   timeZone: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  options: OpenHouseWhenOptions = {}
 ): string {
   const s = new Date(startsAt);
   const e = new Date(endsAt);
   const sameYear = wallParts(s, timeZone).year === wallParts(now, timeZone).year;
   const day = new Intl.DateTimeFormat('en-US', {
     timeZone,
-    weekday: 'short',
-    month: 'short',
+    weekday: options.long ? 'long' : 'short',
+    month: options.long ? 'long' : 'short',
     day: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
   }).format(s);
@@ -180,7 +195,50 @@ export function formatOpenHouseWhen(
     a.period === b.period
       ? `${a.clock}–${b.clock} ${b.period}`
       : `${a.clock} ${a.period}–${b.clock} ${b.period}`;
-  return `${day} · ${range.trim()}`;
+  const zone = options.zoneLabel ? zoneShortName(timeZone, s) : '';
+  return `${day} · ${[range.trim(), zone].filter(Boolean).join(' ')}`;
+}
+
+/** "CST", "PDT", or "GMT+1" where en-US has no abbreviation; '' if unknown. */
+function zoneShortName(timeZone: string, at: Date): string {
+  try {
+    return (
+      new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'short' })
+        .formatToParts(at)
+        .find((p) => p.type === 'timeZoneName')?.value ?? ''
+    );
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * The zone a visitor-facing open-house time is shown in (US-669): the agent's
+ * (list_public_open_houses / get_public_open_house return it as time_zone),
+ * else the visitor's own zone — what every visitor saw before — else UTC.
+ */
+export function visitorOpenHouseTimeZone(agentZone: unknown): string {
+  if (isValidTimeZone(agentZone)) return agentZone;
+  return detectBrowserTimeZone() ?? 'UTC';
+}
+
+/**
+ * True when the times should carry the zone's name: the visitor's clock reads
+ * differently from the agent's at that instant, so "1:00 PM" alone would be
+ * read as the visitor's 1:00 PM.
+ */
+export function needsZoneLabel(
+  timeZone: string,
+  at: Date,
+  viewerZone: string | null = detectBrowserTimeZone()
+): boolean {
+  if (!viewerZone || viewerZone === timeZone) return false;
+  return offsetMs(at, timeZone) !== offsetMs(at, viewerZone);
+}
+
+/** "2026-11-14": the open house's date where it happens, for a file name. */
+export function openHouseLocalDate(startsAt: string, timeZone: string): string {
+  return isoToWallTime(startsAt, timeZone).date;
 }
 
 /**

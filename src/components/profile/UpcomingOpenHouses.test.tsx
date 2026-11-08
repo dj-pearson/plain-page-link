@@ -16,6 +16,13 @@ vi.mock('@/lib/openHouseCalendar', async (importOriginal) => ({
   downloadIcs: (...args: unknown[]) => downloadIcs(...args),
 }));
 
+// The visitor's device zone (US-669): Denver, an hour behind Chicago.
+let viewerZone: string | null = 'America/Denver';
+vi.mock('@/lib/timeZone', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/timeZone')>()),
+  detectBrowserTimeZone: () => viewerZone,
+}));
+
 import { UpcomingOpenHouses } from './UpcomingOpenHouses';
 
 const STORAGE = 'https://db.example.com/storage/v1/object/public/listing-photos';
@@ -41,6 +48,49 @@ function oneOpenHouse(overrides: Record<string, unknown> = {}) {
 describe('UpcomingOpenHouses', () => {
   beforeEach(() => {
     hookResult = { data: [] };
+    viewerZone = 'America/Denver';
+  });
+
+  // US-669: 18:00Z on Oct 3 is 1 PM in Chicago and noon in Denver.
+  describe("times in the agent's zone", () => {
+    it("shows the property's local time, named, to a visitor in another zone", () => {
+      hookResult = { data: [oneOpenHouse({ time_zone: 'America/Chicago' })] };
+      render(<UpcomingOpenHouses agentId="agent-1" />);
+      expect(screen.getByText(/1:00–3:00 PM CDT$/)).toBeInTheDocument();
+    });
+
+    it('leaves the zone name off for a visitor already in that zone', () => {
+      viewerZone = 'America/Chicago';
+      hookResult = { data: [oneOpenHouse({ time_zone: 'America/Chicago' })] };
+      render(<UpcomingOpenHouses agentId="agent-1" />);
+      expect(screen.getByText(/1:00–3:00 PM$/)).toBeInTheDocument();
+    });
+
+    it("falls back to the visitor's zone when the agent has none", () => {
+      hookResult = { data: [oneOpenHouse({ time_zone: null })] };
+      render(<UpcomingOpenHouses agentId="agent-1" />);
+      expect(screen.getByText(/12:00–2:00 PM$/)).toBeInTheDocument();
+    });
+
+    it('names the calendar file by the local date', async () => {
+      // 02:00Z Oct 4 is still the evening of Oct 3 in Chicago.
+      hookResult = {
+        data: [
+          oneOpenHouse({
+            time_zone: 'America/Chicago',
+            starts_at: '2026-10-04T00:00:00.000Z',
+            ends_at: '2026-10-04T02:00:00.000Z',
+          }),
+        ],
+      };
+      render(<UpcomingOpenHouses agentId="agent-1" />);
+      await userEvent.click(screen.getByRole('button', { name: /add to calendar/i }));
+      await userEvent.click(screen.getByRole('button', { name: /\.ics/i }));
+      expect(downloadIcs).toHaveBeenLastCalledWith(
+        expect.objectContaining({ start: new Date('2026-10-04T00:00:00.000Z') }),
+        'open-house-2026-10-03.ics'
+      );
+    });
   });
 
   it('renders nothing when there are no upcoming open houses', () => {
