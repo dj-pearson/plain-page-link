@@ -93,3 +93,22 @@ describe('useNotificationPreferences time-zone default (US-433)', () => {
     expect(updatePayloads[1].notification_preferences).toMatchObject({ digest: 'weekly' });
   });
 });
+
+describe('useNotificationPreferences failed read (US-612)', () => {
+  beforeEach(() => {
+    updatePayloads.length = 0;
+    updateResults = [];
+  });
+
+  it('refuses to save rather than writing the defaults over what is stored', async () => {
+    ownRow = { data: null, error: { message: 'network down', code: '' } };
+    const { result } = renderHook(() => useNotificationPreferences(), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await act(async () => {
+      await expect(result.current.update.mutateAsync({ sla_hours: 24 })).rejects.toThrow(
+        /have not loaded/
+      );
+    });
+    expect(updatePayloads).toHaveLength(0);
+  });
+});

@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SectionLoadError } from '@/components/dashboard/SectionLoadError';
 
 const SLA_OPTIONS = [1, 2, 4, 8, 24];
 
@@ -54,6 +55,8 @@ export function LeadNotificationPreferences() {
     digestMode,
     digestHour,
     isLoading,
+    isError,
+    refetch,
     update,
   } = useNotificationPreferences();
   // US-518: the hour is read on the agent's own clock. With no zone saved, the
@@ -89,105 +92,117 @@ export function LeadNotificationPreferences() {
         </div>
       </CardHeader>
       <CardContent>
-        <Select
-          value={mode}
-          onValueChange={(value) => save({ leads: value as LeadNotificationMode })}
-          disabled={isLoading || update.isPending}
-        >
-          <SelectTrigger className="w-full sm:w-72">
-            <SelectValue placeholder="Select notification frequency" />
-          </SelectTrigger>
-          <SelectContent>
-            {OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                <span className="font-medium">{opt.label}</span>
-                <span className="block text-xs text-muted-foreground">{opt.description}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="mt-6 space-y-2">
-          <p className="text-sm font-medium" id="digest-label">
-            Morning email
-          </p>
-          <p className="text-xs text-muted-foreground">
-            New leads, follow-ups due today and your clients&apos; upcoming birthdays and
-            anniversaries — sent only when there is something. Monday&apos;s adds last week&apos;s
-            numbers.
-          </p>
-          <Select
-            value={digestMode}
-            onValueChange={(value) => save({ digest: value as DigestMode })}
-            disabled={isLoading || update.isPending}
-          >
-            <SelectTrigger className="w-full sm:w-72" aria-labelledby="digest-label">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Every morning</SelectItem>
-              <SelectItem value="weekly">Mondays only</SelectItem>
-              <SelectItem value="off">Off</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {digestMode !== 'off' && (
-          <div className="mt-4 space-y-2">
-            <p className="text-sm font-medium" id="digest-hour-label">
-              Send it at
-            </p>
+        {isError ? (
+          // US-612: with the read failed the selects would show the defaults
+          // as if they were the agent's choices. Say so instead.
+          <SectionLoadError
+            message="Your notification settings did not load."
+            onRetry={() => void refetch()}
+            retryLabel="Retry loading notification settings"
+          />
+        ) : (
+          <>
             <Select
-              value={String(digestHour)}
-              onValueChange={(value) => save({ digest_hour: Number(value) })}
-              disabled={isLoading || update.isPending || !clockZone}
+              value={mode}
+              onValueChange={(value) => save({ leads: value as LeadNotificationMode })}
+              disabled={isLoading || update.isPending}
             >
-              <SelectTrigger
-                className="w-full sm:w-72"
-                aria-labelledby="digest-hour-label"
-                aria-describedby="digest-hour-hint"
-              >
-                <SelectValue />
+              <SelectTrigger className="w-full sm:w-72">
+                <SelectValue placeholder="Select notification frequency" />
               </SelectTrigger>
               <SelectContent>
-                {DIGEST_HOUR_CHOICES.map((h) => (
-                  <SelectItem key={h} value={String(h)}>
-                    {formatDigestHour(h)}
+                {OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    <span className="font-medium">{opt.label}</span>
+                    <span className="block text-xs text-muted-foreground">{opt.description}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground" id="digest-hour-hint">
-              {clockZone
-                ? `Your time: ${timeZoneLabel(clockZone)}.`
-                : 'Set your time zone below to choose the hour.'}
-            </p>
-          </div>
-        )}
 
-        <div className="mt-6 space-y-2">
-          <p className="text-sm font-medium">Chase me about unanswered leads after</p>
-          <p className="text-xs text-muted-foreground">
-            A new lead with no response by this point is flagged on your Leads page, and the
-            overdue-lead check emails you about it.
-          </p>
-          <Select
-            value={String(slaHours)}
-            onValueChange={(value) => save({ sla_hours: Number(value) })}
-            disabled={isLoading || update.isPending}
-          >
-            <SelectTrigger className="w-full sm:w-72">
-              <SelectValue placeholder="Select a response window" />
-            </SelectTrigger>
-            <SelectContent>
-              {SLA_OPTIONS.map((h) => (
-                <SelectItem key={h} value={String(h)}>
-                  {h === 1 ? '1 hour' : h === 24 ? '1 day' : `${h} hours`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            <div className="mt-6 space-y-2">
+              <p className="text-sm font-medium" id="digest-label">
+                Morning email
+              </p>
+              <p className="text-xs text-muted-foreground">
+                New leads, follow-ups due today and your clients&apos; upcoming birthdays and
+                anniversaries — sent only when there is something. Monday&apos;s adds last
+                week&apos;s numbers.
+              </p>
+              <Select
+                value={digestMode}
+                onValueChange={(value) => save({ digest: value as DigestMode })}
+                disabled={isLoading || update.isPending}
+              >
+                <SelectTrigger className="w-full sm:w-72" aria-labelledby="digest-label">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Every morning</SelectItem>
+                  <SelectItem value="weekly">Mondays only</SelectItem>
+                  <SelectItem value="off">Off</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {digestMode !== 'off' && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium" id="digest-hour-label">
+                  Send it at
+                </p>
+                <Select
+                  value={String(digestHour)}
+                  onValueChange={(value) => save({ digest_hour: Number(value) })}
+                  disabled={isLoading || update.isPending || !clockZone}
+                >
+                  <SelectTrigger
+                    className="w-full sm:w-72"
+                    aria-labelledby="digest-hour-label"
+                    aria-describedby="digest-hour-hint"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DIGEST_HOUR_CHOICES.map((h) => (
+                      <SelectItem key={h} value={String(h)}>
+                        {formatDigestHour(h)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground" id="digest-hour-hint">
+                  {clockZone
+                    ? `Your time: ${timeZoneLabel(clockZone)}.`
+                    : 'Set your time zone below to choose the hour.'}
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 space-y-2">
+              <p className="text-sm font-medium">Chase me about unanswered leads after</p>
+              <p className="text-xs text-muted-foreground">
+                A new lead with no response by this point is flagged on your Leads page, and the
+                overdue-lead check emails you about it.
+              </p>
+              <Select
+                value={String(slaHours)}
+                onValueChange={(value) => save({ sla_hours: Number(value) })}
+                disabled={isLoading || update.isPending}
+              >
+                <SelectTrigger className="w-full sm:w-72">
+                  <SelectValue placeholder="Select a response window" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SLA_OPTIONS.map((h) => (
+                    <SelectItem key={h} value={String(h)}>
+                      {h === 1 ? '1 hour' : h === 24 ? '1 day' : `${h} hours`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

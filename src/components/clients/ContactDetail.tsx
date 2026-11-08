@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { SectionLoadError } from '@/components/dashboard/SectionLoadError';
 import {
   INTERACTION_KINDS,
   contactName,
@@ -363,7 +364,7 @@ function KeyDatesPanel({
   contactId: string;
   householdNames: string[];
 }) {
-  const { keyDates, isLoading, deleteKeyDate } = useKeyDates(contactId);
+  const { keyDates, isLoading, isError, refetch, deleteKeyDate } = useKeyDates(contactId);
   // null: no form open; 'new': adding; otherwise the id being edited.
   const [editing, setEditing] = useState<string | null>(null);
   const today = new Date();
@@ -382,6 +383,18 @@ function KeyDatesPanel({
       <div className="flex justify-center py-6">
         <LoadingSpinner />
       </div>
+    );
+  }
+
+  // US-612: a failed read is not "No dates yet" — that invites re-entering a
+  // birthday that is already saved.
+  if (isError) {
+    return (
+      <SectionLoadError
+        message="This client's key dates did not load."
+        onRetry={() => void refetch()}
+        retryLabel="Retry loading key dates"
+      />
     );
   }
 
@@ -500,7 +513,7 @@ function occurredAt(day: string): string | undefined {
 }
 
 function ActivityPanel({ contactId }: { contactId: string }) {
-  const { interactions, isLoading, logInteraction, deleteInteraction } =
+  const { interactions, isLoading, isError, refetch, logInteraction, deleteInteraction } =
     useContactInteractions(contactId);
   const [kind, setKind] = useState<InteractionKind>('call');
   const [summary, setSummary] = useState('');
@@ -608,6 +621,13 @@ function ActivityPanel({ contactId }: { contactId: string }) {
         <div className="flex justify-center py-6">
           <LoadingSpinner />
         </div>
+      ) : isError ? (
+        // US-612: not "Nothing logged yet" when the history failed to load.
+        <SectionLoadError
+          message="This client's activity did not load."
+          onRetry={() => void refetch()}
+          retryLabel="Retry loading activity"
+        />
       ) : interactions.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing logged yet.</p>
       ) : (

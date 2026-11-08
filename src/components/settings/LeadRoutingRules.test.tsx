@@ -5,11 +5,15 @@ import { describeRuleAssignee } from '@/lib/routingRuleAssignee';
 
 const toggle = vi.fn();
 let rules: LeadRoutingRule[] = [];
+let failed = false;
+const refetch = vi.fn();
 
 vi.mock('@/hooks/useLeadRouting', () => ({
   useLeadRouting: () => ({
     rules,
     isLoading: false,
+    isError: failed,
+    refetch,
     createRule: { mutate: vi.fn(), isPending: false },
     toggleRule: { mutate: toggle, isPending: false },
     deleteRule: { mutate: vi.fn(), isPending: false },
@@ -57,6 +61,17 @@ describe('describeRuleAssignee (US-454)', () => {
 describe('LeadRoutingRules (US-454)', () => {
   beforeEach(() => {
     toggle.mockClear();
+    failed = false;
+  });
+
+  it('says the rules did not load instead of "No routing rules yet" (US-612)', () => {
+    rules = [];
+    failed = true;
+    render(<LeadRoutingRules teamId="t1" members={members} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Your routing rules did not load.');
+    expect(screen.queryByText(/No routing rules yet/)).toBeNull();
+    screen.getByRole('button', { name: 'Retry loading routing rules' }).click();
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it("shows a departed teammate's paused rule as unassigned and does not offer to resume it", () => {

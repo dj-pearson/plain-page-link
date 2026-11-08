@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SectionLoadError } from '@/components/dashboard/SectionLoadError';
 
 interface LeadRoutingRulesProps {
   teamId: string;
@@ -31,7 +32,8 @@ interface LeadRoutingRulesProps {
 const LEAD_TYPES = ['any', 'buyer', 'seller', 'valuation', 'contact', 'open_house'];
 
 export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
-  const { rules, isLoading, createRule, toggleRule, deleteRule } = useLeadRouting(teamId);
+  const { rules, isLoading, isError, refetch, createRule, toggleRule, deleteRule } =
+    useLeadRouting(teamId);
   const { toast } = useToast();
 
   const [name, setName] = useState('');
@@ -158,6 +160,14 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
           <div className="flex items-center text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
           </div>
+        ) : isError ? (
+          // US-612: not "No routing rules yet" — that reads as "leads
+          // round-robin" when rules the agent set may be routing them.
+          <SectionLoadError
+            message="Your routing rules did not load."
+            onRetry={() => void refetch()}
+            retryLabel="Retry loading routing rules"
+          />
         ) : rules.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">
             No routing rules yet — leads round-robin across the team by default.
