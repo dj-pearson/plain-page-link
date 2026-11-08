@@ -280,6 +280,67 @@ describe('TeamPage', () => {
       );
     });
 
+    // US-430 (US-419): 'remove' is admin-only, so a member had no way out.
+    it('lets a member leave after confirming, then re-reads which team they are in', async () => {
+      results.membership = [
+        { data: { team_id: 't1', role: 'member' }, error: null },
+        { data: null, error: null }, // after leaving: no accepted membership
+      ];
+      results.teams = [
+        { data: null, error: null },
+        { data: TEAM, error: null },
+        { data: null, error: null }, // owns none on the re-read
+      ];
+      results.team_members = [{ data: [OWNER, AGENT, ME_MEMBER], error: null }];
+      invoke.mockResolvedValue({ data: { left: true }, error: null });
+      renderWithProviders(<TeamPage />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Leave Acme Realty' }));
+      expect(invoke).not.toHaveBeenCalled();
+      expect(await screen.findByText('Leave Acme Realty?')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Stay' }));
+      expect(invoke).not.toHaveBeenCalled();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Leave Acme Realty' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Leave team' }));
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith('teams', { body: { action: 'leave', teamId: 't1' } })
+      );
+      await waitFor(() => expect(toast).toHaveBeenCalledWith({ title: 'You left Acme Realty' }));
+      expect(await screen.findByText(/create your team/i)).toBeInTheDocument();
+    });
+
+    it('offers an admin the leave control too', async () => {
+      results.membership = [{ data: { team_id: 't1', role: 'admin' }, error: null }];
+      results.team_members = [
+        { data: [OWNER, AGENT, { ...ME_MEMBER, role: 'admin' }], error: null },
+      ];
+      renderWithProviders(<TeamPage />);
+      expect(await screen.findByRole('button', { name: 'Leave Acme Realty' })).toBeInTheDocument();
+    });
+
+    it('reports a failed leave with a destructive toast and keeps the team shown', async () => {
+      results.membership = [{ data: { team_id: 't1', role: 'member' }, error: null }];
+      results.team_members = [{ data: [OWNER, AGENT, ME_MEMBER], error: null }];
+      invoke.mockResolvedValue({
+        data: null,
+        error: { message: 'You’re not a member of this team' },
+      });
+      renderWithProviders(<TeamPage />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Leave Acme Realty' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Leave team' }));
+      await waitFor(() =>
+        expect(toast).toHaveBeenCalledWith({
+          title: 'Couldn’t leave Acme Realty',
+          description: 'You’re not a member of this team',
+          variant: 'destructive',
+        })
+      );
+      expect(screen.getByRole('heading', { name: 'Acme Realty' })).toBeInTheDocument();
+    });
+
     it('shows a retryable error, not the create prompt, when the membership lookup fails', async () => {
       results.membership = [
         { data: null, error: { message: 'network down' } },
@@ -299,6 +360,12 @@ describe('TeamPage', () => {
       expect(await screen.findByText(/couldn’t load your team$/i)).toBeInTheDocument();
       expect(screen.queryByText(/create your team/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('does not offer the owner a way to leave their own team', async () => {
+    renderWithProviders(<TeamPage />);
+    expect(await screen.findByText('jo@acme.test')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^leave /i })).toBeNull();
   });
 
   it('canManageTeam matches is_team_admin: owner and admin, not member', () => {
