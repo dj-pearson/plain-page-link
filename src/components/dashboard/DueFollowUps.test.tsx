@@ -7,9 +7,10 @@ process.env.TZ = 'America/Los_Angeles';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderWithProviders, screen, userEvent } from '@/test/test-utils';
 
-const { tasksMock, failState } = vi.hoisted(() => ({
+const { tasksMock, failState, completeState } = vi.hoisted(() => ({
   tasksMock: { current: [] as unknown[] },
   failState: { isError: false, refetch: vi.fn() },
+  completeState: { completeTask: vi.fn(), completingTaskId: undefined as string | undefined },
 }));
 
 vi.mock('@/hooks/useLeadActivities', () => ({
@@ -19,7 +20,10 @@ vi.mock('@/hooks/useLeadActivities', () => ({
     isError: failState.isError,
     refetch: failState.refetch,
   }),
-  useLeadActivities: () => ({ completeTask: vi.fn() }),
+  useLeadActivities: () => ({
+    completeTask: completeState.completeTask,
+    completingTaskId: completeState.completingTaskId,
+  }),
 }));
 
 import { DueFollowUps } from './DueFollowUps';
@@ -41,6 +45,8 @@ afterEach(() => {
   vi.useRealTimers();
   failState.isError = false;
   failState.refetch.mockReset();
+  completeState.completeTask.mockReset();
+  completeState.completingTaskId = undefined;
 });
 
 describe('DueFollowUps in Los Angeles (US-240)', () => {
@@ -84,5 +90,33 @@ describe('DueFollowUps when the query fails (US-590)', () => {
     tasksMock.current = [];
     const { container } = renderWithProviders(<DueFollowUps />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('DueFollowUps Done button on a phone (US-618)', () => {
+  it('is 44px tall below sm and names the task it completes', async () => {
+    tasksMock.current = [task('a', '2099-01-01T00:00:00+00:00')];
+    renderWithProviders(<DueFollowUps />);
+
+    const done = screen.getByRole('button', { name: 'Mark "Task a" done' });
+    expect(done.className).toMatch(/(^|\s)h-11(\s|$)/);
+    expect(done.className).not.toMatch(/(^|\s)h-8(\s|$)/);
+
+    await userEvent.click(done);
+    expect(completeState.completeTask).toHaveBeenCalledWith('a');
+  });
+
+  it('disables only the row being completed, so a double tap sends one update', () => {
+    tasksMock.current = [
+      task('a', '2099-01-01T00:00:00+00:00'),
+      task('b', '2099-01-01T00:00:00+00:00'),
+    ];
+    completeState.completingTaskId = 'a';
+    renderWithProviders(<DueFollowUps />);
+
+    const a = screen.getByRole('button', { name: 'Mark "Task a" done' });
+    expect(a).toBeDisabled();
+    expect(a).toHaveTextContent('Saving');
+    expect(screen.getByRole('button', { name: 'Mark "Task b" done' })).toBeEnabled();
   });
 });

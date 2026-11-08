@@ -76,7 +76,6 @@
     "dompurify": "^3.4.16",
     "framer-motion": "^11.0.8",
     "gsap": "^3.13.0",
-    "idb": "^8.0.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.354.0",

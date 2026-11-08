@@ -399,6 +399,8 @@ export function useLeadActivities(leadId?: string) {
     isLoggingMeeting: logMeetingMutation.isPending,
     isCreatingTask: createTaskMutation.isPending,
     isCompletingTask: completeTaskMutation.isPending,
+    // Which task is being completed, so a list can disable just that row.
+    completingTaskId: completeTaskMutation.isPending ? completeTaskMutation.variables : undefined,
     isDeletingActivity: deleteActivityMutation.isPending,
 
     // Refetch
