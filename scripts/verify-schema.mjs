@@ -731,6 +731,9 @@ check('zip routing rules match against the property address', () => {
       VALUES ('${team}', '${owner}', 'Schema Check Team') ON CONFLICT (id) DO NOTHING;
       INSERT INTO public.team_members (team_id, user_id, accepted_at, invited_at)
       VALUES ('${team}', '${roundRobin}', now(), now()) ON CONFLICT DO NOTHING;
+      -- US-454: a rule routes only to someone on the team.
+      INSERT INTO public.team_members (team_id, user_id, accepted_at, invited_at)
+      VALUES ('${team}', '${zipTarget}', now(), now() + interval '1 second') ON CONFLICT DO NOTHING;
       INSERT INTO public.lead_routing_rules (team_id, name, criteria, assigned_to, priority, is_active)
       VALUES ('${team}', 'Schema check zip', '{"zip":"84604"}'::jsonb, '${zipTarget}', 1, true);
     `);
@@ -743,6 +746,9 @@ check('zip routing rules match against the property address', () => {
     ];
 
     for (const [n, address, shouldMatch, label] of cases) {
+      // zipTarget is a member too, so reset the round robin: the fallback then
+      // always picks the earliest-invited member (roundRobin), never zipTarget.
+      q(`DELETE FROM public.team_round_robin WHERE team_id = '${team}';`);
       q(`
         INSERT INTO public.leads (id, user_id, name, encrypted_email, lead_type, property_address)
         VALUES ('${leadOf(n)}', '${owner}', 'Zip Check', 'enc:v1:zipcheck', 'buyer',
@@ -754,6 +760,24 @@ check('zip routing rules match against the property address', () => {
           `${label}: expected ${shouldMatch ? '' : 'no '}match on the zip rule, got ${got ? 'a match' : 'the round-robin fallback'}`
         );
       }
+    }
+
+    // US-454 (US-440): once the rule's assignee leaves the team, the rule is
+    // paused, and even switched back on it must not route to them: assigning
+    // a lead grants read and update on it.
+    q(`DELETE FROM public.team_members WHERE team_id = '${team}' AND user_id = '${zipTarget}';`);
+    const [stillActive] = q(
+      `SELECT is_active::text FROM public.lead_routing_rules WHERE team_id = '${team}' AND name = 'Schema check zip';`
+    );
+    if (stillActive !== 'false') out.push("a departed member's routing rule was not paused when they left");
+    q(`UPDATE public.lead_routing_rules SET is_active = true WHERE team_id = '${team}';`);
+    q(`DELETE FROM public.team_round_robin WHERE team_id = '${team}';`);
+    q(`
+      INSERT INTO public.leads (id, user_id, name, encrypted_email, lead_type, property_address)
+      VALUES ('${leadOf(5)}', '${owner}', 'Zip Check', 'enc:v1:zipcheck', 'buyer', '1 Main St, Provo, UT 84604');
+    `);
+    if (assignee(leadOf(5)) === zipTarget) {
+      out.push('a reactivated rule routed a lead to a member who had left the team');
     }
   } catch (e) {
     const msg = String(e.stderr || e.message)

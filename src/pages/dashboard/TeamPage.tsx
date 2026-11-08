@@ -247,6 +247,8 @@ export default function TeamPage() {
     },
     onSuccess: (_data, member) => {
       queryClient.invalidateQueries({ queryKey: ['team-members', team?.id] });
+      // US-454: removal pauses the member's routing rules server-side.
+      queryClient.invalidateQueries({ queryKey: ['lead-routing-rules', team?.id] });
       toast({ title: `${memberLabel(member)} was removed from the team` });
     },
     onError: (e, member) =>
