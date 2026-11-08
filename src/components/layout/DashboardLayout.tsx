@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { logger } from '@/lib/logger';
 import { PRIMARY_NAV } from '@/config/dashboard-nav';
+import { useAvatarAppIconBackfill } from '@/hooks/useAvatarAppIconBackfill';
 
 export default function DashboardLayout() {
   const location = useLocation();
@@ -19,6 +20,8 @@ export default function DashboardLayout() {
   const role = useAuthStore((s) => s.role);
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  // Pre-US-481 photos get their home-screen icons on the first visit (US-492).
+  useAvatarAppIconBackfill(profile?.id, profile?.avatar_url);
 
   const isActive = (path: string) => {
     return location.pathname === path;
