@@ -5647,3 +5647,84 @@ Other findings:
 - [mobile] src/App.tsx:161-166 calls cleanupServiceWorkers() on every mount without awaiting or catching it. If it finds a legacy controller, nothing reloads the page. Gate it to run once per sw.js VERSION, or move it into register-sw.ts.
 - [mobile] src/lib/sync-manager.ts and src/lib/offline-storage.ts (plus src/hooks/useOfflineStorage.ts) have no importers. They are dead code that CLAUDE.md still lists as PWA features. Delete them or wire them up; that is the owner's call.
 - [mobile] src/lib/register-sw.ts still shows a 'A new version is available' toast on 'waiting', which sw.js skipWaiting makes practically unreachable. The owner decided silent updates stay, so the toast and its updateRequested path could be removed.
+
+---
+
+## Continuous improvement loop — round 9 — 2026-11-08 (US-451 to US-460 done)
+
+Ten lanes, all approved with no fix-ups. Closed US-289, US-318, US-363, US-438, US-440, US-441, US-448, US-450 (the round-8 install regression).
+One integration fix: CSVUploadDialog imported sanitizeExternalUrl through the DOMPurify module, which the new performance guard test forbids.
+Final: tsc clean (app + node config), 2465 unit tests pass (from 2350), verify:migrations OK (78 files), vite build OK, eslint 588 warnings (CI ratchet 644 -> 588).
+
+- US-451 [listings] Deleted listings and removed photos stayed public in storage
+- US-452 [leads] A workflow's "Add Note" never reached the lead's timeline (written to leads.notes, which nothing reads)
+- US-453 [profile] Page builder: block renderer and settings panel typed without `as any` (closes US-363)
+- US-454 [uiux] Removed or departed teammates kept getting the team's new leads through routing rules
+- US-455 [performance] Public profile, listing, Links and Page Builder pages loaded the DOMPurify HTML sanitizer (11 KB gzip) without using it
+- US-456 [security] The database accepted javascript: and other non-web URLs in agents' link, social, Calendly and virtual-tour columns (US-289)
+- US-457 [enterprise] Overdue-lead chase emails no longer go out in the middle of the agent's night
+- US-458 [marketing] US-458: Hard bounces and spam complaints now stop future drip emails
+- US-459 [seo] The Privacy Policy and Terms said they had changed today, on every visit
+- US-460 [mobile] A homebuyer who adds an agent's profile to the home screen gets the AgentBio dashboard login
+
+Owner actions:
+- US-452: Apply migration supabase/migrations/20261108000452_lead_notes_into_timeline.sql (copies existing leads.notes onto lead timelines, then drops leads.notes)
+- US-452: Redeploy the execute-workflow edge function (Coolify functions.agentbio.net) together with the migration, ideally just before it: the old code writes leads.notes and fails once the column is gone
+- US-454: Apply migration supabase/migrations/20261108000454_routing_rules_follow_roster.sql. It replaces auto_assign_lead and pauses existing rules that point at someone no longer on the team.
+- US-456: Apply migration supabase/migrations/20261108000456_agent_url_scheme_checks.sql. It cleans existing rows: unfixable profile and listing URLs become NULL, and unfixable links become '#' and inactive. The public page already hid all of these. Optionally, before applying, run this count to see how many rows it will touch: SELECT count(*) FROM links WHERE NOT (url ~* '^(https?://|mailto:|tel:|#|/)')
+- US-456: Deploy Cloudflare Pages so the Profile, link-toast and CSV-import messages go live (deploy with or after the migration; no edge function change)
+- US-457: Redeploy scheduled-maintenance (the functions.agentbio.net Coolify app built from the root Dockerfile) so the chaser applies quiet hours. Migration 20261107000433 (profiles.timezone) must already be applied for this to take effect; without it every agent is emailed at once, as before.
+- US-458: Apply migration supabase/migrations/20261108000458_email_suppressions_bounces.sql
+- US-458: Deploy the new edge function resend-webhook (functions.agentbio.net router picks up the new directory on redeploy of the Coolify app)
+- US-458: In Resend > Webhooks add endpoint <functions-url>/resend-webhook for events email.bounced and email.complained, and set its signing secret (whsec_...) as RESEND_WEBHOOK_SECRET on the edge-functions server (PII_ENCRYPTION_KEY must already be set)
+- US-459: The legal dates are taken from git history of each page's text. If counsel treats any other date as the effective date for a policy, correct it in src/config/legal-dates.ts. When a policy's wording changes, move its 'modified' date in the same commit.
+
+Opened:
+- US-461 [listings] US-451 slice: photos uploaded and then abandoned in the add and edit dialogs are never removed
+- US-462 [listings] US-451 slice: sweep existing orphaned listing photos
+- US-463 [leads] US-278 slice 3 remainder: delete the LegacyLead family in src/types/lead.ts
+- US-464 [profile] StickyActionBar follows the profile theme and the craft floor
+- US-465 [uiux] Leads already assigned to a departed teammate stay readable by them
+- US-466 [security] Explain a refused virtual tour URL in the listing editor
+- US-467 [enterprise] Let the agent choose their quiet hours for chase emails
+- US-468 [marketing] Agent-facing sends respect bounce/complaint suppressions where appropriate
+- US-469 [marketing] Reconcile Privacy Policy email section with actual suppression behaviour
+- US-470 [mobile] An installed agent page shows the AgentBio logo instead of the agent's photo
+- US-471 [mobile] Crawler/prerender response still names /manifest.json on profile pages
+
+Other findings:
+- [listings] [listings] src/lib/sync-manager.ts:165 deletes a listing during offline sync with only .eq('id', id) and no storage cleanup. RLS still scopes the delete, but this path bypasses the cleanup that useListings now does.
+- [listings] [listings] src/hooks/useSecureListings.ts is imported nowhere and duplicates useListings' CRUD (lines 212 and 257). It is dead code and could be deleted.
+- [listings] [listings] src/hooks/useListings.ts still selects '*' on listings (the open security-lane story US-342).
+- [listings] [listings] Still open: US-276 needs submit-lead to store visitor_id (leads lane). US-437 and US-360 need a browser-capable CI run.
+- [listings] [profile] src/components/profile/StickyActionBar.tsx still uses fixed off-theme colours (bg-purple-600, bg-indigo-600, and a bg-white panel with both a border and shadow-2xl).
+- [leads] supabase/functions/execute-workflow/ownership.ts:5 has a header comment that still mentions editing a lead's 'notes'. It is historical and harmless, but it could be reworded.
+- [leads] When I committed, lint-staged backed up the working state with git stash (the stash stack shared with other worktrees) and then cleaned it up. Parallel lanes committing at the same moment could collide on that.
+- [leads] US-439 (Leads.tsx quick-filter chips and per-status counts ignore nurturing/closed), US-279 (filter row overflows under 640px) and US-418 (step-two enrichment never emailed; needs an owner decision) are still open in this lane.
+- [profile] src/stores/pageBuilderStore.ts:76 blocksFromJson and src/components/profile/CustomBlocksSection.tsx:34 still cast jsonb to PageBlock[] without checking each element. CustomBlocksSection filters out non-objects; the store does not. A malformed element (null) in a saved page would reach the editor. A shared parsePageBlocks(value: unknown) at that boundary would close it.
+- [profile] src/lib/pageBuilder.ts:141 updateBlock still asserts `{ ...block.config, ...config } as BlockConfig`. Now that the settings forms emit typed per-block patches, this could become a per-type merge. Low value.
+- [profile] src/types/pageBuilder.ts:314 PageSEO.structuredData is Record<string, any>; it could be Record<string, unknown>.
+- [profile] BlockSettings testimonial and gallery delete buttons (src/components/pageBuilder/BlockSettings.tsx, the Trash2 buttons in TestimonialSettings and GallerySettings) have no aria-label or type="button", unlike the stats one, which has both. Small a11y fix for the uiux lane.
+- [uiux] src/integrations/supabase/types.ts has drifted from the applied schema. Regenerating against the full migration chain adds `timezone: string` to the get_own_profile Returns (around line 9331), which looks like it came from 20261107000433_profile_timezone.sql (US-433). `gen-supabase-types --check`, the verify-backend CI step, will fail until someone regenerates. I left it alone to keep this lane's scope.
+- [uiux] src/components/settings/LeadRoutingRules.tsx: deleting a rule still has no confirmation, and there is no way to change a rule's assignee, so an admin must delete and recreate a paused departed rule.
+- [uiux] supabase/functions/teams/index.ts 'create' still inserts the owner's team_members row without checking the error. This was recorded in round 8 and is still open.
+- [performance] src/utils/sanitize.ts: after this change nothing imports it. sanitizeHtml, sanitizeText, sanitizeBio, sanitizeRichContent, sanitizeEmail and sanitizePhone are unused, and src/lib/security/validation.ts has its own DOMPurify-based sanitizeHtml. A dead-code cleanup could delete them, or merge them into one sanitizer.
+- [performance] There is no rendered-route check that DOMPurify stays off /demo. scripts/check-route-weight.mjs measures total KB only. The source guard in sanitizeUrl.test.ts covers this regression, but a different import path could bring purify back unnoticed.
+- [performance] Settings route (US-443, 52.8 KB beyond layout) is still not measured or split.
+- [security] US-384 is still open and is a one-line data migration: UPDATE api_keys SET is_active=false WHERE revoked_at IS NOT NULL. It is a good next small security slice.
+- [security] The image URL columns profiles.avatar_url, brokerage_logo and og_image, and the photo URLs in listings.photos, have no scheme constraint. These render as img src, so javascript: does not execute there, but og_image is emitted in meta tags. Consider an http(s)-only CHECK on them in a later slice.
+- [security] src/integrations/supabase/types.ts on the loop branch was missing get_own_profile's timezone column, a sign that types:check is not run during integration. This commit regenerates types.ts, so that column is now included.
+- [security] src/hooks/useLinks.ts:37 still uses .select('*') on links. links has no column grants today, but this matches the US-342 pattern.
+- [enterprise] supabase/functions/scheduled-maintenance/overdue.ts: if an agent whose emails are held cannot be read (absent from getAgents and not part of a failed chunk), no error is reported. Their held rows simply wait for the next run. This matches the existing retry behaviour but is silent.
+- [enterprise] listHeldChases filters on data->>email_pending over the week of lead_overdue rows. That is fine at today's volume. If notifications grows a lot, a partial index WHERE type = 'lead_overdue' AND data ? 'email_pending' would keep it cheap.
+- [enterprise] US-424 is still a small, self-contained enterprise fix: supabase/functions/gdpr-export/index.ts (~141-166) marks a queued export request completed, with no file, when the user downloads directly. Good candidate for the next round.
+- [enterprise] US-386 can probably be closed as no_change_needed: the round-7/8 notes say nothing loops over agents calling getAgentContact.
+- [enterprise] The lint-staged pre-commit hook backs up state with `git stash`, and the stash stack is shared across worktrees. Parallel lane agents committing at the same moment could in principle interfere with each other's backup entries.
+- [marketing] US-449 (bio drip 7-day window drops email 7) is still open and small. supabase/functions/send-scheduled-bio-emails/index.ts:51-64 selects only captures with created_at >= now-7d, while BIO_DRIP_DAY puts email 7 on day 7, so the hourly run can miss it. Widen the window to 8 days or more (email_sequence_completed already ends it).
+- [marketing] US-447 is still open: the drip HTML has a gradient header and border-left callouts, and the footer has no CAN-SPAM postal address. The postal address needs the owner to supply it.
+- [marketing] scripts/smoke-edge-functions.mjs could not run here (no deno in the sandbox). CI will exercise resend-webhook for the first time.
+- [seo] src/pages/legal/DMCAPolicy.tsx uses the example URL https://agentbio.net/agent/username/photo-123 in its prose, but /agent/ is not a route (progress.txt:5415). Changing it is a legal-copy edit, so I left it alone.
+- [seo] src/pages/Pricing.tsx (~line 95, offers[].seller) and src/pages/landing/VsLater.tsx:44 use an inline Organization {name:'AgentBio'} with no @id. publisherOrganization(baseUrl) would link them to the site Organization node.
+- [seo] The legal pages' WebPage nodes still use a generic 'about: Thing' and no author or publisher. Linking publisher to organizationId() would tie each policy to the entity that issues it.
+- [mobile] The profile manifest's theme_color (#2563eb) matches public/manifest.json, but index.html:78 sets theme-color #0ea5e9. The colour mismatch between the installed app's chrome and the page predates this change.
+- [mobile] The dashboard manifest declares every icon as purpose 'any maskable' (public/manifest.json:13-58). Using one image for both purposes crops the logo on Android adaptive icons. Separate maskable art would fix it.
