@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 /**
  * US-461: ListingPhotoManager uploads the moment files are picked. The dialog
@@ -56,11 +56,13 @@ const initialData: EditListingFormData = {
   photos: [SAVED],
 };
 
-function setup() {
+function setup(submitResult: () => Promise<boolean> = () => Promise.resolve(true)) {
   const onClose = vi.fn();
-  const onSubmit = vi.fn();
+  const onSubmit = vi.fn<(data: EditListingFormData, uploaded: string[]) => Promise<boolean>>(() =>
+    submitResult()
+  );
   const onDiscardUploads = vi.fn();
-  render(
+  const view = render(
     <EditListingModal
       isOpen
       onClose={onClose}
@@ -70,7 +72,7 @@ function setup() {
       listingId="l1"
     />
   );
-  return { onClose, onSubmit, onDiscardUploads };
+  return { onClose, onSubmit, onDiscardUploads, unmount: view.unmount };
 }
 
 describe('EditListingModal photo uploads (US-461)', () => {
@@ -134,5 +136,79 @@ describe('EditListingModal photo uploads (US-461)', () => {
 
     onUploaded?.([NEW_A]);
     expect(onDiscardUploads).toHaveBeenCalledWith([NEW_A]);
+  });
+});
+
+describe('EditListingModal unmounted without saving (US-512)', () => {
+  beforeEach(() => {
+    uploadNext = [];
+    lastOnUploaded = undefined;
+  });
+
+  it('discards the session uploads when it unmounts with the dialog open', () => {
+    const { onDiscardUploads, unmount } = setup();
+    uploadNext = [NEW_A, SAVED];
+    fireEvent.click(screen.getByText('stub upload'));
+    unmount();
+    expect(onDiscardUploads).toHaveBeenCalledTimes(1);
+    expect(onDiscardUploads).toHaveBeenCalledWith([NEW_A]);
+  });
+
+  it('does not discard twice after a cancel followed by the unmount', () => {
+    const { onDiscardUploads, unmount } = setup();
+    uploadNext = [NEW_A];
+    fireEvent.click(screen.getByText('stub upload'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    unmount();
+    expect(onDiscardUploads).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the uploads of a save that landed when the dialog then unmounts', async () => {
+    const { onSubmit, onDiscardUploads, unmount } = setup();
+    uploadNext = [NEW_A];
+    fireEvent.click(screen.getByText('stub upload'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
+    unmount();
+    expect(onDiscardUploads).not.toHaveBeenCalled();
+  });
+
+  it('waits for a save in flight, and discards only if that save fails', async () => {
+    let finish: (saved: boolean) => void = () => undefined;
+    const { onDiscardUploads, unmount } = setup(
+      () => new Promise<boolean>((resolve) => (finish = resolve))
+    );
+    uploadNext = [NEW_A];
+    fireEvent.click(screen.getByText('stub upload'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    unmount();
+    expect(onDiscardUploads).not.toHaveBeenCalled();
+
+    finish(false);
+    await waitFor(() => expect(onDiscardUploads).toHaveBeenCalledWith([NEW_A]));
+  });
+
+  it('does not discard after an in-flight save succeeds', async () => {
+    let finish: (saved: boolean) => void = () => undefined;
+    const { onDiscardUploads, unmount } = setup(
+      () => new Promise<boolean>((resolve) => (finish = resolve))
+    );
+    uploadNext = [NEW_A];
+    fireEvent.click(screen.getByText('stub upload'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    unmount();
+    finish(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onDiscardUploads).not.toHaveBeenCalled();
+  });
+
+  it('discards an upload that finishes after the unmount', () => {
+    const { onDiscardUploads, unmount } = setup();
+    const onUploaded = lastOnUploaded;
+    unmount();
+    expect(onDiscardUploads).not.toHaveBeenCalled();
+    onUploaded?.([NEW_B]);
+    expect(onDiscardUploads).toHaveBeenCalledWith([NEW_B]);
   });
 });
