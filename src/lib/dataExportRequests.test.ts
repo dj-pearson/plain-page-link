@@ -138,6 +138,10 @@ describe('shouldOfferQueuedExport', () => {
     expect(shouldOfferQueuedExport(new TypeError('Failed to fetch'))).toBe(true);
   });
 
+  it('offers it when a streamed download was cut short and does not parse (US-584)', () => {
+    expect(shouldOfferQueuedExport(new SyntaxError('Unexpected end of JSON input'))).toBe(true);
+  });
+
   it('does not offer it for a sign-in or rate-limit failure', () => {
     expect(shouldOfferQueuedExport(err(401))).toBe(false);
     expect(shouldOfferQueuedExport(err(429))).toBe(false);

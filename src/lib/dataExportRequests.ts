@@ -149,7 +149,10 @@ export function describeExportRequest(
  * Whether a failed immediate download should offer the emailed link instead:
  * the server could not finish it (503 — a section could not be read — or a
  * gateway 502/504), or the browser stopped waiting, or the connection dropped.
- * A 401 or 429 is not helped by queueing.
+ * A large export is streamed (US-584): a section that fails after the download
+ * has started cuts the body short, which reaches here as the dropped
+ * connection's TypeError or, if the body ended cleanly, as the SyntaxError of
+ * a document that does not parse. A 401 or 429 is not helped by queueing.
  */
 export function shouldOfferQueuedExport(error: unknown): boolean {
   if (error instanceof EdgeFunctionError) {
@@ -164,8 +167,9 @@ export function shouldOfferQueuedExport(error: unknown): boolean {
   if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
     return true;
   }
-  // fetch rejects with a TypeError when the connection itself fails.
-  return error instanceof TypeError;
+  // fetch rejects with a TypeError when the connection itself fails; a body
+  // cut short before its closing brace does not parse.
+  return error instanceof TypeError || error instanceof SyntaxError;
 }
 
 /** The message for a failed link re-send, in words for the subject (US-404). */
