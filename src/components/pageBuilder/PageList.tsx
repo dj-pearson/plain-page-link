@@ -12,6 +12,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Plus,
   Eye,
   Edit,
@@ -31,6 +41,87 @@ import { pageTemplates, applyTemplate } from '@/lib/pageTemplates';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { PageConfig } from '@/types/pageBuilder';
 
+/** The public profile renders the active page only while it is published
+ * (usePublicProfile filters on both). */
+const isLivePage = (page: PageConfig): boolean => page.isActive === true && page.published === true;
+
+interface DeletePageDialogProps {
+  page: PageConfig | null;
+  username: string | null;
+  /** A published page that could be set as active instead, if there is one. */
+  otherPublishedTitle: string | null;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function DeletePageDialog({
+  page,
+  username,
+  otherPublishedTitle,
+  deleting,
+  onCancel,
+  onConfirm,
+}: DeletePageDialogProps) {
+  const live = page ? isLivePage(page) : false;
+  const title = page?.title || 'this page';
+  const blockCount = page?.blocks.length ?? 0;
+  const host = typeof window !== 'undefined' ? window.location.host : 'agentbio.net';
+  const where = username ? `${host}/${username}` : 'your public page';
+
+  return (
+    <AlertDialog
+      open={page !== null}
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {live ? 'Delete your live page?' : `Delete “${title}”?`}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {live ? (
+              <>
+                “{title}” is what visitors see at {where}. Deleting it removes its {blockCount}{' '}
+                {blockCount === 1 ? 'block' : 'blocks'} from your public page straight away. Your
+                profile, listings, links and reviews stay.
+                {otherPublishedTitle
+                  ? ` To keep a custom page showing, set “${otherPublishedTitle}” as active first.`
+                  : ''}{' '}
+                This cannot be undone.
+              </>
+            ) : (
+              <>
+                This deletes the page and its blocks. Your public page does not change. This cannot
+                be undone.
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting}>
+            {live ? 'Keep it live' : 'Cancel'}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            disabled={deleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={(event) => {
+              // Stay open until the delete settles, so a failure is not hidden
+              // behind a dialog that already closed.
+              event.preventDefault();
+              onConfirm();
+            }}
+          >
+            {deleting ? 'Deleting…' : live ? 'Delete live page' : 'Delete page'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export function PageList() {
   const navigate = useNavigate();
   const { user, profile } = useAuthStore();
@@ -42,6 +133,11 @@ export function PageList() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [activating, setActivating] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  // The page awaiting delete confirmation. A native confirm() said the same
+  // thing for every page, so deleting the live one dropped its blocks off the
+  // public profile with no warning (US-642).
+  const [pendingDelete, setPendingDelete] = useState<PageConfig | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadPages();
@@ -118,19 +214,34 @@ export function PageList() {
     }
   };
 
-  const handleDelete = async (pageId: string) => {
-    if (!confirm('Are you sure you want to delete this page?')) return;
-
+  const confirmDelete = async () => {
+    const target = pendingDelete;
+    if (!target || !user) return;
+    setDeleting(true);
     try {
-      const { error } = await supabase.from('custom_pages').delete().eq('id', pageId);
+      // Scoped to the owner and asked to return the row: RLS answers a delete
+      // it filters out with zero rows and no error, which used to read as
+      // "Page deleted successfully" while the page stayed.
+      const { data, error } = await supabase
+        .from('custom_pages')
+        .delete()
+        .eq('id', target.id)
+        .eq('user_id', user.id)
+        .select('id');
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Page was not deleted');
 
-      toast.success('Page deleted successfully');
+      toast.success(
+        isLivePage(target) ? 'Page deleted. Your public page no longer shows it.' : 'Page deleted'
+      );
+      setPendingDelete(null);
       await loadPages();
     } catch (error) {
       logger.error('Failed to delete page', error as Error);
       toast.error('Failed to delete page');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -192,9 +303,7 @@ export function PageList() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pages.map((page) => {
             const isActive = page.isActive === true;
-            // The public profile renders the active page only while it is
-            // published (usePublicProfile filters on both).
-            const isLive = isActive && page.published;
+            const isLive = isLivePage(page);
             return (
               <Card key={page.id} className="p-6 space-y-4">
                 <div className="space-y-2">
@@ -268,7 +377,7 @@ export function PageList() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(page.id)}
+                    onClick={() => setPendingDelete(page)}
                     className="gap-2 w-full text-destructive hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -284,6 +393,19 @@ export function PageList() {
           })}
         </div>
       )}
+
+      <DeletePageDialog
+        page={pendingDelete}
+        username={profile?.username ?? null}
+        otherPublishedTitle={
+          pages.find((p) => p.id !== pendingDelete?.id && p.published)?.title ?? null
+        }
+        deleting={deleting}
+        onCancel={() => {
+          if (!deleting) setPendingDelete(null);
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
 
       {/* Template Selector Dialog */}
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
