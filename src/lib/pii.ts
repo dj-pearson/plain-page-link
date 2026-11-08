@@ -212,3 +212,45 @@ export async function encryptPII<T extends Nullable<string>>(plaintext: T): Prom
   const [result] = await encryptPIIBatch([plaintext]);
   return result as string;
 }
+
+/** One of the caller's contacts that a lead already is (US-629). */
+export interface ContactMatchForLead {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  /** The lead this contact is already linked to, if any. */
+  lead_id: string | null;
+  matched_on: 'email' | 'phone' | 'email_and_phone';
+}
+
+/** pii-crypto hashes a batch of contacts per call; this caps the round trips. */
+const MAX_MATCH_ROUNDS = 8;
+
+/**
+ * The caller's contacts with the same email or phone as this lead, strongest
+ * match first. pii-crypto compares keyed fingerprints, so nothing is
+ * decrypted into the browser; a locked lead never matches.
+ *
+ * Contacts are fingerprinted lazily, a batch per call, so this asks again
+ * while pii-crypto reports `complete: false` (a large sphere's first
+ * conversion), up to a fixed number of rounds.
+ *
+ * Throws when pii-crypto cannot answer; the caller decides whether to go
+ * ahead without the check.
+ */
+export async function findContactsMatchingLead(leadId: string): Promise<ContactMatchForLead[]> {
+  let matches: ContactMatchForLead[] = [];
+  for (let round = 0; round < MAX_MATCH_ROUNDS; round++) {
+    const { data, error } = await invokePiiCrypto<{
+      matches: ContactMatchForLead[];
+      complete: boolean;
+    }>({ op: 'match_contacts_for_lead', leadId });
+    if (error) throw error;
+    if (!data || !Array.isArray(data.matches)) {
+      throw new Error('pii-crypto returned an unexpected response');
+    }
+    matches = data.matches;
+    if (data.complete !== false) break;
+  }
+  return matches;
+}

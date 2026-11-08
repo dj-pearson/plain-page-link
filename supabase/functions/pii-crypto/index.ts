@@ -51,6 +51,7 @@ import {
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 import { encryptSecret, decryptSecret } from '../_shared/encryption.ts';
 import { contactsCopiedFromLockedLeads } from './contactLock.ts';
+import { matchContactsForLead, type UnhashedContactRow } from './contactMatch.ts';
 
 // One page of leads decrypts 2 fields x 50 rows. 200 leaves headroom without
 // letting a single request pin a worker on PBKDF2 — each value is a separate
@@ -62,7 +63,12 @@ const MAX_ROWS = 100;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type Op = 'encrypt' | 'decrypt_leads' | 'decrypt_contacts' | 'decrypt_profile';
+type Op =
+  | 'encrypt'
+  | 'decrypt_leads'
+  | 'decrypt_contacts'
+  | 'decrypt_profile'
+  | 'match_contacts_for_lead';
 
 export default async (req: Request) => {
   const origin = req.headers.get('origin');
@@ -110,6 +116,7 @@ export default async (req: Request) => {
       values?: unknown;
       leadIds?: unknown;
       contactIds?: unknown;
+      leadId?: unknown;
     };
     const op = body.op;
 
@@ -117,10 +124,11 @@ export default async (req: Request) => {
       op !== 'encrypt' &&
       op !== 'decrypt_leads' &&
       op !== 'decrypt_contacts' &&
-      op !== 'decrypt_profile'
+      op !== 'decrypt_profile' &&
+      op !== 'match_contacts_for_lead'
     ) {
       return errorResponse(
-        "op must be 'encrypt', 'decrypt_leads', 'decrypt_contacts' or 'decrypt_profile'",
+        "op must be 'encrypt', 'decrypt_leads', 'decrypt_contacts', 'decrypt_profile' or 'match_contacts_for_lead'",
         'REQUEST_VALIDATION_FAILED',
         req,
         400
@@ -150,6 +158,103 @@ export default async (req: Request) => {
       }
 
       return successResponse({ phone }, req);
+    }
+
+    // ---------------------------------------------------------------------
+    // match_contacts_for_lead — which of the caller's contacts this lead
+    // already is (US-629), by keyed fingerprint. Hashes a batch of the
+    // caller's not-yet-hashed contacts first; `complete: false` asks the
+    // client to call again. See contactMatch.ts.
+    // ---------------------------------------------------------------------
+    if (op === 'match_contacts_for_lead') {
+      const leadId = body.leadId;
+      if (typeof leadId !== 'string' || !UUID_RE.test(leadId)) {
+        return errorResponse('leadId must be a uuid', 'REQUEST_VALIDATION_FAILED', req, 400);
+      }
+      const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY');
+      if (!hashSecret) {
+        return errorResponse('Matching is not configured', 'MATCH_UNAVAILABLE', req, 503);
+      }
+
+      const result = await matchContactsForLead(
+        {
+          hashSecret,
+          decrypt: async (value) => {
+            if (!value) return null;
+            try {
+              const plain = (await decryptSecret(value)) ?? null;
+              // A value that will not open (corrupt, rotated key) has nothing
+              // to fingerprint.
+              return plain && !plain.startsWith('enc:v1:') ? plain : null;
+            } catch {
+              return null;
+            }
+          },
+          loadLead: async (id) => {
+            const { data, error } = await supabase
+              .from('leads')
+              .select('id, user_id, assigned_to, encrypted_email, encrypted_phone')
+              .eq('id', id)
+              .maybeSingle();
+            if (error) throw error;
+            return data;
+          },
+          isLeadLocked: async (ownerId, id) => {
+            const { data, error } = await supabase.rpc('locked_lead_ids', {
+              _user_id: ownerId,
+              _lead_ids: [id],
+            });
+            // Fail closed here, unlike decrypt_leads: a missed match only
+            // means the agent sees "Add to clients" without the suggestion.
+            if (error) return true;
+            return ((data ?? []) as string[]).includes(id);
+          },
+          loadUnhashedContacts: async (userId, limit) => {
+            const { data, error } = await supabase
+              .from('contacts')
+              .select('id, encrypted_email, encrypted_phone, updated_at')
+              .eq('user_id', userId)
+              .is('lookup_hashed_at', null)
+              .limit(limit);
+            if (error) throw error;
+            return (data ?? []) as UnhashedContactRow[];
+          },
+          saveContactHashes: async (row, hashes) => {
+            // Only if the contact is as it was read: an edit in between
+            // clears the hashes by trigger and must not be overwritten.
+            const { error } = await supabase
+              .from('contacts')
+              .update({ ...hashes, lookup_hashed_at: new Date().toISOString() })
+              .eq('id', row.id)
+              .eq('updated_at', row.updated_at);
+            if (error) throw error;
+          },
+          findCandidates: async (userId, hashes) => {
+            const clauses = [
+              hashes.email_hash ? `email_hash.eq.${hashes.email_hash}` : null,
+              hashes.phone_hash ? `phone_hash.eq.${hashes.phone_hash}` : null,
+            ].filter(Boolean);
+            const { data, error } = await supabase
+              .from('contacts')
+              .select('id, first_name, last_name, lead_id, email_hash, phone_hash')
+              .eq('user_id', userId)
+              .or(clauses.join(','))
+              .limit(20);
+            if (error) throw error;
+            return data ?? [];
+          },
+        },
+        user.id,
+        leadId
+      );
+
+      if (result.status === 'not_found') {
+        return errorResponse('Lead not found', 'LEAD_NOT_FOUND', req, 404);
+      }
+      if (result.status === 'locked') {
+        return successResponse({ matches: [], complete: true, locked: true }, req);
+      }
+      return successResponse({ matches: result.matches, complete: result.complete }, req);
     }
 
     // ---------------------------------------------------------------------

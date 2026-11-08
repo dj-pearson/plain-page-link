@@ -1011,6 +1011,7 @@ export type Database = {
           address: string | null;
           city: string | null;
           created_at: string;
+          email_hash: string | null;
           employer: string | null;
           encrypted_email: string | null;
           encrypted_phone: string | null;
@@ -1021,9 +1022,11 @@ export type Database = {
           last_contacted_at: string | null;
           last_name: string | null;
           lead_id: string | null;
+          lookup_hashed_at: string | null;
           next_touch_at: string | null;
           notes: string | null;
           occupation: string | null;
+          phone_hash: string | null;
           preferred_contact: string | null;
           referred_by: string | null;
           relationship: string;
@@ -1039,6 +1042,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           created_at?: string;
+          email_hash?: string | null;
           employer?: string | null;
           encrypted_email?: string | null;
           encrypted_phone?: string | null;
@@ -1049,9 +1053,11 @@ export type Database = {
           last_contacted_at?: string | null;
           last_name?: string | null;
           lead_id?: string | null;
+          lookup_hashed_at?: string | null;
           next_touch_at?: string | null;
           notes?: string | null;
           occupation?: string | null;
+          phone_hash?: string | null;
           preferred_contact?: string | null;
           referred_by?: string | null;
           relationship?: string;
@@ -1067,6 +1073,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           created_at?: string;
+          email_hash?: string | null;
           employer?: string | null;
           encrypted_email?: string | null;
           encrypted_phone?: string | null;
@@ -1077,9 +1084,11 @@ export type Database = {
           last_contacted_at?: string | null;
           last_name?: string | null;
           lead_id?: string | null;
+          lookup_hashed_at?: string | null;
           next_touch_at?: string | null;
           notes?: string | null;
           occupation?: string | null;
+          phone_hash?: string | null;
           preferred_contact?: string | null;
           referred_by?: string | null;
           relationship?: string;
