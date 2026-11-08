@@ -5,11 +5,20 @@ export type LeadRow = Database['public']['Tables']['leads']['Row'];
 
 /**
  * The columns the browser may read (US-254). authenticated holds SELECT on
- * every column of `leads` except the two ciphertexts and phone_hash (US-522,
- * read only by submit-lead) — select LEAD_COLUMNS (src/lib/leadColumns.ts)
+ * every column of `leads` except the two ciphertexts and the lookup columns
+ * only submit-lead reads (phone_hash, US-522; email_hash and the step-two
+ * token, US-559) — select LEAD_COLUMNS (src/lib/leadColumns.ts)
  * and decrypt through pii-crypto by lead id.
  */
-export type LeadReadRow = Omit<LeadRow, 'encrypted_email' | 'encrypted_phone' | 'phone_hash'>;
+export type LeadReadRow = Omit<
+  LeadRow,
+  | 'encrypted_email'
+  | 'encrypted_phone'
+  | 'phone_hash'
+  | 'email_hash'
+  | 'update_token_hash'
+  | 'update_token_expires_at'
+>;
 
 /**
  * A lead as the app consumes it: the row, with the contact details decrypted.
