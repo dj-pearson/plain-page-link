@@ -12,6 +12,8 @@
  * for the contact details, so the regression cannot return silently.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
 import { mockLead, mockLeadRow } from '@/test/fixtures/lead';
 import type { LeadRow } from '@/types/lead';
@@ -342,5 +344,25 @@ describe('Leads page', () => {
     const inProgress = await screen.findByRole('button', { name: /in progress/i });
     await waitFor(() => expect(inProgress).toHaveTextContent('9'));
     expect(screen.getByRole('button', { name: /won/i })).toHaveTextContent('11');
+  });
+});
+
+describe('Leads route weight (US-476)', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/pages/dashboard/Leads.tsx'), 'utf8');
+
+  it('does not import date-fns, which would put date-vendor on the route', () => {
+    expect(source).not.toMatch(/from 'date-fns'/);
+  });
+
+  it('does not statically import the dialogs or the CSV writer', () => {
+    for (const mod of [
+      '@/components/leads/LeadDetailModal',
+      '@/components/integrations/ZapierIntegrationModal',
+      '@/components/UpgradeModal',
+      '@/lib/exportUtils',
+      '@/lib/leadFormSchema',
+    ]) {
+      expect(source).not.toMatch(new RegExp(`^import [^;]*from '${mod}';`, 'm'));
+    }
   });
 });
