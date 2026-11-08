@@ -39,6 +39,14 @@ describe('useProfileManifest', () => {
     expect(manifestHref()).toBe('/manifest.json');
   });
 
+  it("restores the dashboard's, not the agent's, when the server already linked the agent's (US-553)", () => {
+    document.head.innerHTML = '<link rel="manifest" href="/jane/manifest.json" />';
+    const { unmount } = renderHook(() => useProfileManifest('jane'));
+    expect(manifestHref()).toBe('/jane/manifest.json');
+    unmount();
+    expect(manifestHref()).toBe('/manifest.json');
+  });
+
   it('leaves the dashboard manifest alone without a username', () => {
     renderHook(() => useProfileManifest(''));
     expect(manifestHref()).toBe('/manifest.json');

@@ -248,6 +248,36 @@ export function linkProfileManifest(html: string, username: string): string {
   return out.includes('</head>') ? out.replace('</head>', `    ${link}\n  </head>`) : out;
 }
 
+/**
+ * The SPA document for a person, naming the agent's manifest (US-553).
+ *
+ * index.html links /manifest.json, the dashboard app. useProfileManifest
+ * swaps it once React runs, but Chrome on Android can judge install
+ * eligibility against the manifest the parser saw first, so a buyer could be
+ * offered the dashboard app (start_url /dashboard) on an agent's page. The
+ * body is otherwise byte-for-byte what the asset server sent, and nothing here
+ * reads the database: the username comes from the URL, and the manifest route
+ * answers for itself when the handle does not exist.
+ *
+ * Anything that is not a successful HTML document passes through untouched.
+ * content-length and the asset ETag describe the original bytes, so both go;
+ * the asset's own cache-control stays.
+ */
+async function serveHumanDocument(assetResponse: Response, username: string): Promise<Response> {
+  const contentType = assetResponse.headers.get('content-type') ?? '';
+  if (!assetResponse.ok || !contentType.includes('text/html')) return assetResponse;
+
+  const html = await assetResponse.text();
+  const headers = new Headers(assetResponse.headers);
+  headers.delete('content-length');
+  headers.delete('etag');
+  return new Response(linkProfileManifest(html, username), {
+    status: assetResponse.status,
+    statusText: assetResponse.statusText,
+    headers,
+  });
+}
+
 /** A single route parameter, whichever shape Pages hands it over in. */
 export function routeParam(raw: string | string[] | undefined): string | undefined {
   return Array.isArray(raw) ? raw[0] : raw;
@@ -299,7 +329,7 @@ export async function serveProfileRoute(
   const username = segment;
 
   if (!isCrawler(request.headers.get('user-agent'))) {
-    return next();
+    return serveHumanDocument(await next(), username);
   }
 
   const restUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL;

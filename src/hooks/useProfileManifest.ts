@@ -28,6 +28,8 @@ import { useEffect } from 'react';
 import { avatarAppIconUrls } from '@/lib/avatarAppIcon';
 
 const DASHBOARD_MANIFEST = '/manifest.json';
+/** Any agent's manifest: /<one segment>/manifest.json. */
+const PROFILE_MANIFEST_HREF = /^\/[^/]+\/manifest\.json$/;
 
 /** Must match profileManifestPath in functions/_lib/profile-manifest.ts. */
 export function profileManifestHref(username: string): string {
@@ -77,7 +79,13 @@ export function useProfileManifest(username: string, avatarUrl: string | null = 
       link.rel = 'manifest';
       document.head.appendChild(link);
     }
-    const previousHref = link.getAttribute('href') ?? DASHBOARD_MANIFEST;
+    // The server already names the agent's manifest in the document a person
+    // first loads (US-553), so the href found here can be this page's own.
+    // Leaving for the dashboard must not restore that: anything that is not
+    // the dashboard manifest goes back to it.
+    const currentHref = link.getAttribute('href');
+    const previousHref =
+      currentHref && !PROFILE_MANIFEST_HREF.test(currentHref) ? currentHref : DASHBOARD_MANIFEST;
     link.setAttribute('href', profileManifestHref(username));
 
     const appleTitle = document.querySelector<HTMLMetaElement>(
