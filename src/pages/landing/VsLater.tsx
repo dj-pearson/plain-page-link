@@ -1,4 +1,4 @@
-import { Check, X, ArrowRight, Star, TrendingUp } from 'lucide-react';
+import { Check, X, ArrowRight, Star, Home } from 'lucide-react';
 import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -7,8 +7,8 @@ import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl, getCanonicalUrl, getOgImageUrl } from '@/config/seo.config';
-import { PRICING_PLANS } from '@/config/pricing-plans';
-import { COMPETITORS } from '@/config/competitors';
+import { PRICING_PLANS, linkAllowanceSummary } from '@/config/pricing-plans';
+import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
 
 export default function VsLater() {
   const canonicalUrl = getCanonicalUrl('/vs/later');
@@ -99,7 +99,7 @@ export default function VsLater() {
   return (
     <>
       <Helmet>
-        <title>AgentBio vs Later: Real Estate Link in Bio Comparison 2025</title>
+        <title>AgentBio vs Later: Real Estate Link in Bio Comparison</title>
         <meta
           name="description"
           content="Compare AgentBio and Later for real estate agents. Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
@@ -142,8 +142,10 @@ export default function VsLater() {
         <section className="container mx-auto px-4 pt-24 pb-16">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
-              <TrendingUp className="h-4 w-4" />
-              Trusted by 3,000+ Real Estate Agents
+              {/* Was "Trusted by 3,000+ Real Estate Agents", a count nothing
+                  measured (US-501). */}
+              <Home className="h-4 w-4" aria-hidden="true" />
+              Built for real estate agents
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-foreground">
@@ -297,8 +299,21 @@ export default function VsLater() {
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
               Feature-by-Feature Comparison
             </h2>
-            <p className="text-center text-muted-foreground mb-12 text-lg">
+            <p className="text-center text-muted-foreground mb-4 text-lg">
               See exactly what you get with each platform
+            </p>
+            <p className="text-center text-sm text-muted-foreground mb-12 max-w-3xl mx-auto">
+              Later&rsquo;s plans checked against{' '}
+              <a
+                href={COMPETITORS.later.homepage}
+                className="underline underline-offset-2"
+                rel="nofollow noopener"
+                target="_blank"
+              >
+                later.com
+              </a>{' '}
+              on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices, which change and vary
+              by region.
             </p>
 
             <div className="glass-panel overflow-hidden">
@@ -313,7 +328,11 @@ export default function VsLater() {
                   </thead>
                   <tbody>
                     <ComparisonRow feature="Link in Bio Page" agentbio={true} later={true} />
-                    <ComparisonRow feature="Unlimited Links" agentbio={true} later={true} />
+                    <ComparisonRow
+                      feature="Link Buttons"
+                      agentbio={linkAllowanceSummary()}
+                      later={true}
+                    />
                     <ComparisonRow feature="Custom Branding" agentbio={true} later="Limited" />
                     <ComparisonRow
                       feature="Property Listing Cards"
@@ -345,13 +364,15 @@ export default function VsLater() {
                       later={false}
                       description="Pre-designed pages for agents"
                     />
-                    <ComparisonRow feature="Video Testimonials" agentbio={true} later="Basic" />
+                    {/* Was "Video Testimonials": testimonials have no video column. */}
                     <ComparisonRow
-                      feature="Lead Magnets/Downloads"
+                      feature="Client Reviews"
                       agentbio={true}
-                      later="Via 3rd party"
-                      description="Offer free guides in exchange for emails"
+                      later={false}
+                      description="Star-rated reviews clients submit from your review page"
                     />
+                    {/* A "Lead Magnets/Downloads" row stood here; AgentBio has no
+                        downloadable-guide feature (US-501). */}
                     <ComparisonRow
                       feature="Analytics & Tracking"
                       agentbio="Advanced"
@@ -462,7 +483,6 @@ export default function VsLater() {
                   <p className="text-sm mt-1">
                     Later schedules the posts; AgentBio is what the link in them points at. They
                     solve different halves of the same problem, and plenty of agents pay for both.
-                    Many top agents run this combination.
                   </p>
                 </div>
               </div>
@@ -518,7 +538,7 @@ export default function VsLater() {
                   step: '1',
                   title: 'Sign Up for AgentBio',
                   description:
-                    'Create your free account at agentbio.io. Choose a username (agentbio.io/yourname).',
+                    'Create your free account at agentbio.net. Choose a username (agentbio.net/yourname).',
                 },
                 {
                   step: '2',
