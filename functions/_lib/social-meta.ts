@@ -16,9 +16,10 @@
 // Relative, not '@/': the Pages Functions bundle does not resolve the Vite alias.
 import { isPublicListingStatus, listingStatusLabel } from '../../src/lib/listingStatus';
 import {
-  listingAvailability,
+  AGENT_OFFER_LIMIT,
+  agentListingOffers,
   listingJsonLdNodes,
-  listingReference,
+  listingPageUrl,
 } from '../../src/lib/listingJsonLd';
 
 export interface ProfileMeta {
@@ -276,42 +277,6 @@ function absolute(url: string | null | undefined, origin: string): string | null
   return `${origin.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
 }
 
-/** A listing's own page: /:username/listing/:id (US-275). */
-function listingPageUrl(origin: string, username: string, listingId: string): string {
-  return `${origin.replace(/\/$/, '')}/${encodeURIComponent(username)}/listing/${encodeURIComponent(listingId)}`;
-}
-
-/**
- * The homes the agent's page shows, as offers the agent makes (US-551).
- *
- * Each names its listing page by url and by the `#listing` node id that page
- * declares (here and in ListingPage.tsx), so a consumer merging by @id links
- * the agent to the home's full description. Sold homes stay in the list, as
- * on the page, with availability SoldOut — the same mapping
- * listingAvailability (src/lib/listingJsonLd.ts) applies. The caller passes
- * only listings already held to selectListingForPage, so nothing the agent
- * hid can reach this.
- */
-function listingOffers(
-  listings: readonly BodyListing[],
-  username: string,
-  origin: string
-): Record<string, unknown>[] {
-  return listings.slice(0, PROFILE_BODY_LISTING_LIMIT).map((listing) => {
-    const url = listingPageUrl(origin, username, listing.id);
-    const address = listing.address?.trim() || 'Property';
-    const place = [listing.city?.trim(), listing.state?.trim()].filter(Boolean).join(', ');
-    const price = Number(String(listing.price ?? '').replace(/[^0-9.]/g, ''));
-    return {
-      '@type': 'Offer',
-      url,
-      availability: listingAvailability(listing.status),
-      ...(Number.isFinite(price) && price > 0 ? { price, priceCurrency: 'USD' } : {}),
-      itemOffered: listingReference(url, `${address}${place ? `, ${place}` : ''}`),
-    };
-  });
-}
-
 /**
  * The tags for an agent's profile page.
  *
@@ -359,7 +324,16 @@ export function buildProfileTags(
       ...(profile.bio ? { description: summarise(profile.bio, 500) } : {}),
       ...(brokerage ? { worksFor: { '@type': 'Organization', name: brokerage } } : {}),
       ...(cities.length ? { areaServed: cities.map((c) => ({ '@type': 'City', name: c })) } : {}),
-      ...(listings.length ? { makesOffer: listingOffers(listings, profile.username, origin) } : {}),
+      ...(listings.length
+        ? {
+            makesOffer: agentListingOffers(
+              listings,
+              profile.username,
+              origin,
+              PROFILE_BODY_LISTING_LIMIT
+            ),
+          }
+        : {}),
     },
   };
 }
@@ -566,8 +540,11 @@ export interface BodyListing {
   square_feet: number | null;
 }
 
-/** How many listings the profile body links to. The sitemap carries the rest. */
-export const PROFILE_BODY_LISTING_LIMIT = 12;
+/**
+ * How many listings the profile body links to, and its JSON-LD offers. The
+ * sitemap carries the rest. The SPA's makesOffer uses the same number.
+ */
+export const PROFILE_BODY_LISTING_LIMIT = AGENT_OFFER_LIMIT;
 
 /** The status as the page's badge names it; nothing for a non-public or missing one. */
 function statusLabel(status: string | null | undefined): string[] {

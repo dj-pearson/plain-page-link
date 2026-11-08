@@ -26,7 +26,9 @@ import {
   selectAvailableListings,
   reachableListingHref,
   selectSoldListings,
+  selectVisibleProfileListings,
 } from '@/lib/publicListingVisibility';
+import { agentListingOffers } from '@/lib/listingJsonLd';
 import type { ListingsBlockHref } from '@/components/pageBuilder/blocks/ListingsBlock';
 import { formatResponseTime } from '@/lib/responseTime';
 import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
@@ -240,6 +242,16 @@ export default function FullProfilePage() {
   const serviceCities = cleanServiceCities(profile.service_cities);
   const areaServed = areaServedSchema(serviceCities);
 
+  // The homes this page shows, as offers the agent makes (US-586): the same
+  // builder, set and order as the crawler HTML (functions/_lib/social-meta.ts),
+  // so both renderings of /:username carry one graph. Each offer points at the
+  // `#listing` node its listing page declares.
+  const offers = agentListingOffers(
+    selectVisibleProfileListings(listings as PublicProfileListing[], settings),
+    profile.username,
+    origin
+  );
+
   // Generate comprehensive structured data for SEO (dual schema for better coverage)
   const personSchema = {
     '@context': 'https://schema.org',
@@ -276,6 +288,7 @@ export default function FullProfilePage() {
             knowsAbout: profile.specialties,
           }),
         ...(areaServed && { areaServed }),
+        ...(offers.length > 0 && { makesOffer: offers }),
         ...(profile.brokerage_name && {
           memberOf: {
             '@type': 'Organization',

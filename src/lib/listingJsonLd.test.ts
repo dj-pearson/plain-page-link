@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  agentListingOffers,
+  AGENT_OFFER_LIMIT,
   homeNodeId,
   listingJsonLdNodes,
   listingNodeId,
+  listingPageUrl,
   listingReference,
   residenceType,
 } from './listingJsonLd';
@@ -117,5 +120,59 @@ describe('listingReference', () => {
       url: PAGE,
     });
     expect(homeNodeId(PAGE)).toBe(`${PAGE}#home`);
+  });
+});
+
+describe('agentListingOffers (US-586)', () => {
+  const ORIGIN = 'https://agentbio.net/';
+
+  it('names each home by its listing page url and #listing node id', () => {
+    const [offer] = agentListingOffers(
+      [
+        {
+          id: 'abc-123',
+          status: 'active',
+          address: ' 412 Maple Avenue ',
+          city: 'Salt Lake City',
+          state: 'UT',
+          price: '$525,000',
+        },
+      ],
+      'jane',
+      ORIGIN
+    );
+    expect(offer).toEqual({
+      '@type': 'Offer',
+      url: PAGE,
+      availability: 'https://schema.org/InStock',
+      price: 525000,
+      priceCurrency: 'USD',
+      itemOffered: listingReference(PAGE, '412 Maple Avenue, Salt Lake City, UT'),
+    });
+    expect((offer.itemOffered as { '@id': string })['@id']).toBe(listingNodeId(PAGE));
+  });
+
+  it('marks sold homes SoldOut and leaves out a price that is not a number', () => {
+    const [offer] = agentListingOffers(
+      [{ id: 's', status: 'sold', address: null, city: null, state: null, price: 'call' }],
+      'jane',
+      ORIGIN
+    );
+    expect(offer.availability).toBe('https://schema.org/SoldOut');
+    expect(offer).not.toHaveProperty('price');
+    expect(offer).not.toHaveProperty('priceCurrency');
+    expect((offer.itemOffered as { name: string }).name).toBe('Property');
+  });
+
+  it(`offers at most ${AGENT_OFFER_LIMIT} homes unless told otherwise`, () => {
+    const many = Array.from({ length: AGENT_OFFER_LIMIT + 3 }, (_, i) => ({ id: `l-${i}` }));
+    expect(agentListingOffers(many, 'jane', ORIGIN)).toHaveLength(AGENT_OFFER_LIMIT);
+    expect(agentListingOffers(many, 'jane', ORIGIN, 2)).toHaveLength(2);
+  });
+
+  it('encodes the username and id in the page url', () => {
+    expect(listingPageUrl('https://agentbio.net', 'jane doe', 'a/b')).toBe(
+      'https://agentbio.net/jane%20doe/listing/a%2Fb'
+    );
   });
 });
