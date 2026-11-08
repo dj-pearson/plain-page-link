@@ -84,6 +84,7 @@ const ACTION_LABELS: Record<string, string> = {
   account_deletion_request: 'Account Deletion Requested',
   account_deletion_cancelled: 'Account Deletion Cancelled',
   listing_create: 'Listing Created',
+  listing_import: 'Listings Imported',
   listing_update: 'Listing Updated',
   listing_delete: 'Listing Deleted',
   lead_create: 'Lead Captured',

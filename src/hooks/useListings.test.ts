@@ -279,6 +279,95 @@ describe('useListings', () => {
   });
 
   /**
+   * US-597: the CSV import went through addListing per row, so a 100-row file
+   * meant 100 inserts, 100 refetches and 100 audit calls.
+   */
+  describe('importListings', () => {
+    let client: QueryClient;
+    const clientWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const csvRow = (row: number) => ({
+      row,
+      address: `${row} Oak St`,
+      city: 'Springfield',
+      state: 'IL',
+      zip_code: '',
+      price: 425000,
+      bedrooms: 3,
+      bathrooms: 2,
+      square_feet: null,
+      property_type: 'single_family',
+      status: 'active',
+      description: null,
+      mls_number: null,
+      lot_size_acres: null,
+      is_featured: false,
+      virtual_tour_url: null,
+      year_built: null,
+    });
+
+    beforeEach(() => {
+      client = createTestQueryClient();
+      queryResult = { data: [listingRow], error: null };
+      fromMock.mockImplementation(() => createQueryBuilder(queryResult));
+      vi.mocked(logAuditEvent).mockClear();
+    });
+
+    it('inserts 30 rows in two requests, as the owner, and refetches once', async () => {
+      const { result } = renderHook(() => useListings(), { wrapper: clientWrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const builder = createQueryBuilder({ data: [{ id: 'n1' }], error: null });
+      fromMock.mockImplementation(() => builder);
+      const invalidate = vi.spyOn(client, 'invalidateQueries');
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.importListings.mutateAsync({
+          rows: Array.from({ length: 30 }, (_, i) => csvRow(i + 2)),
+          describeError: () => 'x',
+          today: '2026-11-08',
+        });
+      });
+
+      const inserts = (builder.insert as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c) => c[0] as { user_id: string }[]
+      );
+      expect(inserts.map((batch) => batch.length)).toEqual([25, 5]);
+      expect(inserts.flat().every((r) => r.user_id === mockAuthenticatedUser.id)).toBe(true);
+      expect(builder.select).toHaveBeenCalledWith('id');
+      expect(invalidate).toHaveBeenCalledTimes(1);
+      expect(logAuditEvent).toHaveBeenCalledTimes(2);
+      expect(logAuditEvent).toHaveBeenCalledWith('listing_import', expect.anything());
+      expect(outcome).toEqual({ imported: 30, failures: [] });
+    });
+
+    it('still refetches once when every row is refused', async () => {
+      const { result } = renderHook(() => useListings(), { wrapper: clientWrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      fromMock.mockImplementation(() =>
+        createQueryBuilder({ data: null, error: { code: '23514', message: 'limit' } })
+      );
+      const invalidate = vi.spyOn(client, 'invalidateQueries');
+
+      let outcome: { imported: number; failures: unknown[] } | undefined;
+      await act(async () => {
+        outcome = await result.current.importListings.mutateAsync({
+          rows: [csvRow(2), csvRow(3)],
+          describeError: () => 'Your plan allows 3 active listings.',
+          today: '2026-11-08',
+        });
+      });
+
+      expect(outcome?.imported).toBe(0);
+      expect(outcome?.failures).toHaveLength(2);
+      expect(invalidate).toHaveBeenCalledTimes(1);
+      expect(logAuditEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
    * US-451: deleting a listing, or dropping a photo from one, only changed the
    * row, so the originals and their WebP variants stayed public in the bucket.
    */

@@ -269,33 +269,97 @@ export function buildCsvListing(listing: CsvImportListing, today: string): NewLi
   };
 }
 
+/** Rows per batched insert. Small enough that a refused chunk's row-by-row retry stays cheap. */
+export const CSV_IMPORT_CHUNK_SIZE = 25;
+
 /**
- * Insert the rows one at a time and record why each refused one failed.
+ * Whether an insert error is the database refusing the statement (a plan
+ * limit, a CHECK, a bad value) rather than the request not completing.
+ *
+ * PostgREST and Postgres errors carry a code (a SQLSTATE such as 23514, or
+ * PGRSTxxx). A dropped connection or a timeout carries none, and the
+ * statement may still have committed, so retrying its rows one by one could
+ * insert them twice.
+ */
+export function isDatabaseRefusal(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('code' in error)) return false;
+  const code = (error as { code: unknown }).code;
+  return typeof code === 'string' && code.trim() !== '';
+}
+
+/**
+ * Insert the rows and record why each refused one failed (US-597).
+ *
+ * Rows go in chunks of CSV_IMPORT_CHUNK_SIZE through `insertMany`, so a
+ * 100-row file is four requests instead of one hundred. A multi-row insert is
+ * one statement, all or nothing, so when the database refuses a chunk its rows
+ * are retried one at a time through `insert`: every row that fits is kept and
+ * each refused row gets its own reason.
  *
  * It does not stop at the first plan-limit refusal: active and sold listings
  * are metered separately, so a sold row can still fit after the active
- * allowance is used up.
+ * allowance is used up. The limit trigger runs per row and sees the rows
+ * inserted earlier in the same statement, so a chunk cannot slip past it.
+ *
+ * A chunk that fails without a database refusal (the request did not
+ * complete) is not retried, because it may have been saved: its rows are
+ * reported with the reason instead.
+ *
+ * Without `insertMany` every row is inserted on its own.
  */
 export async function importCsvListings(
   listings: readonly CsvImportListing[],
   options: {
     insert: (listing: NewListing) => Promise<unknown>;
+    insertMany?: (listings: NewListing[]) => Promise<unknown>;
     describeError: (error: unknown) => string;
     today: string;
+    chunkSize?: number;
   }
 ): Promise<CsvImportResult> {
   let imported = 0;
   const failures: CsvImportFailure[] = [];
-  for (const listing of listings) {
+  const fail = (listing: CsvImportListing, error: unknown) => {
+    failures.push({
+      row: listing.row,
+      address: listing.address,
+      reason: options.describeError(error),
+    });
+  };
+
+  const insertOneByOne = async (rows: readonly CsvImportListing[]) => {
+    for (const listing of rows) {
+      try {
+        await options.insert(buildCsvListing(listing, options.today));
+        imported++;
+      } catch (error) {
+        fail(listing, error);
+      }
+    }
+  };
+
+  const { insertMany } = options;
+  if (!insertMany) {
+    await insertOneByOne(listings);
+    return { imported, failures };
+  }
+
+  const size = Math.max(1, Math.floor(options.chunkSize ?? CSV_IMPORT_CHUNK_SIZE));
+  for (let start = 0; start < listings.length; start += size) {
+    const chunk = listings.slice(start, start + size);
+    if (chunk.length === 1) {
+      await insertOneByOne(chunk);
+      continue;
+    }
     try {
-      await options.insert(buildCsvListing(listing, options.today));
-      imported++;
+      await insertMany(chunk.map((listing) => buildCsvListing(listing, options.today)));
+      imported += chunk.length;
     } catch (error) {
-      failures.push({
-        row: listing.row,
-        address: listing.address,
-        reason: options.describeError(error),
-      });
+      if (isDatabaseRefusal(error)) {
+        await insertOneByOne(chunk);
+      } else {
+        for (const listing of chunk) fail(listing, error);
+      }
     }
   }
   return { imported, failures };

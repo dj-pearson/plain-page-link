@@ -33,11 +33,7 @@ import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
 import { todayCalendarDate } from '@/lib/localDate';
 import { describeListingSaveError, normalizeVirtualTourUrl } from '@/lib/listingUrls';
 import { buildImportedListing } from '@/lib/listingImport';
-import {
-  importCsvListings,
-  type CsvImportListing,
-  type CsvImportResult,
-} from '@/lib/listingCsvImport';
+import type { CsvImportListing, CsvImportResult } from '@/lib/listingCsvImport';
 import { reorderWithinView, sortOrderChanges } from '@/lib/listingOrder';
 import type { EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
@@ -136,6 +132,7 @@ export default function Listings() {
     updateListing,
     deleteListing,
     reorderListings,
+    importListings,
     discardUnsavedPhotos,
   } = useListings();
   // Views per listing from the public profile (US-263). Absent until loaded,
@@ -306,10 +303,11 @@ export default function Listings() {
    * Save the valid rows of a CSV and report what landed. Each refused row
    * keeps its reason (a plan limit, a refused tour URL) instead of becoming an
    * anonymous "failed" count, and the dialog shows the real total (US-587).
+   * Rows are inserted in chunks with one refetch at the end (US-597).
    */
   const handleCSVImport = async (rows: CsvImportListing[]): Promise<CsvImportResult> => {
-    const result = await importCsvListings(rows, {
-      insert: (listing) => addListing.mutateAsync(listing),
+    const result = await importListings.mutateAsync({
+      rows,
       describeError: (error) =>
         describeListingSaveError(
           error,
