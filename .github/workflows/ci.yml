@@ -232,7 +232,7 @@ jobs:
       # US-223: was --max-warnings=-1, which let the count only grow. This is
       # the count on 2026-11-07 (US-352; was 673); lower it whenever a change removes warnings.
       - name: Run ESLint
-        run: npx eslint src/ --max-warnings=567
+        run: npx eslint src/ --max-warnings=563
 
   security:
     name: Security Audit
@@ -259,7 +259,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Run ESLint
-        run: npx eslint src/ --max-warnings=567
+        run: npx eslint src/ --max-warnings=563
 
   e2e:
     name: End-to-End (Playwright)

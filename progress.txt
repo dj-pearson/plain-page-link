@@ -5876,3 +5876,75 @@ Other findings:
 - [seo] Prerendered pages carry build date plus one year as priceValidUntil. If the site went a year without a rebuild the date would lapse again. The deploy cadence makes this moot, but the seo-audit script could flag a priceValidUntil that is in the past.
 - [mobile] src/pages/onboarding/OnboardingWizardPage.tsx: the onboarding photo is uploaded without validateUpload (magic-number check, US-076) and without a size check, unlike useProfileImageUpload. The bucket's file_size_limit and allowed_mime_types are the only guard (security/uiux lane).
 - [mobile] src/pages/onboarding/OnboardingWizardPage.tsx: on a 'Try again' after a failed save, handleComplete uploads the photo (and now its icons) again under a new timestamp, leaving orphaned objects in avatars/<uid>/. The next dashboard avatar upload deletes them, but an agent who never uploads again keeps them.
+
+---
+
+## Continuous improvement loop — round 12 — 2026-11-08 (US-512 to US-521 done)
+
+Ten lanes; eight approved outright, leads and profile each needed one fix-up. Closed US-445, US-466, US-484, US-492, US-504, US-506, US-508; first slice of US-488 (owner decision: custom CSS stays).
+One merge conflict: security (virtual tour check) and listings (async save + unmount discard) both rewrote EditListingModal.handleSubmit; resolved by validating first, then the async save with the normalised URL.
+Final: tsc clean (app + node config), 2792 unit tests pass (from 2686), verify:migrations OK (83 files), vite build OK, eslint 563 warnings (CI ratchet 567 -> 563).
+
+- US-512 [listings] Photos uploaded in the edit listing dialog stayed public when the agent left the page without saving
+- US-513 [leads] A repeat enquiry overwrote the visitor's first message and dropped the second listing
+- US-514 [profile] An agent's custom CSS never reached their public page; it now applies there, sanitised and kept inside the profile area
+- US-515 [uiux] Team owners can't see which teammate holds which lead on the Leads list (US-504)
+- US-516 [performance] The Settings page downloaded all six security and privacy sections on open, even though they sit far below the fold
+- US-517 [security] The listing editor accepted javascript: as a virtual tour link and gave a vague "try again" when the database refused it, but turned down a plain matterport.com link
+- US-518 [enterprise] Agents can now choose the hour of their morning email (US-445). Before this, everyone with a time zone got it at the same local hour, set by one server-wide value
+- US-519 [marketing] Comparison pages claimed setup times, agent switching, real estate templates and 'Advanced' analytics that nothing measured
+- US-520 [seo] AI answer engines (GPTBot, ClaudeBot, PerplexityBot...) read AgentBio's homepage instead of the agent's page
+- US-521 [mobile] Agents whose photo predates US-481 still show the AgentBio logo when a homebuyer installs their page (US-492 backfill)
+
+Owner actions:
+- US-513: Redeploy the submit-lead edge function (the functions.agentbio.net Coolify app, which serves supabase/functions/ via edge-functions-server.ts) so repeat enquiries stop overwriting the first message. No migration and no secrets.
+- US-514: Apply migration supabase/migrations/20261108000514_custom_css_on_public_page.sql. The frontend ships safely before it: a missing customCss key falls back to the helper read, and if the helper is missing too, no CSS is applied.
+- US-516: Deploy Cloudflare Pages for the frontend change. No migrations, no edge function changes.
+- US-518: Redeploy scheduled-maintenance (the functions.agentbio.net Coolify app built from the root Dockerfile, which runs edge-functions-server.ts) so the job reads notification_preferences.digest_hour. Until then the control saves the hour, but the email still arrives at DIGEST_LOCAL_HOUR.
+- US-518: Migration 20261107000433_profile_timezone.sql (profiles.timezone, digest_runs.slot) must already be applied; without it every agent gets the UTC edition and the chosen hour has no effect.
+- US-519: Deploy Cloudflare Pages (frontend copy and head changes only; no migrations, no edge functions)
+
+Opened:
+- US-522 [leads] Phone-only repeat enquiries are never folded
+- US-523 [profile] Custom CSS: @keyframes with names scoped to the agent
+- US-524 [profile] Custom CSS: preview in the dashboard
+- US-525 [profile] Remove the dead custom_css field from src/types/theme.ts
+- US-526 [uiux] Leads stats chips and the Needs-attention count ignore the assignee filter
+- US-527 [security] Explain URL-scheme refusals in the CSV import summary
+- US-528 [enterprise] Settings copy should follow the server's DIGEST_LOCAL_HOUR when an operator changes it
+- US-529 [seo] Give answer engines more than a heading and one paragraph on an agent's page
+- US-530 [seo] Let named AI bots in robots.txt inherit the /api/ Disallow
+
+Other findings:
+- [listings] US-276 (viewed listings on a lead) is still blocked on the leads lane: submit-lead has to store visitor_id before the lead detail and lead-scoring (src/lib/lead-scoring.ts:134-145) can use it.
+- [listings] US-360 and US-437 (Playwright listing-page specs, including the mobile contact bar) still need a CI run with browsers. The sandbox has none.
+- [leads] US-463 can be closed. src/types/lead.ts no longer declares LegacyLead, LeadFormType, LeadStatus, LeadPriority or ContactMethod; they were removed in commit 2521ff6 (US-428). The remaining LeadFormType (src/components/profile/LeadFormModal.tsx:9) and ContactMethod (src/lib/analyticsEvents.ts:33) are unrelated live types.
+- [leads] supabase/functions/submit-lead/index.ts: the main insert path never checks that listing_id belongs to user_id. validateLeadData only checks that it is a UUID (supabase/functions/_shared/validation.ts:243). A visitor can therefore file a lead against another agent's listing id, and the auto-reply then names that listing's address. The open-house path and the new repeat path do check ownership.
+- [leads] The step-two enrich action in submit-lead/index.ts (rawData.action === 'enrich') applies buildEnrichment columns, which include `message` (lead-enrichment.ts TEXT_COLUMNS). So step two can overwrite the step-one message in the same way the fold did.
+- [leads] US-279 only needs the 375px Playwright no-horizontal-scroll test; the toolbar already wraps (US-246).
+- [profile] src/components/profile/ListingGallery.tsx:193: the sort dropdown closes on outside clicks through a `fixed inset-0` backdrop. On pages with custom CSS, contain: paint limits that backdrop to the profile container, so a click on the compliance footer below will not close the dropdown. It is minor, and pages without custom CSS are unaffected. A Radix Popover or a document-level outside-click handler would remove the dependency.
+- [profile] Plan gating uses the existing customThemes feature (Starter and above in 20260902000014 and src/config/pricing-plans.ts). The owner said 'within plan limits' without naming a tier. If custom CSS should be Professional-only, it needs its own feature key, plus matching changes in pricing-plans.ts and the pricing tests.
+- [profile] verify-schema's 'every table referenced in code exists' check fails on the loop branch before this change: it picks up fake table names inside the test strings of supabase/functions/_shared/resend-webhook.test.ts. The fix is to exclude *.test.ts from that scan or rename those strings.
+- [uiux] US-420 (block joining a second team, or add a team switcher) still needs an owner decision before it can be done. supabase/functions/teams/index.ts accept does not check for an existing membership.
+- [uiux] src/pages/dashboard/Leads.tsx:443: `let truncated = false` triggers eslint no-useless-assignment. It is a one-line cleanup (declare it without an initial value), but I left it alone because it is outside this change.
+- [uiux] Leads.tsx: the 'Assigned to me' button only shows when assignedCount > 0. If a routing rule assigns a lead to the owner themselves, there is no way to filter to 'Me' in the new assignee Select except through a hand-written link (it then reads 'Me'). Whether to add a 'Me' option is a small product call.
+- [performance] The old global IntersectionObserver mock in src/test/setup.ts (now fixed) meant that until this change, any component under test that called `new IntersectionObserver` would have thrown under vitest 4. src/components/ui/OptimizedImage.tsx and ProgressiveImage.tsx use IntersectionObserver; if they had tests that rendered them, those tests would have crashed or gone down a catch path.
+- [performance] Ctrl+F for 'Two-factor' or 'Export my data' on Settings finds nothing until the reader scrolls near the section, because it is not mounted yet. If that matters, a requestIdleCallback prefetch of the chunk after first paint could be added (it costs bytes but keeps the find).
+- [performance] src/pages/dashboard/Settings.tsx (the profile visibility toggles, around lines 600-630 in the original file) uses hard-coded bg-gray-200, after:bg-white and after:border-gray-300 on the switch tracks, which ignore dark mode (uiux lane).
+- [security] src/hooks/useLinks.ts:37 still uses .select('*') on links. links has no column grants today, but it is the same pattern as US-342 (already noted in progress.txt:5717).
+- [security] US-444 (generate-article and x-api-key) still needs the owner to decide which endpoints should be callable from outside. Fixing only the doc in docs/setup/MAKE_COM_INTEGRATION.md:70-110 would close it without code if the owner says no.
+- [security] Profile-lane custom CSS (US-488), for the threat model review: the sanitiser should refuse or strip url() pointing outside the site, @import, expression()/behavior, and </style> breakout. Those enable data exfiltration through attribute selectors combined with url(), and markup injection. It should also scope every selector under the profile root so an agent cannot restyle or overlay the lead form or the booking modal to phish visitors (position:fixed overlays). The CSP style-src and img-src should keep url() fetches to allowed hosts even if the sanitiser misses one.
+- [enterprise] [enterprise] US-446 is still open. Onboarding (src/pages/onboarding/OnboardingWizardPage.tsx) does not offer the detected time zone, so agents who never save a notification setting stay on the UTC edition and cannot use the new hour control's effect.
+- [enterprise] [enterprise] US-405 is still open. The queued data export builds the whole JSON in memory, and it remains the largest enterprise risk for big accounts, but it is too large for one session.
+- [enterprise] [enterprise] Moving the digest hour earlier, on a day whose earlier edition a clean pass has already completed (digest_runs), means the agent gets nothing until tomorrow. This is documented in the digests.ts header and matches the existing US-354 trade-off; per-agent reconsideration would need a different marker design.
+- [marketing] src/pages/landing/VsLater.tsx 'Choose Later' scenario says 'Industry-leading scheduling tools' about Later: competitor puffery with nothing recorded behind it (US-507 territory).
+- [marketing] The comparison CTAs all say 'No credit card required'. That looks true, because a Free plan exists in PRICING_PLANS, but no test ties the copy to the register flow.
+- [marketing] The Beacons FAQ answer about email marketing says 'You can integrate AgentBio with your existing email platform'. The only integration is the Zapier webhook, so this should say 'via Zapier' to match the Later page.
+- [marketing] US-297 (planLimits.ts METERED_KEYS still meters emails_per_month) and US-296 (dead USAGE_PRICING in pricing-plans.ts) are still small, self-contained marketing slices for the next round.
+- [marketing] lint-staged's pre-commit hook writes a backup entry into the git stash, which is shared across worktrees (it showed 'Backed up original state in git stash'). Parallel lanes that commit at the same time could interfere through it.
+- [seo] public/robots.txt: the named AI-bot groups (GPTBot, ClaudeBot, etc.) do not repeat 'Disallow: /api/'. Under the robots spec they ignore the '*' group, so /api/ is open to them (low impact; /api only holds the sentry tunnel).
+- [seo] Cloudflare caching: profile-route.ts sets cache-control 'public, s-maxage=300' on the bot-only response and sends no 'Vary: User-Agent'. Pages Functions responses are not edge-cached by default, so this should be safe today, but if a cache rule is ever added a human could be served the bot document. This is not new behaviour, but more bot traffic now takes this path.
+- [seo] Open seo-lane cleanup stories US-370 (unused PageSEO/SchemaMarkup) and US-509 (unused FAQ sets in src/lib/faq-schema.ts) are still small, self-contained deletions for a later round. US-389/US-371 are still waiting on the owner's decision about custom-domain canonicals.
+- [seo] Full vitest run reports 'Errors 1 error' even though every test passes. The likely cause is the LazyModal unhandled rejection already noted in progress.txt (profile lane), but I did not confirm it.
+- [mobile] src/lib/storeAvatarAppIcons.ts uploads the icons with cacheControl '3600'. Before this change, the first HEAD for a missing icon could have been cached as a 404 by a CDN in front of storage. I used cache: 'no-store' on the client HEAD, but the Pages Function's findAvatarIcons HEAD (functions/_lib/profile-manifest.ts:132) still goes through storage's default caching. If self-hosted storage sits behind a caching proxy that caches 404s, the manifest may lag the backfill by that TTL.
+- [mobile] src/hooks/useAvatarAppIconBackfill.ts relies on useAuthStore's persisted profile. If an agent replaces their photo on another device, the backfill checks the stale avatar_url until the store refreshes the profile on the next initialize. The cost is one extra HEAD and no wrong writes, because the icon names derive from the photo.
