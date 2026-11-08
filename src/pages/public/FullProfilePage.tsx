@@ -40,7 +40,6 @@ import { isUnpublishedPreview } from '@/lib/profilePublishing';
 import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
-import { getSafeOrigin } from '@/lib/utils';
 import { areaServedSchema, cleanServiceCities } from '@/lib/serviceAreas';
 import { getBaseUrl } from '@/config/seo.config';
 import { websiteId } from '@/config/site-entities';
@@ -208,8 +207,12 @@ export default function FullProfilePage() {
       ? testimonials.reduce((sum: number, t) => sum + (t.rating || 0), 0) / testimonials.length
       : 0;
 
-  // Generate SEO data with safe origin detection for SSR/crawlers
-  const origin = getSafeOrigin();
+  // The configured origin, not the visitor's host (US-595). On the *.pages.dev
+  // alias the host made this page self-canonicalise as a duplicate of the
+  // agent's agentbio.net page; nothing serves a profile from a custom domain,
+  // so the configured origin is the only canonical address it has. The
+  // crawler HTML (functions/_lib/site-origin.ts) applies the same rule.
+  const origin = getBaseUrl();
   const seoTitle =
     profile.seo_title || `${profile.full_name || profile.username} - Real Estate Agent`;
   const seoDescription =

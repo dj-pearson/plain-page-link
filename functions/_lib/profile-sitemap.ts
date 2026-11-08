@@ -45,6 +45,8 @@ export interface ProfileSitemapEnv {
   VITE_SUPABASE_ANON_KEY?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
+  /** The site's canonical origin (US-595); see site-origin.ts. */
+  VITE_APP_URL?: string;
 }
 
 export interface SitemapEntry {

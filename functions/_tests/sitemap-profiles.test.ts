@@ -54,6 +54,20 @@ afterEach(() => {
 const run = (env: Record<string, string> = ENV) => onRequestGet({ request: REQUEST(), env });
 
 describe('/sitemap-profiles.xml', () => {
+  it('lists the canonical origin, not the host that served the file (US-595)', async () => {
+    serve({ profiles: json([{ username: 'jane' }]) });
+    const onAlias = await onRequestGet({
+      request: new Request('https://agentbio.pages.dev/sitemap-profiles.xml'),
+      env: ENV,
+    });
+    const xml = await onAlias.text();
+    expect(xml).toContain('<loc>https://agentbio.net/jane</loc>');
+    expect(xml).not.toContain('pages.dev');
+
+    const configured = await run({ ...ENV, VITE_APP_URL: 'https://staging.example.test/' });
+    expect(await configured.text()).toContain('<loc>https://staging.example.test/jane</loc>');
+  });
+
   it('lists every published username as an absolute, URL-encoded loc', async () => {
     serve({
       profiles: json([{ username: 'jane' }, { username: 'dana-rivers' }, { username: 'josé' }]),

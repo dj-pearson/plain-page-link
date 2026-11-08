@@ -832,3 +832,56 @@ describe('/:username/listing/:listingId (US-275)', () => {
     });
   });
 });
+
+describe('the canonical origin (US-595)', () => {
+  /** The production *.pages.dev alias answers for the same project. */
+  const ALIAS = 'https://agentbio.pages.dev';
+
+  const crawl = (path: string, env: Record<string, unknown> = ENV) => {
+    const [, username, , listingId] = path.split('/');
+    const context = {
+      request: new Request(`${ALIAS}${path}`, { headers: { 'user-agent': CRAWLER } }),
+      env: env as never,
+      params: { username, listingId },
+      next: async () => indexResponse(),
+    };
+    return listingId ? onListingRequestGet(context) : onRequestGet(context);
+  };
+
+  it("names agentbio.net in an agent's page served on another host", async () => {
+    const html = await (await crawl('/jane')).text();
+    expect(html).toContain('<link rel="canonical" href="https://agentbio.net/jane" />');
+    expect(html).toContain('https://agentbio.net/jane#');
+    expect(html).toContain('https://agentbio.net/jane/listing/abc-123');
+    expect(html).not.toContain('pages.dev');
+  });
+
+  it('names agentbio.net in a listing page served on another host', async () => {
+    const response = await crawl('/jane/listing/abc-123');
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      '<link rel="canonical" href="https://agentbio.net/jane/listing/abc-123" />'
+    );
+    expect(html).not.toContain('pages.dev');
+  });
+
+  it('follows VITE_APP_URL when the project sets one', async () => {
+    const html = await (
+      await crawl('/jane', { ...ENV, VITE_APP_URL: 'https://staging.example.test/' })
+    ).text();
+    expect(html).toContain('<link rel="canonical" href="https://staging.example.test/jane" />');
+    expect(html).not.toContain('pages.dev');
+  });
+
+  it('still redirects a mixed-case handle on the host it was asked on', async () => {
+    const response = await onRequestGet({
+      request: new Request(`${ALIAS}/JaneDoe`, { headers: { 'user-agent': CRAWLER } }),
+      env: ENV as never,
+      params: { username: 'JaneDoe' },
+      next: async () => indexResponse(),
+    });
+    expect(response.status).toBe(301);
+    expect(response.headers.get('location')).toBe(`${ALIAS}/janedoe`);
+  });
+});
