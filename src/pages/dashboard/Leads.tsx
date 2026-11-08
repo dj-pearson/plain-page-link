@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Download,
@@ -23,7 +23,6 @@ import {
   Home,
   DoorOpen,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useLeads, fetchAllLeads } from '@/hooks/useLeads';
 import { useQuery } from '@tanstack/react-query';
@@ -35,7 +34,6 @@ import {
   leadStatusLabel,
   type LeadStatus,
 } from '@/lib/leadStatus';
-import { exportToCSV } from '@/lib/exportUtils';
 import { cn } from '@/lib/utils';
 import { useLeadContactAction } from '@/hooks/useLeadContactAction';
 import { useLeadsActivitySummaries } from '@/hooks/useLeadActivities';
@@ -43,10 +41,9 @@ import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
-import { UpgradeModal } from '@/components/UpgradeModal';
-import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
-import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
-import { leadAddressLabel } from '@/lib/leadFormSchema';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
+import { leadAddressLabel } from '@/lib/leadAddressLabel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -62,8 +59,32 @@ import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import type { LeadScore } from '@/hooks/useMLLeadScoring';
 import { logger } from '@/lib/logger';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
+import { timeAgo } from '@/lib/timeAgo';
 import { useLeadStats } from '@/hooks/useLeadStats';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+
+/*
+ * Every dialog on this page is closed on first render, so none of them ships
+ * with the route (US-476). The lead detail alone brought useContacts, the
+ * activity timeline, the listing card and key dates; Zapier brought useProfile
+ * and the webhook validator; the upgrade dialog brought the pricing table.
+ * Hovering or focusing a lead warms the detail chunk before the click.
+ */
+const loadLeadDetailModal = () => import('@/components/leads/LeadDetailModal');
+const LeadDetailModal = lazy(() =>
+  loadLeadDetailModal().then((m) => ({ default: m.LeadDetailModal }))
+);
+const ZapierIntegrationModal = lazy(() =>
+  import('@/components/integrations/ZapierIntegrationModal').then((m) => ({
+    default: m.ZapierIntegrationModal,
+  }))
+);
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+
+/** A failed prefetch is retried by the click that needs the chunk. */
+const preloadLeadDetail = () => void loadLeadDetailModal().catch(() => undefined);
 
 export default function Leads() {
   // Search is local; status and type live in the URL so a filtered view is
@@ -79,6 +100,8 @@ export default function Leads() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [isBulkActing, setIsBulkActing] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date');
+  const upgradeModal = useMountOnFirstOpen(showUpgradeModal);
+  const zapierModal = useMountOnFirstOpen(showZapierModal);
   const { toast } = useToast();
   const user = useAuthStore((s) => s.user);
   const { subscription } = useSubscriptionLimits();
@@ -370,13 +393,20 @@ export default function Leads() {
     setIsExporting(true);
     let exportLeads: Lead[];
     let truncated = false;
+    let exportToCSV: (typeof import('@/lib/exportUtils'))['exportToCSV'];
     try {
-      const all = await fetchAllLeads(user.id, {
-        status: statusFilter,
-        leadType: typeFilter,
-        search: searchQuery,
-        assignedToMe,
-      });
+      // The CSV writer is only needed here, so it loads with the leads it
+      // writes rather than with the page (US-476).
+      const [all, exportUtils] = await Promise.all([
+        fetchAllLeads(user.id, {
+          status: statusFilter,
+          leadType: typeFilter,
+          search: searchQuery,
+          assignedToMe,
+        }),
+        import('@/lib/exportUtils'),
+      ]);
+      exportToCSV = exportUtils.exportToCSV;
       truncated = all.truncated;
       exportLeads = needsAttentionOnly ? all.leads.filter(isNeedsAttention) : all.leads;
     } catch (err) {
@@ -889,6 +919,8 @@ export default function Leads() {
               key={lead.id}
               className="hover:shadow-md active:shadow-lg transition-all cursor-pointer"
               onClick={() => handleLeadClick(lead)}
+              onPointerEnter={preloadLeadDetail}
+              onFocus={preloadLeadDetail}
             >
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
@@ -971,12 +1003,7 @@ export default function Leads() {
                         {lastContactByLead.has(lead.id) && (
                           <div className="flex items-center gap-2 min-h-[32px]">
                             <MessageSquare className="h-3 w-3 flex-shrink-0" />
-                            <span>
-                              Last contacted{' '}
-                              {formatDistanceToNow(new Date(lastContactByLead.get(lead.id)!), {
-                                addSuffix: true,
-                              })}
-                            </span>
+                            <span>Last contacted {timeAgo(lastContactByLead.get(lead.id)!)}</span>
                           </div>
                         )}
                         {lead.property_address && (
@@ -1074,26 +1101,48 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        open={showUpgradeModal}
-        onOpenChange={setShowUpgradeModal}
-        feature="lead_export"
-        currentPlan={subscription?.plan_name || 'Free'}
-        requiredPlan="Starter"
-      />
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowUpgradeModal(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={showUpgradeModal}
+            onOpenChange={setShowUpgradeModal}
+            feature="lead_export"
+            currentPlan={subscription?.plan_name || 'Free'}
+            requiredPlan="Starter"
+          />
+        </LazyModal>
+      )}
 
-      {/* Zapier Integration Modal */}
-      <ZapierIntegrationModal open={showZapierModal} onOpenChange={setShowZapierModal} />
+      {zapierModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowZapierModal(false);
+            zapierModal.unmount();
+          }}
+        >
+          <ZapierIntegrationModal open={showZapierModal} onOpenChange={setShowZapierModal} />
+        </LazyModal>
+      )}
 
-      {/* Lead Detail Modal */}
       {selectedLead && (
-        <LeadDetailModal
-          lead={selectedLead}
-          open={showLeadDetail}
-          onOpenChange={setShowLeadDetail}
-          onLeadUpdated={() => refetch()}
-        />
+        <LazyModal
+          onClose={() => {
+            setShowLeadDetail(false);
+            setSelectedLead(null);
+          }}
+        >
+          <LeadDetailModal
+            lead={selectedLead}
+            open={showLeadDetail}
+            onOpenChange={setShowLeadDetail}
+            onLeadUpdated={() => refetch()}
+          />
+        </LazyModal>
       )}
     </div>
   );
