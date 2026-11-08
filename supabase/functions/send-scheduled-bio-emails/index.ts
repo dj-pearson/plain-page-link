@@ -1,6 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
-import { getSiteUrl } from '../_shared/env.ts';
+import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts';
+import {
+  isSuppressed,
+  unsubscribeFooterHtml,
+  unsubscribeFooterText,
+  unsubscribeHeaders,
+  unsubscribeLinks,
+  unsubscribeSecret,
+} from '../_shared/marketing-unsubscribe.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { maskEmail } from '../_shared/log-redaction.ts'
@@ -34,6 +42,12 @@ serve(async (req) => {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    // US-425: no marketing email without a working opt-out.
+    const secret = unsubscribeSecret()
+    if (!secret) {
+      throw new Error('PII_ENCRYPTION_KEY is not set; refusing to send drip email without an unsubscribe link')
+    }
+
     // Get email captures from last 7 days that need sequences sent
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -77,6 +91,22 @@ serve(async (req) => {
 
       if (sequenceToSend !== undefined) {
         try {
+          // US-425: an address that opted out (from either tool) gets nothing
+          // more, and its sequence is ended so it is not picked up again.
+          if (await isSuppressed(supabase, String(capture.email), secret)) {
+            await supabase
+              .from('instagram_bio_email_captures')
+              .update({ email_sequence_completed: true })
+              .eq('id', capture.id)
+            continue
+          }
+
+          const unsubscribe = await unsubscribeLinks('bio', capture.id, secret, {
+            siteUrl: getSiteUrl(),
+            functionsUrl: getFunctionsUrl(),
+          })
+          const reason = 'You received this email because you used AgentBio\'s Instagram Bio Analyzer.'
+
           const emailContent = bioDripEmail(sequenceToSend, {
             firstName: safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
             market: safeHtmlText(capture.market, 100),
@@ -88,7 +118,13 @@ serve(async (req) => {
           // it never was) and mark the email sent whatever sendEmail reported,
           // so a capture's sequence would be recorded as delivered while
           // nothing left the building.
-          const result = await sendEmail({ to: capture.email, ...emailContent })
+          const result = await sendEmail({
+            to: capture.email,
+            subject: emailContent.subject,
+            body: `${emailContent.body}\n\n${unsubscribeFooterText(unsubscribe, reason)}`,
+            html: `${emailContent.html}\n${unsubscribeFooterHtml(unsubscribe, reason)}`,
+            headers: unsubscribeHeaders(unsubscribe),
+          })
           if (!result.ok) {
             throw new Error(result.error ?? 'send failed')
           }

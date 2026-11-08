@@ -105,6 +105,8 @@ const RESERVED_SEGMENTS = new Set([
   'for',
   'tools',
   'legal',
+  // US-425: the Unsubscribe page, linked from marketing email.
+  'unsubscribe',
   'pricing',
   'about',
   'contact',

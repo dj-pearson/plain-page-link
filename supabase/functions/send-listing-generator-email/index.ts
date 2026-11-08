@@ -9,7 +9,14 @@ import { getClientIP } from '../_shared/client-ip.ts';
 import { safeHtmlText, safeNumber } from '../_shared/public-email.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
-import { getSiteUrl } from '../_shared/env.ts';
+import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts';
+import {
+  isSuppressed,
+  unsubscribeHeaders,
+  unsubscribeLinks,
+  unsubscribeSecret,
+  type UnsubscribeLinks,
+} from '../_shared/marketing-unsubscribe.ts';
 
 import { HttpError, errorStatus } from '../_shared/http-error.ts';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
@@ -48,6 +55,13 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // US-425: no marketing email without a working opt-out.
+    const secret = unsubscribeSecret();
+    if (!secret) {
+      console.error('[send-listing-generator-email] PII_ENCRYPTION_KEY is not set; refusing to send without an unsubscribe link');
+      return json(503, { error: 'Email is temporarily unavailable.' });
+    }
 
     const rateLimitResult = await checkRateLimitDb(
       supabase,
@@ -88,6 +102,13 @@ serve(async (req) => {
       return json(429, { error: 'This address has received enough email today.' });
     }
 
+    if (await isSuppressed(supabase, String(capture.email), secret)) {
+      // They opted out before (from either tool's emails). End this capture's
+      // sequence and send nothing; the visitor still has the results on screen.
+      await supabase.from('listing_email_captures').update({ email_sequence_completed: true }).eq('id', captureId);
+      return json(200, { success: true, sent: false });
+    }
+
     const { data: listing, error: listingError } = await supabase
       .from('listing_descriptions')
       .select('property_details, descriptions')
@@ -96,8 +117,14 @@ serve(async (req) => {
     if (listingError) throw listingError;
     if (!listing) throw new HttpError('Nothing to send for this capture', 404, 'NOT_FOUND');
 
+    const unsubscribe = await unsubscribeLinks('listing', captureId, secret, {
+      siteUrl: SITE_URL,
+      functionsUrl: getFunctionsUrl(),
+    });
+
     const emailSent = await sendWelcomeEmail({
       email: capture.email as string,
+      unsubscribe,
       ...safeTemplateData(capture.first_name, listing.property_details, listing.descriptions),
     });
 
@@ -146,6 +173,7 @@ function safeTemplateData(firstName: unknown, propertyDetails: unknown, descript
 
 async function sendWelcomeEmail(data: {
   email: string;
+  unsubscribe: UnsubscribeLinks;
   firstName: string;
   propertyDetails: any;
   descriptions: any[];
@@ -162,6 +190,7 @@ async function sendWelcomeEmail(data: {
         to: [data.email],
         subject: `${data.firstName}, Your 3 Professional Listing Descriptions Are Ready! 🏡`,
         html: getWelcomeEmailHTML(data),
+        headers: unsubscribeHeaders(data.unsubscribe),
       }),
     });
 
@@ -178,6 +207,7 @@ async function sendWelcomeEmail(data: {
 }
 
 function getWelcomeEmailHTML(data: {
+  unsubscribe: UnsubscribeLinks;
   firstName: string;
   propertyDetails: any;
   descriptions: any[];
@@ -321,7 +351,7 @@ function getWelcomeEmailHTML(data: {
     </p>
     <p style="font-size: 12px; color: #9ca3af; margin: 0;">
       <a href="${SITE_URL}" style="color: #9333ea; text-decoration: none;">AgentBio</a> •
-      <a href="${SITE_URL}/unsubscribe" style="color: #9ca3af; text-decoration: none;">Unsubscribe</a>
+      <a href="${data.unsubscribe.pageUrl.replace(/&/g, '&amp;')}" style="color: #6b7280;">Unsubscribe</a>
     </p>
   </div>
 

@@ -24,6 +24,7 @@ import NotFound from './pages/public/NotFound';
 // Lazy load public review page
 const SubmitReview = lazy(() => import('./pages/public/SubmitReview'));
 const OpenHouseSignIn = lazy(() => import('./pages/public/OpenHouseSignIn'));
+const Unsubscribe = lazy(() => import('./pages/public/Unsubscribe'));
 const TeamAccept = lazy(() => import('./pages/team/TeamAccept'));
 
 /**
@@ -339,6 +340,8 @@ function App() {
                   username catch-all. */}
               {/* Open house sign-in kiosk. Before the username catch-all. */}
               <Route path="/open-house/:openHouseId" element={<OpenHouseSignIn />} />
+              {/* US-425: the Unsubscribe link in the free-tool emails. */}
+              <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/:username/review" element={<SubmitReview />} />
               <Route
                 path="/:username/listing/:listingId"

@@ -1268,6 +1268,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      email_suppressions: {
+        Row: {
+          created_at: string;
+          email_hash: string;
+          method: string;
+          source: string;
+        };
+        Insert: {
+          created_at?: string;
+          email_hash: string;
+          method: string;
+          source: string;
+        };
+        Update: {
+          created_at?: string;
+          email_hash?: string;
+          method?: string;
+          source?: string;
+        };
+        Relationships: [];
+      };
       encrypted_pii_config: {
         Row: {
           created_at: string;

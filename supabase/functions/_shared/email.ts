@@ -14,6 +14,10 @@ export interface EmailOptions {
    * lead answering the auto-reply wrote to nobody.
    */
   replyTo?: string
+  /**
+   * Extra message headers, e.g. List-Unsubscribe on marketing email (US-425).
+   */
+  headers?: Record<string, string>
 }
 
 // Escape user-controlled values before interpolating them into HTML email
@@ -82,6 +86,7 @@ export async function sendEmail(options: EmailOptions): Promise<SendEmailResult>
         // wrapping it so user-controlled content can't inject markup.
         html: options.html || `<p>${escapeHtml(options.body).replace(/\n/g, '<br>')}</p>`,
         ...(options.replyTo ? { reply_to: options.replyTo } : {}),
+        ...(options.headers && Object.keys(options.headers).length > 0 ? { headers: options.headers } : {}),
       }),
     })
 

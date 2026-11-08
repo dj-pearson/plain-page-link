@@ -7,7 +7,15 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
-import { getSiteUrl } from '../_shared/env.ts';
+import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts';
+import {
+  isSuppressed,
+  unsubscribeFooterHtml,
+  unsubscribeHeaders,
+  unsubscribeLinks,
+  unsubscribeSecret,
+  type UnsubscribeLinks,
+} from '../_shared/marketing-unsubscribe.ts';
 import { safeHtmlText } from '../_shared/public-email.ts';
 import { maskEmail } from '../_shared/log-redaction.ts';
 
@@ -69,6 +77,12 @@ serve(async (req) => {
       });
     }
 
+    // US-425: no marketing email without a working opt-out.
+    const secret = unsubscribeSecret();
+    if (!secret) {
+      throw new Error('PII_ENCRYPTION_KEY is not set; refusing to send drip email without an unsubscribe link');
+    }
+
     // Get pending emails from database function
     const { data: pendingEmails, error: queryError } = await supabase.rpc('get_pending_listing_emails');
 
@@ -93,8 +107,24 @@ serve(async (req) => {
       if (!scheduleInfo) continue;
 
       try {
+        // US-425: an address that opted out (from either tool) gets nothing
+        // more, and its sequence is ended so it is not picked up again.
+        if (await isSuppressed(supabase, String(capture.email), secret)) {
+          await supabase
+            .from('listing_email_captures')
+            .update({ email_sequence_completed: true })
+            .eq('id', capture.id);
+          continue;
+        }
+
+        const unsubscribe = await unsubscribeLinks('listing', capture.id, secret, {
+          siteUrl: SITE_URL,
+          functionsUrl: getFunctionsUrl(),
+        });
+
         // Send email via Resend
         const emailSent = await sendSequenceEmail({
+          unsubscribe,
           email: capture.email,
           firstName: safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
           sequenceNumber: scheduleInfo.dayNumber,
@@ -165,6 +195,7 @@ serve(async (req) => {
 });
 
 async function sendSequenceEmail(data: {
+  unsubscribe: UnsubscribeLinks;
   email: string;
   firstName: string;
   sequenceNumber: number;
@@ -172,7 +203,12 @@ async function sendSequenceEmail(data: {
   captureId: string;
 }): Promise<boolean> {
   try {
-    const emailHTML = getSequenceEmailHTML(data.sequenceNumber, data.firstName);
+    const emailHTML =
+      getSequenceEmailHTML(data.sequenceNumber, data.firstName) +
+      `<div style="max-width: 600px; margin: 0 auto; padding: 0 20px 20px;">${unsubscribeFooterHtml(
+        data.unsubscribe,
+        "You're receiving this because you used AgentBio's listing description generator."
+      )}</div>`;
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -185,6 +221,7 @@ async function sendSequenceEmail(data: {
         to: [data.email],
         subject: data.subject,
         html: emailHTML,
+        headers: unsubscribeHeaders(data.unsubscribe),
       }),
     });
 
