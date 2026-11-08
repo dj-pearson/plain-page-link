@@ -349,4 +349,28 @@ describe('Profile editor', () => {
       }
     });
   });
+
+  describe('opens the tab a checklist step links to (US-487)', () => {
+    afterEach(() => {
+      window.history.replaceState({}, '', '/');
+    });
+
+    it('?tab=service opens Service Areas', () => {
+      window.history.replaceState({}, '', '/dashboard/profile?tab=service');
+      renderWithProviders(<Profile />);
+      expect(screen.getByRole('tab', { name: 'Service Areas' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+    });
+
+    it('an unknown tab falls back to Basic Info', () => {
+      window.history.replaceState({}, '', '/dashboard/profile?tab=bogus');
+      renderWithProviders(<Profile />);
+      expect(screen.getByRole('tab', { name: 'Basic Info' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+    });
+  });
 });
