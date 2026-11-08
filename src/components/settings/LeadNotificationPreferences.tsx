@@ -10,9 +10,12 @@
 import { Bell } from 'lucide-react';
 import {
   useNotificationPreferences,
+  DIGEST_HOUR_CHOICES,
   type LeadNotificationMode,
   type DigestMode,
 } from '@/hooks/useNotificationPreferences';
+import { useAgentTimeZone } from '@/hooks/useAgentTimeZone';
+import { timeZoneLabel } from '@/lib/timeZone';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -24,6 +27,9 @@ import {
 } from '@/components/ui/select';
 
 const SLA_OPTIONS = [1, 2, 4, 8, 24];
+
+/** 5 -> "5am", 10 -> "10am" (every choice is a morning hour). */
+const formatDigestHour = (hour: number) => `${hour}am`;
 
 const OPTIONS: { value: LeadNotificationMode; label: string; description: string }[] = [
   { value: 'instant', label: 'Instant', description: 'Email me the moment a lead comes in' },
@@ -42,7 +48,19 @@ export function LeadNotificationPreferences() {
   const { toast } = useToast();
   // One reader and writer for this column — see useNotificationPreferences for
   // why the Leads page and this card must not each hold their own query.
-  const { leadMode: mode, slaHours, digestMode, isLoading, update } = useNotificationPreferences();
+  const {
+    leadMode: mode,
+    slaHours,
+    digestMode,
+    digestHour,
+    isLoading,
+    update,
+  } = useNotificationPreferences();
+  // US-518: the hour is read on the agent's own clock. With no zone saved, the
+  // first save stores this device's (useNotificationPreferences); with neither,
+  // the job sends the UTC edition and ignores the hour, so the control is off.
+  const zone = useAgentTimeZone();
+  const clockZone = zone.timeZone ?? zone.detected;
 
   const save = (next: Parameters<typeof update.mutate>[0]) =>
     update.mutate(next, {
@@ -90,10 +108,13 @@ export function LeadNotificationPreferences() {
         </Select>
 
         <div className="mt-6 space-y-2">
-          <p className="text-sm font-medium" id="digest-label">Morning email</p>
+          <p className="text-sm font-medium" id="digest-label">
+            Morning email
+          </p>
           <p className="text-xs text-muted-foreground">
             New leads, follow-ups due today and your clients&apos; upcoming birthdays and
-            anniversaries — sent only when there is something. Monday&apos;s adds last week&apos;s numbers.
+            anniversaries — sent only when there is something. Monday&apos;s adds last week&apos;s
+            numbers.
           </p>
           <Select
             value={digestMode}
@@ -110,6 +131,39 @@ export function LeadNotificationPreferences() {
             </SelectContent>
           </Select>
         </div>
+
+        {digestMode !== 'off' && (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm font-medium" id="digest-hour-label">
+              Send it at
+            </p>
+            <Select
+              value={String(digestHour)}
+              onValueChange={(value) => save({ digest_hour: Number(value) })}
+              disabled={isLoading || update.isPending || !clockZone}
+            >
+              <SelectTrigger
+                className="w-full sm:w-72"
+                aria-labelledby="digest-hour-label"
+                aria-describedby="digest-hour-hint"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DIGEST_HOUR_CHOICES.map((h) => (
+                  <SelectItem key={h} value={String(h)}>
+                    {formatDigestHour(h)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground" id="digest-hour-hint">
+              {clockZone
+                ? `Your time: ${timeZoneLabel(clockZone)}.`
+                : 'Set your time zone below to choose the hour.'}
+            </p>
+          </div>
+        )}
 
         <div className="mt-6 space-y-2">
           <p className="text-sm font-medium">Chase me about unanswered leads after</p>

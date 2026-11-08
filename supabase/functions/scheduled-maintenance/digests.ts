@@ -44,6 +44,16 @@
  * preferences, but reads leads, tasks, dates and digest_log only for agents
  * whose edition is due and not yet settled.
  *
+ * US-518 (US-445): an agent with a time zone may choose the hour, 5am to
+ * 10am, in notification_preferences.digest_hour. Each chosen hour is its own
+ * edition with its own marker (slot `zone@hour`); an agent who has not chosen
+ * keeps the DIGEST_LOCAL_HOUR edition under the bare zone slot, so markers
+ * written before this mean what they meant. The hour is ignored for an agent
+ * with no zone: a "7am" in UTC would be nobody's morning. Changing the hour
+ * on a day the edition already went out does not send a second one
+ * (digest_log is per agent per day); moving it earlier, to an edition a clean
+ * pass has already settled that day, starts at tomorrow's edition.
+ *
  * No Deno globals here, so it runs under vitest; the database side is
  * digest-store.ts.
  */
@@ -64,6 +74,8 @@ export type DigestKind = 'daily' | 'weekly';
 export const DEFAULT_DIGEST_HOUR_UTC = 13;
 /** The local hour an agent with a time zone gets the edition (US-433). */
 export const DEFAULT_DIGEST_LOCAL_HOUR = 7;
+/** The local hours an agent may choose for the edition (US-518). */
+export const DIGEST_HOUR_CHOICES = [5, 6, 7, 8, 9, 10] as const;
 /** How many hourly runs after the digest hour may still send a missed edition. */
 export const DEFAULT_CATCHUP_HOURS = 6;
 /** Profiles per page; each page's related rows are read for its agents only. */
@@ -88,6 +100,16 @@ export function digestKindFor(pref: unknown, on: Date | string): DigestKind | nu
   return monday ? 'weekly' : 'daily';
 }
 
+/**
+ * The local hour the agent chose for the edition (US-518), or null when they
+ * have not chosen one, or stored something outside DIGEST_HOUR_CHOICES.
+ */
+export function chosenDigestHour(prefs: unknown): number | null {
+  if (!prefs || typeof prefs !== 'object') return null;
+  const hour = (prefs as { digest_hour?: unknown }).digest_hour;
+  return typeof hour === 'number' && (DIGEST_HOUR_CHOICES as readonly number[]).includes(hour) ? hour : null;
+}
+
 /** The UTC date after `now`'s, as `YYYY-MM-DD`. */
 export function dueCutoffDay(now: Date): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString().slice(0, 10);
@@ -100,6 +122,8 @@ export interface DigestSchedule {
   anchor: Date;
   /** Set for an agent's local edition (US-433); absent for the UTC edition. */
   timeZone?: string;
+  /** Set when the agent chose the hour (US-518); part of the edition's slot. */
+  chosenHour?: number;
 }
 
 /**
@@ -223,9 +247,13 @@ function groupBy<T extends { user_id: string }>(rows: T[]): Map<string, T[]> {
 const short = (id: string) => id.slice(0, 8);
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** The digest_runs slot of an edition: its zone, or '' for the UTC edition. */
+/**
+ * The digest_runs slot of an edition: '' for the UTC edition, the zone for the
+ * default local hour, and `zone@hour` for an hour the agent chose (US-518).
+ */
 export function editionSlot(schedule: DigestSchedule): string {
-  return schedule.timeZone ?? '';
+  if (!schedule.timeZone) return '';
+  return schedule.chosenHour === undefined ? schedule.timeZone : `${schedule.timeZone}@${schedule.chosenHour}`;
 }
 
 export interface EditionWindows {
@@ -282,9 +310,10 @@ export async function runDigests(
     schedule: DigestSchedule | null;
     /**
      * An agent's local edition for their zone (US-433), or null when it is not
-     * due. Without it, agents with a zone get the UTC edition too.
+     * due. `hour` is the hour the agent chose (US-518), null for the default
+     * local hour. Without it, agents with a zone get the UTC edition too.
      */
-    scheduleFor?: (timeZone: string) => DigestSchedule | null;
+    scheduleFor?: (timeZone: string, hour: number | null) => DigestSchedule | null;
     siteUrl: string;
     /**
      * Read and write the per-edition run marker (digest_runs). True for the
@@ -314,7 +343,9 @@ export async function runDigests(
   const editions = new Map<string, Edition>();
   const editionOf = (profile: DigestProfile): Edition | null => {
     const timeZone = scheduleFor ? normalizeTimeZone(profile.timezone) : null;
-    const schedule = timeZone && scheduleFor ? scheduleFor(timeZone) : opts.schedule;
+    const hour = timeZone ? chosenDigestHour(profile.notification_preferences) : null;
+    const local = timeZone && scheduleFor ? scheduleFor(timeZone, hour) : undefined;
+    const schedule = local === undefined ? opts.schedule : local && hour !== null ? { ...local, chosenHour: hour } : local;
     if (!schedule) return null;
     const key = `${schedule.day}|${editionSlot(schedule)}`;
     let edition = editions.get(key);

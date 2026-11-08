@@ -308,7 +308,8 @@ serve(async (req) => {
     //    it now (still once per agent per day). US-433: an agent with a time
     //    zone gets it at DIGEST_LOCAL_HOUR on their own clock instead, so some
     //    agent's edition is due in most hours and every run pages through
-    //    the profiles.
+    //    the profiles. US-518: an agent may choose that hour (5 to 10) in
+    //    notification_preferences.digest_hour.
     // ---------------------------------------------------------------------
     const body = (await req.json().catch(() => ({}))) as { force_digest?: boolean };
     results.push(
@@ -327,7 +328,8 @@ serve(async (req) => {
         // always does a full pass.
         const report = await runDigests(supabaseDigestStore(supabase), {
           schedule,
-          scheduleFor: (timeZone) => digestSchedule(now, { hour: localHour, catchUpHours, force, timeZone }),
+          scheduleFor: (timeZone, hour) =>
+            digestSchedule(now, { hour: hour ?? localHour, catchUpHours, force, timeZone }),
           siteUrl: getSiteUrl(),
           useRunMarker: body.force_digest !== true,
         });
