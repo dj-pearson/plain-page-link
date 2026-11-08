@@ -14,6 +14,7 @@ import {
 } from '../_shared/lead-enrichment.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { mergeRepeatEnquiry } from '../_shared/lead-repeat.ts'
+import { resolveOwnedListing, type OwnedListing } from '../_shared/lead-listing.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl, leadVisitorId } from '../_shared/validation.ts'
 import { safeFetch } from '../_shared/ssrf-guard.ts'
@@ -238,6 +239,24 @@ serve(async (req) => {
       leadData.source = 'open_house'
     }
 
+    // US-555: the listing id arrives from the visitor's browser too. It is kept
+    // only when it names one of this agent's own listings. A listing deleted
+    // since the page was opened used to fail the insert on the foreign key and
+    // lose the enquiry, and another agent's listing id was filed (and named in
+    // the auto-reply) as given. The open house's listing is the agent's by the
+    // check above, and an open house cascades away with its listing.
+    let ownedListing: OwnedListing | null = null
+    if (leadData.listing_id) {
+      const resolved = await resolveOwnedListing(supabase, leadData.user_id, leadData.listing_id)
+      ownedListing = resolved.listing
+      if (resolved.dropped) {
+        console.warn(
+          `[submit-lead] stored an enquiry for ${leadData.user_id} without listing ${leadData.listing_id}: ${resolved.dropped}`
+        )
+      }
+      leadData.listing_id = ownedListing?.id
+    }
+
     // US-086: encrypt the PII before it is stored. This path — the one every
     // public capture form uses — wrote no ciphertext at all, so coverage was
     // inconsistent as well as ineffective: useLeads dual-wrote encrypted_*,
@@ -274,17 +293,10 @@ serve(async (req) => {
         .maybeSingle()
       if (earlierError) throw earlierError
       if (earlier) {
-        // The listing id arrives from the visitor's browser. Only one of this
-        // agent's own listings may be attached to (or named on) their lead.
-        const { data: repeatListing } =
-          leadData.listing_id && leadData.listing_id !== earlier.listing_id
-            ? await supabase
-                .from('listings')
-                .select('id, address')
-                .eq('id', leadData.listing_id)
-                .eq('user_id', leadData.user_id)
-                .maybeSingle()
-            : { data: null }
+        // Only one of this agent's own listings may be attached to (or named
+        // on) their lead; ownedListing was resolved above (US-555).
+        const repeatListing =
+          ownedListing && ownedListing.id !== earlier.listing_id ? ownedListing : null
 
         const merge = mergeRepeatEnquiry(
           {
@@ -295,7 +307,7 @@ serve(async (req) => {
           {
             message: leadData.message,
             listing_id: repeatListing?.id ?? null,
-            listing_address: (repeatListing?.address as string | undefined) ?? null,
+            listing_address: repeatListing?.address ?? null,
             form_data: leadData.form_data,
             source: leadData.source,
           }
@@ -441,9 +453,9 @@ serve(async (req) => {
         .select('username, avatar_url, calendly_url')
         .eq('id', leadData.user_id)
         .maybeSingle()
-      const { data: listingRow } = leadData.listing_id
-        ? await supabase.from('listings').select('address').eq('id', leadData.listing_id).maybeSingle()
-        : { data: null }
+      // ownedListing is already checked to be this agent's (US-555), so the
+      // auto-reply can never name another agent's address.
+      const listingRow = ownedListing
       const siteUrl = getSiteUrl()
       const profileUrl = agentProfile?.username ? `${siteUrl}/${agentProfile.username}` : null
 
@@ -462,7 +474,7 @@ serve(async (req) => {
           },
           listing: listingRow?.address
             ? {
-                address: listingRow.address as string,
+                address: listingRow.address,
                 url: profileUrl && leadData.listing_id ? `${profileUrl}?listing=${leadData.listing_id}` : null,
               }
             : null,
