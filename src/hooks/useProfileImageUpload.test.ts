@@ -279,7 +279,7 @@ describe('useAvatarUpload home-screen icons (US-481)', () => {
 
   it('stores the downscaled photo, a year-cacheable object, and draws icons from the original (US-591)', async () => {
     const original = new File([new Uint8Array(50_000)], 'me.jpg', { type: 'image/jpeg' });
-    const small = new File([new Uint8Array(4_000)], 'me.webp', { type: 'image/webp' });
+    const small = new File([new Uint8Array(4_000)], 'me.jpg', { type: 'image/jpeg' });
     shrinkMock.mockResolvedValueOnce(small);
     const { result } = renderHook(() => useAvatarUpload(), { wrapper });
     await act(async () => {
@@ -288,9 +288,9 @@ describe('useAvatarUpload home-screen icons (US-481)', () => {
 
     expect(shrinkMock).toHaveBeenCalledWith(original, { maxSide: 800, opaque: true });
     expect(storageMock.upload).toHaveBeenCalledWith(
-      'u1/avatar-1700000000000.webp',
+      'u1/avatar-1700000000000.jpg',
       small,
-      expect.objectContaining({ cacheControl: '31536000', contentType: 'image/webp' })
+      expect.objectContaining({ cacheControl: '31536000', contentType: 'image/jpeg' })
     );
     expect(renderIconsMock).toHaveBeenCalledWith(original);
   });

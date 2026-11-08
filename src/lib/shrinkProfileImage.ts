@@ -21,9 +21,8 @@ export interface ShrinkOptions {
   /** Longest side of the stored image, in pixels. */
   maxSide: number;
   /**
-   * Whether the image may lose transparency. A photo may (JPEG is an allowed
-   * fallback where the browser cannot encode WebP, as Safari before 17 could
-   * not); a logo may not, so it only ever becomes WebP or stays as uploaded.
+   * Whether the image may lose transparency. A photo may, and is stored as
+   * JPEG; a logo may not, so it only ever becomes WebP or stays as uploaded.
    */
   opaque: boolean;
 }
@@ -60,9 +59,22 @@ export function scaledSize(
   };
 }
 
-/** The encodings to try, best first. */
+/**
+ * The encodings to try, best first.
+ *
+ * The avatar is JPEG only. It is not just drawn by the app: submit-lead puts
+ * profiles.avatar_url into the lead auto-reply email (an <img> in
+ * _shared/email.ts), and it is the og:image fallback when og_image is unset
+ * (functions/_lib/social-meta.ts). Classic Outlook for Windows and some
+ * share-preview crawlers do not render WebP, so a WebP headshot would show as
+ * a broken image in the first email a lead receives. An 800px JPEG at 0.85 is
+ * still a 20-50x saving over a phone original.
+ *
+ * The logo keeps WebP (for its transparency): only the app shows it; no edge
+ * function or email reads brokerage_logo.
+ */
 export function candidateTypes(opaque: boolean): string[] {
-  return opaque ? ['image/webp', 'image/jpeg'] : ['image/webp'];
+  return opaque ? ['image/jpeg'] : ['image/webp'];
 }
 
 /**

@@ -31,8 +31,8 @@ describe('scaledSize', () => {
 });
 
 describe('candidateTypes', () => {
-  it('lets a photo fall back to JPEG but keeps a logo transparent', () => {
-    expect(candidateTypes(true)).toEqual(['image/webp', 'image/jpeg']);
+  it('stores a photo as JPEG (emails, crawlers) but keeps a logo transparent', () => {
+    expect(candidateTypes(true)).toEqual(['image/jpeg']);
     expect(candidateTypes(false)).toEqual(['image/webp']);
     expect(AVATAR_SHRINK.opaque).toBe(true);
     expect(LOGO_SHRINK.opaque).toBe(false);
@@ -104,31 +104,41 @@ describe('shrinkProfileImage', () => {
     expect(await shrinkProfileImage(file, AVATAR_SHRINK)).toBe(file);
   });
 
-  it('stores a downscaled WebP named to match', async () => {
+  it('stores a downscaled JPEG named to match', async () => {
     const close = stubBitmap(4000, 3000);
     const { canvas, drawImage } = stubCanvas((type) => new Blob([new Uint8Array(4_000)], { type }));
 
-    const out = await shrinkProfileImage(bigPhoto(), AVATAR_SHRINK);
+    const out = await shrinkProfileImage(
+      new File([new Uint8Array(50_000)], 'me.png', { type: 'image/png' }),
+      AVATAR_SHRINK
+    );
 
-    expect(out.type).toBe('image/webp');
-    expect(out.name).toBe('me.webp');
+    expect(out.type).toBe('image/jpeg');
+    expect(out.name).toBe('me.jpg');
     expect(out.size).toBe(4_000);
     expect([canvas.width, canvas.height]).toEqual([800, 600]);
     expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 800, 600);
     expect(close).toHaveBeenCalled();
   });
 
-  it('falls back to JPEG for a photo where WebP cannot be encoded', async () => {
+  it('never stores a photo as WebP, which Outlook and some crawlers cannot show', async () => {
     stubBitmap(4000, 3000);
-    stubCanvas((type) =>
-      type === 'image/webp'
-        ? new Blob([new Uint8Array(9_000)], { type: 'image/png' })
-        : new Blob([new Uint8Array(5_000)], { type })
-    );
+    const requested: string[] = [];
+    stubCanvas((type) => {
+      requested.push(type);
+      return new Blob([new Uint8Array(5_000)], { type });
+    });
 
     const out = await shrinkProfileImage(bigPhoto(), AVATAR_SHRINK);
+    expect(requested).toEqual(['image/jpeg']);
     expect(out.type).toBe('image/jpeg');
-    expect(out.name).toBe('me.jpg');
+  });
+
+  it('keeps the original photo where JPEG cannot be encoded', async () => {
+    stubBitmap(4000, 3000);
+    stubCanvas(() => new Blob([new Uint8Array(9_000)], { type: 'image/png' }));
+    const file = bigPhoto();
+    expect(await shrinkProfileImage(file, AVATAR_SHRINK)).toBe(file);
   });
 
   it('keeps a logo as uploaded rather than flatten its transparency to JPEG', async () => {
