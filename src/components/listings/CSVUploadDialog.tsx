@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Upload, FileSpreadsheet, Check, X, AlertCircle, Download, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { sanitizeExternalUrl } from '@/utils/sanitize';
 
 interface CSVRow {
   address: string;
@@ -127,6 +128,16 @@ function validateRow(row: CSVRow, _index: number): ParsedListing {
     errors.push('year_built must be a four-digit year');
   }
 
+  // The database refuses a virtual tour that is not an http(s) address
+  // (listings_virtual_tour_url_scheme, US-456), which would fail the insert.
+  // A bare host ("my.matterport.com/show?m=1") is given https:// here, as the
+  // database would; anything else is flagged on the row.
+  const rawTour = row.virtual_tour_url?.trim() || '';
+  const virtualTourUrl = rawTour ? sanitizeExternalUrl(rawTour) : '';
+  if (rawTour && !virtualTourUrl) {
+    errors.push('virtual_tour_url must be a web address starting with https://');
+  }
+
   const validStatuses = ['active', 'pending', 'under_contract', 'sold', 'draft'];
   const status = validStatuses.includes(row.status?.toLowerCase())
     ? row.status.toLowerCase()
@@ -152,7 +163,7 @@ function validateRow(row: CSVRow, _index: number): ParsedListing {
     mls_number: row.mls_number || null,
     lot_size_acres: lotSize,
     is_featured: row.is_featured?.toLowerCase() === 'true',
-    virtual_tour_url: row.virtual_tour_url || null,
+    virtual_tour_url: virtualTourUrl || null,
     year_built: yearBuilt,
     errors,
   };
