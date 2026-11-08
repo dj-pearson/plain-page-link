@@ -8,8 +8,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  buildListingBody,
   buildListingTags,
+  buildProfileBody,
   buildProfileTags,
+  PROFILE_BODY_LISTING_LIMIT,
+  type BodyListing,
   injectSocialTags,
   isCrawler,
   isReservedSegment,
@@ -281,5 +285,91 @@ describe('replaceRootContent', () => {
     );
     const unbalanced = '<body><div id="root"><div>open</body>';
     expect(replaceRootContent(unbalanced, 'x')).toBe(unbalanced);
+  });
+});
+
+describe('buildProfileBody (US-539)', () => {
+  const bodyListing = (over: Partial<BodyListing> = {}): BodyListing => ({
+    id: 'abc-123',
+    status: 'active',
+    address: '412 Maple Avenue',
+    city: 'Salt Lake City',
+    state: 'UT',
+    price: '525000',
+    bedrooms: 3,
+    bathrooms: 2,
+    square_feet: 1980,
+    ...over,
+  });
+  const body = (p: ProfileMeta, listings: BodyListing[] = [], showContact = true) =>
+    buildProfileBody(p, buildProfileTags(p, ORIGIN), ORIGIN, { listings, showContact });
+
+  it('escapes markup in the bio, name, cities and licence', () => {
+    const hostile: ProfileMeta = {
+      ...profile,
+      full_name: 'Jane <img src=x onerror=alert(1)>',
+      bio: 'Call me </main><script>alert(1)</script>',
+      service_cities: ['<b>Holladay</b>'],
+      license_number: '"><svg onload=alert(1)>',
+      license_state: 'UT',
+    };
+    const html = body(hostile);
+    expect(html).not.toMatch(/<(img|script|svg|b)\b/);
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('<li>&lt;b&gt;Holladay&lt;/b&gt;</li>');
+    expect(html.match(/<\/main>/g)).toHaveLength(1);
+  });
+
+  it('escapes markup in a listing address and encodes its id into the link', () => {
+    const html = body(profile, [
+      bodyListing({ id: 'a"b c', address: '1 <script>x</script> Way', city: 'O"Fallon' }),
+    ]);
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('href="https://agentbio.net/jane/listing/a%22b%20c"');
+    expect(html).toContain('1 &lt;script&gt;x&lt;/script&gt; Way, O&quot;Fallon, UT');
+  });
+
+  it(`links to at most ${PROFILE_BODY_LISTING_LIMIT} listings`, () => {
+    const many = Array.from({ length: PROFILE_BODY_LISTING_LIMIT + 5 }, (_, i) =>
+      bodyListing({ id: `l-${i}` })
+    );
+    expect(body(profile, many).match(/\/listing\//g)).toHaveLength(PROFILE_BODY_LISTING_LIMIT);
+  });
+
+  it('puts only a number in a tel: link and only a plausible address in a mailto: link', () => {
+    const html = body({
+      ...profile,
+      phone: '+1 801-555-0100" onclick="x',
+      email_display: 'jane@x.com?bcc=everyone@x.com',
+    });
+    expect(html).toContain('href="tel:+18015550100"');
+    expect(html).not.toContain('mailto:');
+    expect(html).not.toContain('onclick="');
+  });
+
+  it('leaves contact links out when they are not allowed', () => {
+    const html = body(
+      { ...profile, phone: '801 555 0100', email_display: 'jane@x.com' },
+      [],
+      false
+    );
+    expect(html).not.toContain('tel:');
+    expect(html).not.toContain('mailto:');
+  });
+
+  it('does not repeat the bio when it is already the description', () => {
+    const html = body(profile);
+    expect(html.match(/Fifteen years selling homes/g)).toHaveLength(1);
+  });
+});
+
+describe('buildListingBody (US-539)', () => {
+  it('states the facts and links back to the agent, escaped', () => {
+    const p = { ...profile, full_name: 'Jane & <Co>' };
+    const l = { ...listing, status: 'pending', description: 'Lovely <b>porch</b>' };
+    const html = buildListingBody(p, l, buildListingTags(p, l, ORIGIN), ORIGIN);
+    expect(html).toContain('<p>Pending · $525,000 · 3 bd · 2 ba · 1,980 sqft</p>');
+    expect(html).toContain('<p>Lovely &lt;b&gt;porch&lt;/b&gt;</p>');
+    expect(html).toContain('<a href="https://agentbio.net/jane">Jane &amp; &lt;Co&gt;</a>');
   });
 });

@@ -167,8 +167,9 @@ describe('GET /:username', () => {
     expect(html).not.toContain('id="main-content"');
     expect(html).not.toContain('Link in Bio for Real Estate Agents');
     expect(html).toContain(
-      '<div id="root"><main><h1>Jane Doe — Associate Broker at Summit Realty</h1><p>Fifteen years on the east bench.</p></main></div>'
+      '<div id="root"><main><h1>Jane Doe — Associate Broker at Summit Realty</h1><p>Fifteen years on the east bench.</p>'
     );
+    expect(html).toMatch(/<div id="root"><main>[\s\S]*<\/main><\/div>/);
     // Exactly one of each head tag, all the agent's.
     expect(html.match(/<title>/g)).toHaveLength(1);
     expect(html.match(/rel="canonical"/g)).toHaveLength(1);
@@ -363,6 +364,138 @@ describe('GET /:username', () => {
     );
     const response = await call({ next }).promise;
     expect(await response.text()).toBe('{"ok":true}');
+  });
+});
+
+describe("the agent's page body for crawlers (US-539)", () => {
+  const SOLD_ROW = { ...LISTING_ROW, id: 'sold-1', status: 'sold', address: '9 Birch Court' };
+  const DRAFT_ROW = { ...LISTING_ROW, id: 'draft-1', status: 'draft', address: '1 Secret Lane' };
+  const FULL_PROFILE = {
+    ...PROFILE_ROW,
+    service_cities: ['Salt Lake City', 'Park City'],
+    license_number: 'UT-12345',
+    license_state: 'UT',
+    phone: '(801) 555-0100',
+    email_display: 'jane@summit.example',
+  };
+
+  const serve = (opts: {
+    profile?: Record<string, unknown>;
+    listings?: Record<string, unknown>[] | 'error';
+    settings?: Record<string, unknown>[] | 'error';
+  }) => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/profiles')) return Response.json([opts.profile ?? FULL_PROFILE]);
+      if (url.includes('/rest/v1/listings')) {
+        return opts.listings === 'error'
+          ? new Response('{}', { status: 500 })
+          : Response.json(opts.listings ?? [SOLD_ROW, LISTING_ROW, DRAFT_ROW]);
+      }
+      if (url.includes('/rest/v1/user_settings')) {
+        return opts.settings === 'error'
+          ? new Response('{}', { status: 500 })
+          : Response.json(opts.settings ?? []);
+      }
+      return new Response('[]', { status: 404 });
+    });
+  };
+
+  const profileHtml = async () => (await call({}).promise).text();
+
+  it('names the service areas, brokerage, licence, listings and contact links', async () => {
+    serve({});
+    const html = await profileHtml();
+    expect(html).toContain('<li>Associate Broker at Summit Realty</li>');
+    expect(html).toContain('<li>License #UT-12345 (UT)</li>');
+    expect(html).toContain(
+      '<section><h2>Service areas</h2><ul><li>Salt Lake City</li><li>Park City</li></ul></section>'
+    );
+    expect(html).toContain(
+      '<a href="https://agentbio.net/jane/listing/abc-123">412 Maple Avenue, Salt Lake City, UT</a>'
+    );
+    expect(html).toContain('<a href="https://agentbio.net/jane/listing/sold-1">9 Birch Court');
+    // Available before sold, as the page orders them.
+    expect(html.indexOf('412 Maple Avenue')).toBeLessThan(html.indexOf('9 Birch Court'));
+    // A draft is never public.
+    expect(html).not.toContain('1 Secret Lane');
+    expect(html).toContain('<a href="tel:8015550100">(801) 555-0100</a>');
+    expect(html).toContain('<a href="mailto:jane@summit.example">jane@summit.example</a>');
+  });
+
+  it('reads the listings and the toggles scoped to the agent, without photos', async () => {
+    serve({});
+    await profileHtml();
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    const listingUrl = urls.find((url) => url.includes('/rest/v1/listings'));
+    expect(listingUrl).toContain('user_id=eq.profile-jane');
+    expect(listingUrl).not.toContain('photos');
+    const settingsUrl = urls.find((url) => url.includes('/rest/v1/user_settings'));
+    expect(settingsUrl).toContain('user_id=eq.profile-jane');
+    expect(settingsUrl).toContain('show_contact_buttons');
+  });
+
+  it('names no listing while the agent hides listings', async () => {
+    serve({ settings: [{ show_listings: false, show_sold_properties: true }] });
+    const html = await profileHtml();
+    expect(html).not.toContain('412 Maple Avenue');
+    expect(html).not.toContain('9 Birch Court');
+    expect(html).not.toContain('<h2>Listings</h2>');
+  });
+
+  it('names no sold home while sold properties are hidden', async () => {
+    serve({ settings: [{ show_listings: true, show_sold_properties: false }] });
+    const html = await profileHtml();
+    expect(html).toContain('412 Maple Avenue');
+    expect(html).not.toContain('9 Birch Court');
+  });
+
+  it('withholds listings and contact links when the settings read fails', async () => {
+    serve({ settings: 'error' });
+    const response = await call({}).promise;
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain('<h2>Service areas</h2>');
+    expect(html).not.toContain('412 Maple Avenue');
+    expect(html).not.toContain('tel:');
+  });
+
+  it('still serves the agent when the listings read fails', async () => {
+    serve({ listings: 'error' });
+    const html = await profileHtml();
+    expect(html).toContain('<li>License #UT-12345 (UT)</li>');
+    expect(html).not.toContain('<h2>Listings</h2>');
+  });
+
+  it('leaves out contact links while the agent hides contact buttons', async () => {
+    serve({ settings: [{ show_contact_buttons: false }] });
+    const html = await profileHtml();
+    expect(html).toContain('412 Maple Avenue');
+    expect(html).not.toContain('tel:');
+    expect(html).not.toContain('mailto:');
+  });
+
+  it('gives the listing page its facts and a link back to the agent', async () => {
+    serve({});
+    const html = await (
+      await onListingRequestGet({
+        request: new Request('https://agentbio.net/jane/listing/abc-123', {
+          headers: { 'user-agent': CRAWLER },
+        }),
+        env: ENV as never,
+        params: { username: 'jane', listingId: 'abc-123' },
+        next: async () => indexResponse(),
+      })
+    ).text();
+    expect(html).toContain('<p>Active · $525,000 · 3 bd · 2 ba · 1,980 sqft</p>');
+    expect(html).toContain(
+      '<p>Listed by <a href="https://agentbio.net/jane">Jane Doe</a>, Associate Broker at Summit Realty.</p>'
+    );
+    // The listing page does not read the agent's whole gallery.
+    const listingReads = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/rest/v1/listings')
+    );
+    expect(listingReads).toHaveLength(1);
   });
 });
 
