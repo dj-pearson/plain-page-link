@@ -132,6 +132,24 @@ describe('GET /:username', () => {
     expect(html).not.toContain('Cover.png');
   });
 
+  it("serves an answer engine's crawler the agent, and a 404 for an unknown handle (US-520)", async () => {
+    const GPTBOT =
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.1; +https://openai.com/gptbot';
+    const html = await (await call({ userAgent: GPTBOT }).promise).text();
+    expect(html).toContain('<h1>Jane Doe — Associate Broker at Summit Realty</h1>');
+    expect(html).toContain('"@type":"RealEstateAgent"');
+    expect(html).not.toContain('"@type":"SoftwareApplication"');
+
+    fetchMock.mockImplementation(async () => Response.json([]));
+    const missing = await call({
+      path: '/nobody',
+      username: 'nobody',
+      userAgent:
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)',
+    }).promise;
+    expect(missing.status).toBe(404);
+  });
+
   it("does not serve the homepage's body or structured data under the agent's URL (US-242)", async () => {
     // The fixture really is the homepage; prove it, or the rest proves nothing.
     expect(INDEX_HTML).toContain('"@type":"SoftwareApplication"');
