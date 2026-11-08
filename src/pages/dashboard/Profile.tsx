@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SkeletonProfile } from '@/components/ui/skeleton';
 import { planLimitKeyFromError, UPGRADE_PATH } from '@/lib/planLimits';
 import { urlSchemeErrorFrom } from '@/lib/urlSchemeErrors';
+import { profileTabFromSearch } from '@/lib/profileCompletion';
 import {
   normalizeProfileUrls,
   PROFILE_URL_FIELDS,
@@ -200,7 +201,10 @@ export default function Profile() {
   const [savedForm, setSavedForm] = useState<ProfileForm>(emptyForm);
   const [saveError, setSaveError] = useState<SaveError | null>(null);
   const [urlErrors, setUrlErrors] = useState<ProfileUrlErrors>({});
-  const [tab, setTab] = useState('basic');
+  // The completion checklist links straight to a tab with ?tab= (US-487).
+  const [tab, setTab] = useState<string>(() =>
+    profileTabFromSearch(typeof window === 'undefined' ? '' : window.location.search)
+  );
   const hydrated = useRef(false);
 
   // States for managing array inputs

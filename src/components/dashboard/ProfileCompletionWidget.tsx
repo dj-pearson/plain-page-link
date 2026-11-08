@@ -12,15 +12,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useListings } from '@/hooks/useListings';
 import { useTestimonials } from '@/hooks/useTestimonials';
 import { useLinks } from '@/hooks/useLinks';
-
-interface CompletionStep {
-  id: string;
-  label: string;
-  description: string;
-  completed: boolean;
-  link: string;
-  priority: 'high' | 'medium' | 'low';
-}
+import { buildCompletionSteps, nextCompletionStep } from '@/lib/profileCompletion';
 
 export function ProfileCompletionWidget() {
   const { profile } = useProfile();
@@ -30,64 +22,11 @@ export function ProfileCompletionWidget() {
 
   if (!profile) return null;
 
-  const steps: CompletionStep[] = [
-    {
-      id: 'avatar',
-      label: 'Add profile photo',
-      description: 'Upload a professional headshot',
-      completed: !!profile.avatar_url,
-      link: '/dashboard/profile',
-      priority: 'high',
-    },
-    {
-      id: 'bio',
-      label: 'Write your bio',
-      description: 'Tell visitors about your experience',
-      completed: !!profile.bio && profile.bio.length > 50,
-      link: '/dashboard/profile',
-      priority: 'high',
-    },
-    {
-      id: 'contact',
-      label: 'Add contact info',
-      description: 'Phone and email for leads',
-      completed: !!profile.phone || !!profile.email_display,
-      link: '/dashboard/profile',
-      priority: 'high',
-    },
-    {
-      id: 'listings',
-      label: 'Add your first listing',
-      description: "Showcase properties you're selling",
-      completed: (listings?.length || 0) > 0,
-      link: '/dashboard/listings',
-      priority: 'medium',
-    },
-    {
-      id: 'testimonials',
-      label: 'Add testimonials',
-      description: 'Build trust with client reviews',
-      completed: (testimonials?.length || 0) > 0,
-      link: '/dashboard/testimonials',
-      priority: 'medium',
-    },
-    {
-      id: 'links',
-      label: 'Add custom links',
-      description: 'Link to your website and social',
-      completed: (links?.length || 0) > 0,
-      link: '/dashboard/links',
-      priority: 'low',
-    },
-    {
-      id: 'theme',
-      label: 'Customize theme',
-      description: 'Match your brand colors',
-      completed: !!profile.theme,
-      link: '/dashboard/theme',
-      priority: 'low',
-    },
-  ];
+  const steps = buildCompletionSteps(profile, {
+    listings: listings?.length ?? 0,
+    testimonials: testimonials?.length ?? 0,
+    links: links?.length ?? 0,
+  });
 
   const completedSteps = steps.filter((step) => step.completed).length;
   const totalSteps = steps.length;
@@ -96,8 +35,7 @@ export function ProfileCompletionWidget() {
   // Only show if profile is not 100% complete
   if (completionPercentage === 100) return null;
 
-  const highPriorityIncomplete = steps.filter((s) => s.priority === 'high' && !s.completed);
-  const nextStep = highPriorityIncomplete[0] || steps.find((s) => !s.completed);
+  const nextStep = nextCompletionStep(steps);
 
   return (
     <Card className="border-blue-200 bg-blue-50/50">
