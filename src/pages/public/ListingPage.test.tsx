@@ -5,13 +5,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const h = vi.hoisted(() => ({
   result: {} as Record<string, unknown>,
   listingViews: [] as Array<[string | undefined, string, string | null | undefined]>,
   openHouseListing: [] as Array<string | undefined>,
+  leadForms: [] as Array<{ formType: string; listing?: { id: string; address: string } }>,
+  calendly: [] as Array<{ listingId?: string; listingAddress?: string }>,
 }));
 
 vi.mock('@/hooks/usePublicProfile', () => ({ usePublicProfile: () => h.result }));
@@ -33,9 +35,22 @@ vi.mock('@/components/profile/UpcomingOpenHouses', () => ({
     return null;
   },
 }));
+vi.mock('@/components/profile/LeadFormModal', () => ({
+  LeadFormModal: (props: { formType: string; listing?: { id: string; address: string } }) => {
+    h.leadForms.push({ formType: props.formType, listing: props.listing });
+    return <div role="dialog" aria-label="Lead form" />;
+  },
+}));
+vi.mock('@/components/integrations/CalendlyModal', () => ({
+  CalendlyModal: (props: { listingId?: string; listingAddress?: string }) => {
+    h.calendly.push({ listingId: props.listingId, listingAddress: props.listingAddress });
+    return <div role="dialog" aria-label="Calendly" />;
+  },
+}));
 vi.mock('@/components/profile/LeadCaptureCTA', () => ({ LeadCaptureCTA: () => null }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+import { trackContactTap } from '@/lib/analyticsEvents';
 import ListingPage, { listingMetaDescription, MORE_LISTINGS_LIMIT } from './ListingPage';
 import FullProfilePage from './FullProfilePage';
 import type { PublicProfileListing } from '@/types';
@@ -107,12 +122,13 @@ const loaded = ({
   listings = [listing('l1'), listing('l2'), listing('l3', { status: 'sold' })],
   isPublished = true as boolean | null,
   settings = {} as Record<string, boolean>,
+  profile = {} as Record<string, unknown>,
 } = {}) => ({
   isLoading: false,
   error: null,
   refetch: vi.fn(),
   data: {
-    profile: { ...PROFILE, is_published: isPublished },
+    profile: { ...PROFILE, ...profile, is_published: isPublished },
     listings,
     testimonials: [],
     links: [],
@@ -155,6 +171,9 @@ const canonical = () =>
 beforeEach(() => {
   h.listingViews = [];
   h.openHouseListing = [];
+  h.leadForms = [];
+  h.calendly = [];
+  vi.mocked(trackContactTap).mockClear();
 });
 
 describe('ListingPage', () => {
@@ -241,6 +260,85 @@ describe('ListingPage', () => {
     h.result = loaded();
     renderAt('/JaneDoe/listing/l1?utm_source=ig');
     await waitFor(() => expect(where()).toBe('/janedoe/listing/l1?utm_source=ig'));
+  });
+});
+
+describe('the phone contact bar (US-361)', () => {
+  const bar = async () => screen.findByRole('region', { name: 'Contact about this home' });
+
+  it('is phone-only and keeps both actions in reach', async () => {
+    h.result = loaded();
+    renderAt('/janedoe/listing/l1');
+    const region = await bar();
+    expect(region).toHaveClass('fixed', 'bottom-0', 'sm:hidden');
+    expect(within(region).getByRole('button', { name: 'Ask a question' })).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Request a showing' })).toBeInTheDocument();
+    // No phone on the profile, no Call button.
+    expect(within(region).queryByRole('link', { name: /Call/ })).toBeNull();
+  });
+
+  it('opens the lead form with this listing attached, so the lead carries listing_id', async () => {
+    const user = userEvent.setup();
+    h.result = loaded();
+    renderAt('/janedoe/listing/l1');
+    await user.click(within(await bar()).getByRole('button', { name: 'Request a showing' }));
+    await screen.findByRole('dialog', { name: 'Lead form' });
+    expect(h.leadForms.at(-1)?.listing).toEqual({ id: 'l1', address: 'l1 Oak Street' });
+    expect(trackContactTap).toHaveBeenCalledWith('agent-1', 'schedule');
+  });
+
+  it('asks a question about this listing, not the agent in general', async () => {
+    const user = userEvent.setup();
+    h.result = loaded();
+    renderAt('/janedoe/listing/l1');
+    await user.click(within(await bar()).getByRole('button', { name: 'Ask a question' }));
+    await screen.findByRole('dialog', { name: 'Lead form' });
+    expect(h.leadForms.at(-1)?.listing).toEqual({ id: 'l1', address: 'l1 Oak Street' });
+    expect(trackContactTap).toHaveBeenCalledWith('agent-1', 'contact');
+  });
+
+  it('books through Calendly with the listing when the agent has a link', async () => {
+    const user = userEvent.setup();
+    h.result = loaded({ profile: { calendly_url: 'https://calendly.com/jane' } });
+    renderAt('/janedoe/listing/l1');
+    await user.click(within(await bar()).getByRole('button', { name: 'Schedule a showing' }));
+    await screen.findByRole('dialog', { name: 'Calendly' });
+    expect(h.calendly.at(-1)).toEqual({ listingId: 'l1', listingAddress: 'l1 Oak Street' });
+  });
+
+  it('offers no showing for a sold home, only a question', async () => {
+    h.result = loaded();
+    renderAt('/janedoe/listing/l3');
+    const region = await bar();
+    expect(within(region).getByRole('button', { name: 'Ask a question' })).toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: /showing/i })).toBeNull();
+  });
+
+  it('shows Call only when the agent shows contact buttons', async () => {
+    const user = userEvent.setup();
+    h.result = loaded({ profile: { phone: '(512) 555-0100' } });
+    const { unmount } = renderAt('/janedoe/listing/l1');
+    const call = within(await bar()).getByRole('link', { name: 'Call Jane Doe' });
+    expect(call).toHaveAttribute('href', 'tel:5125550100');
+    call.addEventListener('click', (e) => e.preventDefault());
+    await user.click(call);
+    expect(trackContactTap).toHaveBeenCalledWith('agent-1', 'phone');
+    unmount();
+
+    h.result = loaded({
+      profile: { phone: '(512) 555-0100' },
+      settings: { show_contact_buttons: false },
+    });
+    renderAt('/janedoe/listing/l1');
+    expect(within(await bar()).queryByRole('link', { name: /Call/ })).toBeNull();
+  });
+
+  it('counts nothing while the owner previews an unpublished page', async () => {
+    const user = userEvent.setup();
+    h.result = loaded({ isPublished: false });
+    renderAt('/janedoe/listing/l1');
+    await user.click(within(await bar()).getByRole('button', { name: 'Ask a question' }));
+    expect(trackContactTap).toHaveBeenCalledWith(undefined, 'contact');
   });
 });
 
