@@ -416,8 +416,12 @@ export default function Listings() {
     await moveListing(id, neighbour.id);
   };
 
-  const handleEditListing = async (data: EditListingFormData, uploaded: string[]) => {
-    if (!editingListing) return;
+  /** Resolves true once the save landed (US-512: the dialog then keeps its uploads). */
+  const handleEditListing = async (
+    data: EditListingFormData,
+    uploaded: string[]
+  ): Promise<boolean> => {
+    if (!editingListing) return false;
     try {
       await updateListing.mutateAsync({
         id: editingListing.id,
@@ -467,6 +471,7 @@ export default function Listings() {
       const dropped = uploaded.filter((url) => !saved.has(url));
       if (dropped.length > 0) void discardUnsavedPhotos(dropped);
       setEditingListing(null);
+      return true;
     } catch (error) {
       toast({
         title: 'Error',
@@ -475,6 +480,7 @@ export default function Listings() {
         description: describeListingSaveError(error, 'Failed to update listing. Please try again.'),
         variant: 'destructive',
       });
+      return false;
     }
   };
 

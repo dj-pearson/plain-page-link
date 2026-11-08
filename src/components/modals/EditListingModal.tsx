@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,9 +46,11 @@ interface EditListingModalProps {
   onClose: () => void;
   /**
    * `uploaded` is every photo URL uploaded while the dialog was open, so the
-   * caller can remove the ones the save did not keep (US-461).
+   * caller can remove the ones the save did not keep (US-461). Resolves true
+   * once the save landed: the caller then owns those uploads, and the dialog
+   * no longer discards them when it unmounts (US-512).
    */
-  onSubmit: (data: EditListingFormData, uploaded: string[]) => void;
+  onSubmit: (data: EditListingFormData, uploaded: string[]) => Promise<boolean> | boolean;
   /**
    * Called with photos uploaded in this dialog that are not on the saved
    * listing, when the dialog closes without saving (US-461).
@@ -80,31 +82,59 @@ export function EditListingModal({
   // uploads the moment files are picked, so a cancel used to leave them
   // public in the bucket with no row pointing at them.
   const uploadedRef = useRef<string[]>([]);
+  // Set once this session's uploads are accounted for: discarded on a close,
+  // or handed to the caller by a save that landed.
   const closedRef = useRef(false);
+  const savingRef = useRef(false);
+  const unmountedRef = useRef(false);
+  // The unmount cleanup runs with the first render's closure; read the latest
+  // props through refs.
+  const onDiscardRef = useRef(onDiscardUploads);
+  onDiscardRef.current = onDiscardUploads;
+  const savedPhotosRef = useRef(initialData.photos);
+  savedPhotosRef.current = initialData.photos;
+
+  /** Discard this session's uploads that are not on the saved listing, once. */
+  const discardSession = () => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    // Only this session's uploads: a photo already on the saved listing is
+    // never a candidate, whatever the agent did to it in the form.
+    const saved = new Set(savedPhotosRef.current);
+    const unsaved = uploadedRef.current.filter((url) => !saved.has(url));
+    uploadedRef.current = [];
+    if (unsaved.length > 0) onDiscardRef.current?.(unsaved);
+  };
 
   const handleUploaded = (urls: string[]) => {
     // An upload that finishes after the dialog closed can never be saved.
     if (closedRef.current) {
-      onDiscardUploads?.(urls);
+      onDiscardRef.current?.(urls);
       return;
     }
     uploadedRef.current = [...uploadedRef.current, ...urls];
   };
 
+  // US-512: leaving the Listings page with the dialog open, or the lazy-modal
+  // error boundary replacing it, unmounts the dialog without onOpenChange or
+  // Cancel, so that session's uploads were never discarded. A save still in
+  // flight is left to finish: handleSubmit discards if it fails.
+  const discardOnUnmountRef = useRef(discardSession);
+  discardOnUnmountRef.current = discardSession;
+  useEffect(
+    () => () => {
+      unmountedRef.current = true;
+      if (!savingRef.current) discardOnUnmountRef.current();
+    },
+    []
+  );
+
   const handleClose = () => {
-    if (!closedRef.current) {
-      closedRef.current = true;
-      // Only this session's uploads: a photo already on the saved listing is
-      // never a candidate, whatever the agent did to it in the form.
-      const saved = new Set(initialData.photos);
-      const unsaved = uploadedRef.current.filter((url) => !saved.has(url));
-      uploadedRef.current = [];
-      if (unsaved.length > 0) onDiscardUploads?.(unsaved);
-    }
+    discardSession();
     onClose();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // The database refuses a virtual tour that is not an http(s) address
     // (listings_virtual_tour_url_scheme, US-456). Check it here so the agent
@@ -116,7 +146,26 @@ export function EditListingModal({
       return;
     }
     setTourError(null);
-    onSubmit({ ...formData, virtual_tour_url: tour.value }, [...uploadedRef.current]);
+    if (savingRef.current) return;
+    savingRef.current = true;
+    let saved = false;
+    try {
+      saved = await onSubmit({ ...formData, virtual_tour_url: tour.value }, [
+        ...uploadedRef.current,
+      ]);
+    } catch {
+      // Treated as not saved; the caller reports the error.
+    } finally {
+      savingRef.current = false;
+    }
+    if (saved) {
+      // The caller removed what the save did not keep (US-461).
+      closedRef.current = true;
+      uploadedRef.current = [];
+    } else if (unmountedRef.current) {
+      // The dialog went away while the save was failing; nothing can retry it.
+      discardSession();
+    }
   };
 
   return (
