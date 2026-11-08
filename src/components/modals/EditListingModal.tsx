@@ -86,6 +86,9 @@ export function EditListingModal({
   // or handed to the caller by a save that landed.
   const closedRef = useRef(false);
   const savingRef = useRef(false);
+  // Mirrors savingRef for rendering: Cancel and Save are disabled while a save
+  // is in flight (US-554).
+  const [saving, setSaving] = useState(false);
   const unmountedRef = useRef(false);
   // The unmount cleanup runs with the first render's closure; read the latest
   // props through refs.
@@ -130,6 +133,13 @@ export function EditListingModal({
   );
 
   const handleClose = () => {
+    // US-554: a close during an in-flight save used to discard this session's
+    // uploads at once, and the save then landed with photos pointing at
+    // objects already removed from storage: broken images on the live
+    // listing, and an edit the agent believed cancelled saved anyway. The
+    // dialog stays open until the save settles; a save that fails re-enables
+    // Cancel, which then discards as usual.
+    if (savingRef.current) return;
     discardSession();
     onClose();
   };
@@ -148,6 +158,7 @@ export function EditListingModal({
     setTourError(null);
     if (savingRef.current) return;
     savingRef.current = true;
+    setSaving(true);
     let saved = false;
     try {
       saved = await onSubmit({ ...formData, virtual_tour_url: tour.value }, [
@@ -157,6 +168,7 @@ export function EditListingModal({
       // Treated as not saved; the caller reports the error.
     } finally {
       savingRef.current = false;
+      if (!unmountedRef.current) setSaving(false);
     }
     if (saved) {
       // The caller removed what the save did not keep (US-461).
@@ -178,7 +190,7 @@ export function EditListingModal({
           <DialogTitle className="text-xl text-foreground">Edit Property Listing</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} aria-busy={saving} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <Label htmlFor="address">Street Address *</Label>
@@ -424,11 +436,17 @@ export function EditListingModal({
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={saving}
+              className="flex-1"
+            >
               Cancel
             </Button>
-            <Button type="submit" className="flex-1">
-              Save Changes
+            <Button type="submit" disabled={saving} className="flex-1">
+              {saving ? 'Saving…' : 'Save Changes'}
             </Button>
           </div>
         </form>

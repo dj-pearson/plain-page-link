@@ -249,3 +249,59 @@ describe('EditListingModal unmounted without saving (US-512)', () => {
     expect(onDiscardUploads).toHaveBeenCalledWith([NEW_B]);
   });
 });
+
+describe('EditListingModal closed while a save is in flight (US-554)', () => {
+  beforeEach(() => {
+    uploadNext = [];
+    lastOnUploaded = undefined;
+  });
+
+  function pendingSave() {
+    let finish: (saved: boolean) => void = () => undefined;
+    const ctx = setup(() => new Promise<boolean>((resolve) => (finish = resolve)));
+    return { ...ctx, finish: (saved: boolean) => finish(saved) };
+  }
+
+  it('disables Cancel and Save, and says it is saving', async () => {
+    const { finish } = pendingSave();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(await screen.findByRole('button', { name: 'Saving…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    finish(false);
+    expect(await screen.findByRole('button', { name: 'Save Changes' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+  });
+
+  it('does not discard the uploads the save is writing when Escape is pressed', async () => {
+    const { onClose, onSubmit, onDiscardUploads, finish } = pendingSave();
+    uploadNext = [NEW_A];
+    fireEvent.click(screen.getByText('stub upload'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(onDiscardUploads).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The save lands with NEW_A on the row; it must still exist in storage.
+    finish(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onDiscardUploads).not.toHaveBeenCalled();
+  });
+
+  it('lets a failed save be cancelled afterwards, which then discards', async () => {
+    const { onClose, onDiscardUploads, finish } = pendingSave();
+    uploadNext = [NEW_A];
+    fireEvent.click(screen.getByText('stub upload'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+
+    finish(false);
+    const cancel = await screen.findByRole('button', { name: 'Cancel' });
+    await waitFor(() => expect(cancel).toBeEnabled());
+    fireEvent.click(cancel);
+    expect(onDiscardUploads).toHaveBeenCalledWith([NEW_A]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
