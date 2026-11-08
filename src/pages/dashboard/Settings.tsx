@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertDialog,
@@ -29,12 +29,41 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileDisplaySettings } from '@/components/settings/ProfileDisplaySettings';
-import { SessionManagement } from '@/components/settings/SessionManagement';
-import { LeadNotificationPreferences } from '@/components/settings/LeadNotificationPreferences';
-import { TimeZoneSetting } from '@/components/settings/TimeZoneSetting';
-import { NativeMFASettings } from '@/components/auth/mfa/NativeMFASettings';
-import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
-import { GDPRSettings } from '@/components/settings/GDPRSettings';
+import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
+import { useNearViewport } from '@/hooks/useNearViewport';
+
+// Everything under "Security & Privacy" is far below the fold. It loads as its
+// own chunk when the reader scrolls near it (US-516), not with the page.
+const SecurityPrivacySections = lazy(() => import('@/components/settings/SecurityPrivacySections'));
+
+/** Holds the space of the security sections while their chunk is on its way. */
+function SecuritySectionsSkeleton() {
+  return (
+    <div role="status" aria-live="polite" className="space-y-6">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="h-40 rounded-lg border border-border bg-muted/40 animate-pulse" />
+      ))}
+      <span className="sr-only">Loading security settings…</span>
+    </div>
+  );
+}
+
+function SecuritySectionsLoadError() {
+  return (
+    <div role="alert" className="rounded-lg border border-border bg-card p-6 text-foreground">
+      <p className="mb-4">
+        Your security and privacy settings could not be loaded. Check your connection and try again.
+      </p>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="min-h-[44px] rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-accent"
+      >
+        Reload
+      </button>
+    </div>
+  );
+}
 
 export default function Settings() {
   const user = useAuthStore((s) => s.user);
@@ -42,6 +71,8 @@ export default function Settings() {
   const { settings, updateSettings } = useSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [securityAnchor, setSecurityAnchor] = useState<HTMLDivElement | null>(null);
+  const securityNear = useNearViewport(securityAnchor);
 
   // US-224: email_leads, sms_leads and weekly_report were toggles here that no
   // code ever read. notify-lead honours LeadNotificationPreferences (below);
@@ -706,23 +737,17 @@ export default function Settings() {
         </p>
       </div>
 
-      {/* Lead Notification Preferences */}
-      <LeadNotificationPreferences />
-
-      {/* Time zone (US-433): when the morning email arrives */}
-      <TimeZoneSetting />
-
-      {/* Two-Factor Authentication */}
-      <NativeMFASettings />
-
-      {/* Session Management */}
-      <SessionManagement />
-
-      {/* Security Activity / Audit Logs */}
-      <AuditLogViewer />
-
-      {/* GDPR Settings (Data Export & Account Deletion) */}
-      <GDPRSettings />
+      <div ref={setSecurityAnchor} className="space-y-6">
+        {securityNear ? (
+          <LazyLoadErrorBoundary fallback={<SecuritySectionsLoadError />}>
+            <Suspense fallback={<SecuritySectionsSkeleton />}>
+              <SecurityPrivacySections />
+            </Suspense>
+          </LazyLoadErrorBoundary>
+        ) : (
+          <SecuritySectionsSkeleton />
+        )}
+      </div>
 
       {/* Everything the sidebar no longer carries.
           The dashboard nav had fifteen entries for a product aimed at people

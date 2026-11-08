@@ -34,12 +34,20 @@ class ResizeObserverStub {
 }
 global.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 
-// Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+// IntersectionObserver that never reports an intersection. A class, like the
+// ResizeObserver stub above: under vitest 4 a vi.fn() with an arrow
+// implementation throws "is not a constructor" when called with `new`, so the
+// old mock broke any component that actually constructed one (US-516).
+class IntersectionObserverStub {
+  readonly root = null;
+  readonly rootMargin = '0px';
+  readonly thresholds: ReadonlyArray<number> = [0];
+  observe = (): void => undefined;
+  unobserve = (): void => undefined;
+  disconnect = (): void => undefined;
+  takeRecords = (): IntersectionObserverEntry[] => [];
+}
+global.IntersectionObserver = IntersectionObserverStub as unknown as typeof IntersectionObserver;
 
 // Web Storage.
 //
