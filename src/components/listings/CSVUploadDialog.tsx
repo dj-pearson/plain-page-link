@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { parseSquareFeet } from '@/lib/format';
 import {
   Dialog,
   DialogContent,
@@ -10,52 +9,20 @@ import {
 import { Button } from '@/components/ui/button';
 import { Upload, FileSpreadsheet, Check, X, AlertCircle, Download, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { sanitizeExternalUrl } from '@/utils/sanitizeUrl';
-
-interface CSVRow {
-  address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  price: string;
-  bedrooms: string;
-  bathrooms: string;
-  square_feet: string;
-  property_type: string;
-  status: string;
-  description: string;
-  mls_number: string;
-  lot_size: string;
-  year_built: string;
-  virtual_tour_url: string;
-  is_featured: string;
-  [key: string]: string;
-}
-
-interface ParsedListing {
-  address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  price: number;
-  bedrooms: number;
-  bathrooms: number;
-  square_feet: number | null;
-  property_type: string;
-  status: string;
-  description: string | null;
-  mls_number: string | null;
-  lot_size_acres: number | null;
-  is_featured: boolean;
-  virtual_tour_url: string | null;
-  year_built: number | null;
-  errors: string[];
-}
+import {
+  groupImportFailures,
+  parseListingCsv,
+  validateListingCsvRow,
+  type CsvImportListing,
+  type CsvImportResult,
+  type ParsedCsvListing,
+} from '@/lib/listingCsvImport';
 
 interface CSVUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (listings: Omit<ParsedListing, 'errors'>[]) => Promise<void>;
+  /** Resolves with what was saved and why any row was refused (US-587). */
+  onImport: (listings: CsvImportListing[]) => Promise<CsvImportResult>;
 }
 
 const SAMPLE_CSV = `address,city,state,zip_code,price,bedrooms,bathrooms,square_feet,property_type,status,description,mls_number,lot_size,year_built,is_featured
@@ -63,117 +30,12 @@ const SAMPLE_CSV = `address,city,state,zip_code,price,bedrooms,bathrooms,square_
 "456 Maple Ave Unit 3B",Chicago,IL,60601,350000,2,2,1200,condo,active,"Modern condo in downtown Chicago",ML67890,,2018,true
 "789 Pine Road",Naperville,IL,60540,675000,4,3.5,2800,single_family,sold,"Stunning colonial on a quiet cul-de-sac",ML11111,0.5,1998,false`;
 
-function parseCSV(text: string): CSVRow[] {
-  const lines = text.split(/\r?\n/).filter((line) => line.trim());
-  if (lines.length < 2) return [];
-
-  // Parse header
-  const headers = parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'));
-
-  return lines.slice(1).map((line) => {
-    const values = parseCSVLine(line);
-    const row: CSVRow = {} as CSVRow;
-    headers.forEach((header, i) => {
-      row[header] = (values[i] || '').trim();
-    });
-    return row;
-  });
-}
-
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === ',' && !inQuotes) {
-      result.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  result.push(current);
-  return result;
-}
-
-function validateRow(row: CSVRow, _index: number): ParsedListing {
-  const errors: string[] = [];
-
-  if (!row.address) errors.push('Address is required');
-  if (!row.city) errors.push('City is required');
-  if (!row.state) errors.push('State is required');
-
-  const price = Number(String(row.price || '0').replace(/[^0-9.]/g, ''));
-  if (!price || price <= 0) errors.push('Valid price is required');
-
-  const bedrooms = Number(row.bedrooms) || 0;
-  const bathrooms = Number(row.bathrooms) || 0;
-  const sqft = parseSquareFeet(row.square_feet);
-  const lotSize = row.lot_size ? Number(row.lot_size) : null;
-  // The template has advertised year_built since it was written and the mapper
-  // dropped it — there was no column until 20260902000007 (US-106). A year
-  // outside the CHECK range is rejected here so the whole row does not fail on
-  // the insert.
-  const yearBuilt = row.year_built ? Number(row.year_built.replace(/[^0-9]/g, '')) : null;
-  if (yearBuilt !== null && (!Number.isFinite(yearBuilt) || yearBuilt < 1600 || yearBuilt > 2200)) {
-    errors.push('year_built must be a four-digit year');
-  }
-
-  // The database refuses a virtual tour that is not an http(s) address
-  // (listings_virtual_tour_url_scheme, US-456), which would fail the insert.
-  // A bare host ("my.matterport.com/show?m=1") is given https:// here, as the
-  // database would; anything else is flagged on the row.
-  const rawTour = row.virtual_tour_url?.trim() || '';
-  const virtualTourUrl = rawTour ? sanitizeExternalUrl(rawTour) : '';
-  if (rawTour && !virtualTourUrl) {
-    errors.push('virtual_tour_url must be a web address starting with https://');
-  }
-
-  const validStatuses = ['active', 'pending', 'under_contract', 'sold', 'draft'];
-  const status = validStatuses.includes(row.status?.toLowerCase())
-    ? row.status.toLowerCase()
-    : 'active';
-
-  const validTypes = ['single_family', 'condo', 'townhouse', 'multi_family', 'land', 'commercial'];
-  const propType = validTypes.includes(row.property_type?.toLowerCase())
-    ? row.property_type.toLowerCase()
-    : 'single_family';
-
-  return {
-    address: row.address || '',
-    city: row.city || '',
-    state: (row.state || '').toUpperCase().slice(0, 2),
-    zip_code: row.zip_code || '',
-    price,
-    bedrooms,
-    bathrooms,
-    square_feet: sqft,
-    property_type: propType,
-    status,
-    description: row.description || null,
-    mls_number: row.mls_number || null,
-    lot_size_acres: lotSize,
-    is_featured: row.is_featured?.toLowerCase() === 'true',
-    virtual_tour_url: virtualTourUrl || null,
-    year_built: yearBuilt,
-    errors,
-  };
-}
-
 export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialogProps) {
   const [_file, setFile] = useState<File | null>(null);
-  const [parsedListings, setParsedListings] = useState<ParsedListing[]>([]);
+  const [parsedListings, setParsedListings] = useState<ParsedCsvListing[]>([]);
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'preview' | 'done'>('upload');
+  const [result, setResult] = useState<CsvImportResult | null>(null);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -188,8 +50,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const rows = parseCSV(text);
-      const parsed = rows.map((row, i) => validateRow(row, i));
+      const parsed = parseListingCsv(text).map(validateListingCsvRow);
       setParsedListings(parsed);
       setStep('preview');
     };
@@ -204,8 +65,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        const rows = parseCSV(text);
-        const parsed = rows.map((row, i) => validateRow(row, i));
+        const parsed = parseListingCsv(text).map(validateListingCsvRow);
         setParsedListings(parsed);
         setStep('preview');
       };
@@ -219,8 +79,8 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
   const handleImport = async () => {
     setImporting(true);
     try {
-      const toImport = validListings.map(({ errors, ...listing }) => listing);
-      await onImport(toImport);
+      const toImport = validListings.map(({ errors: _errors, ...listing }) => listing);
+      setResult(await onImport(toImport));
       setStep('done');
     } catch {
       // Error handling in parent
@@ -233,6 +93,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
     onOpenChange(false);
     setFile(null);
     setParsedListings([]);
+    setResult(null);
     setStep('upload');
   };
 
@@ -353,7 +214,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {invalidListings.slice(0, 5).map((listing, idx) => (
                       <p key={idx} className="text-xs text-red-600">
-                        Row {parsedListings.indexOf(listing) + 2}: {listing.errors.join(', ')}
+                        Row {listing.row}: {listing.errors.join(', ')}
                       </p>
                     ))}
                     {invalidListings.length > 5 && (
@@ -412,17 +273,54 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
             </div>
           )}
 
-          {/* Done Step */}
-          {step === 'done' && (
-            <div className="py-12 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="h-8 w-8 text-green-600" />
+          {/* Done Step: what was actually saved, not what was attempted (US-587). */}
+          {step === 'done' && result && (
+            <div className="py-8 space-y-6">
+              <div className="text-center">
+                <div
+                  className={cn(
+                    'w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4',
+                    result.imported > 0 ? 'bg-green-100' : 'bg-red-100'
+                  )}
+                >
+                  {result.imported > 0 ? (
+                    <Check className="h-8 w-8 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-8 w-8 text-red-600" />
+                  )}
+                </div>
+                <h3 className="text-lg font-semibold mb-2">
+                  {result.failures.length === 0
+                    ? 'Import complete'
+                    : result.imported > 0
+                      ? 'Import partly complete'
+                      : 'Nothing was imported'}
+                </h3>
+                <p className="text-muted-foreground" role="status">
+                  Imported {result.imported} of {result.imported + result.failures.length} listing
+                  {result.imported + result.failures.length !== 1 ? 's' : ''}.
+                </p>
               </div>
-              <h3 className="text-lg font-semibold mb-2">Import Complete!</h3>
-              <p className="text-muted-foreground">
-                Successfully imported {validListings.length} listing
-                {validListings.length !== 1 ? 's' : ''}.
-              </p>
+              {result.failures.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-left">
+                  <p className="text-sm font-medium text-red-800 mb-2">
+                    {result.failures.length} row{result.failures.length !== 1 ? 's were' : ' was'}{' '}
+                    not saved:
+                  </p>
+                  <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {groupImportFailures(result.failures).map((group) => (
+                      <li key={group.reason} className="text-xs text-red-700">
+                        <span className="font-medium">
+                          Row{group.rows.length !== 1 ? 's' : ''}{' '}
+                          {group.rows.slice(0, 10).join(', ')}
+                          {group.rows.length > 10 ? ` and ${group.rows.length - 10} more` : ''}:
+                        </span>{' '}
+                        {group.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>
