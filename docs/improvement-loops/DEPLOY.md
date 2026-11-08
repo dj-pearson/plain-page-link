@@ -18,6 +18,8 @@ migration, an edge-function change or a setting.
      from it.
    - The email provider settings are set (`RESEND_API_KEY`).
    - Storage allows files of at least 500 MB, for data exports.
+   - On the Cloudflare Pages project, `VITE_APP_URL` (if set) is
+     `https://agentbio.net`. Pages Functions now read it for canonical URLs.
    - Optional: `DIGEST_LOCAL_HOUR` (default 7) and `DIGEST_CATCHUP_HOURS`
      (default 6).
 3. **Optional check before migration `20261108000456`.** It blanks agent URLs
@@ -51,7 +53,11 @@ app and the frontend depend on each other in both directions:
 4. **Set up the Resend webhook.** Point it at `<functions-url>/resend-webhook`
    for the events `email.bounced` and `email.complained`. Set its signing
    secret as `RESEND_WEBHOOK_SECRET` on the functions app.
-5. **Search consoles.** Submit `/sitemap-profiles.xml` to Google Search
+5. **Smoke test storage** (migration `20261108000592`):
+   - a public avatar or listing photo URL still loads while signed out;
+   - an agent can replace their avatar;
+   - with the anon key, `storage.from('listing-photos').list('')` returns `[]`.
+6. **Search consoles.** Submit `/sitemap-profiles.xml` to Google Search
    Console and Bing if you have not already.
 
 ## Migrations not yet in production (filename order)
@@ -90,6 +96,7 @@ app and the frontend depend on each other in both directions:
 20261108000534_lead_stats_assignee_filter.sql
 20261108000557_lead_stats_type_search_filter.sql
 20261108000559_lead_lookup_hashes_not_browser_readable.sql
+20261108000592_storage_media_not_listable.sql
 ```
 
 ## What changes for users the moment it ships

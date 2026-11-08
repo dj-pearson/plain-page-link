@@ -8188,8 +8188,8 @@
         "A row refused by listings_virtual_tour_url_scheme or by a plan limit is reported with its reason in the import result"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-517)"
+      "passes": true,
+      "notes": " (follow-up from US-517) DONE in round 16 as US-587."
     },
     {
       "id": "US-518",
@@ -9155,6 +9155,349 @@
       "priority": 2,
       "passes": true,
       "notes": "What changed:\n- functions/_lib/profile-route.ts: added an exported `dropAppleWebAppTitle(html)`. Its regex matches the tag in any attribute order or quoting, and also removes the tag's own indentation and line break. It is called inside `linkProfileManifest`. Every response for an agent's page goes through that function: the human path (serveHumanDocument) and the crawler path (the injectSocialTags and markNoindex call sites). So no call site had to change.\n- src/hooks/useProfileManifest.ts: added `DASHBOARD_APPLE_TITLE = 'AgentBio'`. When the server has already removed the meta, the hook creates a fresh copy and adds it to <head> when the visitor leaves the profile. This mirrors the US-563 manifest-restore fix: a person who lands on /jane and then moves to /dashboard in the same tab still gets the AgentBio label. insertBefore now has a guard in case the sibling it was placed next to has moved.\n- functions/_tests/fixtures/prerendered-index.html: this fixture was captured before US-436 added the meta, so it did not contain it. I added the tag after apple-mobile-web-app-status-bar-style so the route tests run against what production actually serves.\n\nTests:\n- link-profile-manifest.test.ts: 4 new cases for dropAppleWebAppTitle.\n- username-route.test.ts: a new crawler test. The human (US-553) and listing tests now also check that the meta is gone, and compare the body with both the manifest link and the meta removed.\n- useProfileManifest.test.tsx: 2 new cases (meta already absent; restored label equals manifest short_name and index.html).\n- Regression check: with the call to dropAppleWebAppTitle taken out of linkProfileManifest, 4 username-route tests fail. They pass with it in.\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx vitest run src/hooks/useProfileManifest.test.tsx functions/_tests/link-profile-manifest.test.ts functions/_tests/username-route.test.ts src/pwa-manifest.test.ts: 4 files, 78 tests passed.\nRegression check (fix temporarily reverted): username-route 4 failed, 46 passed. Fix restored afterwards.\nnpx eslint on the 5 changed .ts/.tsx files: 0 errors. The only warnings are 3 \"File ignored because no matching configuration\" notices for files under functions/, which eslint does not lint. No new rule warnings.\nFull npx vitest run: 301 files passed; 2948 tests passed, 1 skipped.\nNo migration added, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-587",
+      "lane": "listings",
+      "round": 16,
+      "title": "CSV listing import drops or splits rows and says it imported listings it never saved",
+      "description": "Bulk CSV import (Listings > Add > CSV) had four problems that lost or corrupted data. (1) It split the file on newlines before reading quotes. A quoted description with a line break, which MLS and Excel exports often contain, turned one listing into two broken rows: the first half was saved with a truncated description and its later columns missing. (2) Excel's \"CSV UTF-8\" export starts with a byte-order mark, so the first header was read as \"﻿address\" and every row failed with \"Address is required\". (3) Imported rows never got listed_date, and sold rows never got sold_date, so days on market was wrong for every imported listing. (4) A row the database refused (plan limit, refused tour URL) was counted as \"failed\" with no reason, and the done screen said \"Successfully imported N listings\", with N being the rows attempted, not the rows saved. Parsing, validation, building the insert and running the import loop now live in a tested pure module. The dialog's done step shows the real saved count and the refused rows grouped by reason. This also closes US-527 (CSV import failure reasons).",
+      "acceptanceCriteria": [
+        "A quoted CSV field with a line break stays in one row (parseCsvRecords is RFC 4180)",
+        "A file with a UTF-8 byte-order mark parses its first column correctly",
+        "Common header spellings are accepted: Zip, Beds, Baths, Sq Ft, SqFt, MLS #, List Price. Status labels such as 'Under Contract' and 'Off Market' are normalised",
+        "Every imported row sets listed_date to today; a sold row also sets sold_date",
+        "No generated column (beds/baths/sqft) is written",
+        "A row refused by a plan limit or the tour-URL check is reported with its reason (via describeListingSaveError) and row number, and the import keeps going after it",
+        "The done step shows 'Imported X of Y' using the rows actually saved, never the rows attempted"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The finding I was given, that handleAddListing orphans uploaded photos when the insert fails, is already fixed. useListings.ts:153-166 calls discardUnsavedPhotos when addListing's insert errors (US-461). useListingImageUpload.ts rolls back a partly uploaded batch. Listings.tsx:212 checks the tour URL before any upload (US-517). So I audited the listings import path, which had higher impact.\n\nOld evidence:\n- CSVUploadDialog.tsx parseCSV split on /\\r?\\n/ before reading quotes and did not strip a BOM.\n- The done step printed validListings.length as \"Successfully imported\".\n- Listings.tsx handleCSVImport (around line 300) swallowed each error into a failCount and wrote no listed_date or sold_date. Its status whitelist also left out off_market.\n\nChanges:\n- New src/lib/listingCsvImport.ts: parseCsvRecords, normalizeCsvHeader with aliases, parseListingCsv, validateListingCsvRow (moved from the dialog; statuses now come from LISTING_STATUSES; lot size is guarded against NaN; is_featured accepts yes/1), buildCsvListing (canonical columns, listed_date, sold_date when the status is in CLOSED_LISTING_STATUSES), importCsvListings (collects failures by row and reason, and does not stop at the first plan-limit refusal because active and sold listings are metered separately), and groupImportFailures.\n- CSVUploadDialog.tsx: onImport now returns a CsvImportResult. The done step shows the real count and the grouped reasons.\n- Listings.tsx handleCSVImport: uses importCsvListings with describeListingSaveError, and its toast reports the real numbers.\n- Tests: src/lib/listingCsvImport.test.ts (20 tests) and src/components/listings/CSVUploadDialog.test.tsx (2 tests: a BOM, CRLF and multi-line file becomes 3 rows; partial failure shows the real count and both reasons).\n\nNo migration, no edge function, and no prd.json or progress.txt edits. Not pushed.\n\nVERIFIED: npx tsc --noEmit: passes, no output.\nnpx eslint on the 5 changed files: exit 0, no warnings. This also removes a warning that was already there on the unused `errors` destructure.\nnpx vitest run src/lib/listingCsvImport.test.ts src/components/listings src/pages/dashboard: 22 files, 189 tests passed.\nFull npx vitest run: 309 files passed; 3026 tests passed, 1 skipped.\nPrettier ran via lint-staged on commit.\n\nREVIEW: fix_required; fix-up: The reviewer was right. In parseCsvRecords, any `\"` outside quote mode started a quoted field, so one stray inch mark took every row after it into a single multi-line field. I changed the branch to `else if (char === '\"' && field === '')`, so a quote now opens a quoted field only when it is the field's first character. A quote anywhere else falls through to the literal branch and is kept in the field, the way a lenient RFC 4180 parser handles it. I also updated the doc comment. I added a test using the reviewer's case: an unquoted `Has 12\" tiles` followed by two more rows now gives 3 rows, keeps the quote, and gets every address right. Files: /home/user/plain-page-link/.claude/worktrees/wf_d7544cf3-e98-1/src/lib/listingCsvImport.ts and /home/user/plain-page-link/.claude/worktrees/wf_d7544cf3-e98-1/src/lib/listingCsvImport.test.ts. Committed as \"US-587: address review\"; loop/r16-listings now points at that commit. Not pushed.\n\nOWNER ACTIONS: Deploy Cloudflare Pages so the fixed CSV import goes live (frontend only, no migration or function change) | Mark US-527 as passed in prd.json; this commit covers its acceptance criterion"
+    },
+    {
+      "id": "US-597",
+      "lane": "listings",
+      "round": 16,
+      "title": "CSV import: one batched insert instead of N mutateAsync calls",
+      "description": "handleCSVImport inserts rows one at a time through addListing.mutateAsync. Every success invalidates ['listings', user.id] and writes an audit event, so a 100-row file causes 100 listing refetches. Add an importListings mutation that inserts in chunks (for example 25 rows), invalidates once at the end, and falls back to row-by-row only for a chunk that fails, so per-row reasons are kept.",
+      "acceptanceCriteria": [
+        "A 100-row import triggers one listings refetch",
+        "A refused row still reports its own reason and row number",
+        "The plan-limit trigger is still respected (one refused row does not fail its whole chunk silently)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-587)"
+    },
+    {
+      "id": "US-598",
+      "lane": "listings",
+      "round": 16,
+      "title": "CSV import: optional photo URL column",
+      "description": "MLS exports often include photo URLs. The importer has no photos column, so every imported listing has no image. Accept a photos/photo_urls column (separated by | or ;), keep only http(s) URLs via sanitizeExternalUrl, and write photos and image the same way buildImportedListing does.",
+      "acceptanceCriteria": [
+        "photos[0] === image for an imported row with photos",
+        "Non-http(s) URLs are flagged on the row in preview"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-587)"
+    },
+    {
+      "id": "US-588",
+      "lane": "leads",
+      "round": 16,
+      "title": "A teammate's bulk status change on assigned leads did nothing, and the page said it worked",
+      "description": "On /dashboard/leads, a teammate could select leads a team owner had assigned to them and set a status in bulk (for example Contacted). The update was filtered on user_id = viewer, so it matched no rows, yet the toast said \"Updated N lead(s)\". The response step was lost: contacted_at, first_responded_at and closed_at were never written. Bulk delete had the same problem: it said \"Deleted N\" even when the server refused part or all of the selection (assigned leads can only be deleted by their owner). Bulk status now reaches leads the viewer owns or is assigned to. Both bulk actions now report what the server actually changed. Bulk delete stays owner-only, says which assigned leads it kept, and leaves them out of the confirm prompt's count.",
+      "acceptanceCriteria": [
+        "A teammate's bulk status change on leads assigned to them updates those leads, filtered by owner OR assignee, which matches the leads UPDATE policy",
+        "The bulk status and bulk delete toasts report how many leads the server changed (taken from the ids it returns), not how many were selected, and show as destructive when only part of the selection changed",
+        "Bulk delete sends only the viewer's own leads, explains that assigned leads were kept, and sends nothing when every selected lead is an assigned one",
+        "Unit tests cover the summaries, the delete plan, the hook's query filters and the empty-selection case"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Audit finding: src/hooks/useLeads.ts bulkUpdateStatus (around line 290 before the change) ran .update(patch).in('id', ids).eq('user_id', user.id) with no .select. The leads UPDATE policy allows `auth.uid() = user_id OR auth.uid() = assigned_to` (supabase/migrations/20260902000006_zip_routing_and_assignee_access.sql:125-128; WITH CHECK keeps the assignee, per 20261028000004). The detail dialog's single-lead status change (LeadDetailModal.tsx:260-265) is not filtered by user_id and already works for assignees. So only the bulk path silently did nothing, and Leads.tsx reported `Updated ${selectedLeadIds.size}`. Bulk delete (useLeads.ts bulkDelete) is owner-only by policy, but Leads.tsx reported `Deleted ${selectedLeadIds.size}`. The uiux lane flagged this in round 15 progress.txt but left it unfixed.\n\nChanges:\n- src/hooks/useLeads.ts: bulkUpdateStatus now filters with .or(`user_id.eq.${uid},assigned_to.eq.${uid}`), calls .select('id') and returns the changed ids. bulkDelete calls .select('id') and returns the deleted ids. Both return [] without a request when the selection is empty.\n- src/lib/leadBulkActions.ts (new): summarizeBulkStatus, planBulkDelete and summarizeBulkDelete, modelled on summarizeBulkAssign from US-573.\n- src/pages/dashboard/Leads.tsx: handleBulkStatusUpdate and handleBulkDelete use the summaries and show a destructive toast for a partial result. Delete builds a plan first, the confirm prompt counts only the deletable leads and names the kept ones, and an all-assigned selection gets a toast with no request.\n- Tests: src/lib/leadBulkActions.test.ts (8 tests, new) and src/hooks/useLeads.test.ts (+3 tests checking the query filters).\n\nUS-463 was not done because it is already finished: src/types/lead.ts declares only LeadRow, LeadReadRow and Lead, and progress.txt:6074 says so. It can be marked passing. US-362 is a design guard with nothing to build yet. US-418 was skipped because it waits on an owner decision.\n\nVERIFIED: npx tsc --noEmit: passed with no output.\nnpx vitest run src/lib/leadBulkActions.test.ts src/hooks/useLeads.test.ts src/lib/leadAssignee.test.ts src/pages/dashboard: 22 files and 193 tests ran. One of my new tests failed on the first run (it expected no `from()` call, but the success handler refetches). I fixed the test, and the final rerun of leadBulkActions.test.ts and useLeads.test.ts passed (2 files, 15 tests). The other 20 files passed on the first run and were not rerun after the fix.\nnpx eslint on the 5 changed files: 0 errors, 1 warning. The warning is the existing no-useless-assignment in Leads.tsx handleExportLeads (`let truncated`), already recorded in progress.txt. No new warnings.\nFull npx vitest run: 308 files passed, 3015 tests passed, 1 skipped.\nNo migration was added, so verify:migrations does not apply.\nThe lint-staged pre-commit hook ran eslint --fix and prettier, which reformatted a ternary in leadBulkActions.ts. It also wrote a backup into the shared git stash (8dc0e72).\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-599",
+      "lane": "leads",
+      "round": 16,
+      "title": "A Playwright test for a teammate's bulk status change on assigned leads",
+      "description": "An e2e test that signs in as a teammate with an assigned lead, selects it on /dashboard/leads, sets it to Contacted, and checks that the status and contacted_at persist.",
+      "acceptanceCriteria": [
+        "The e2e test fails against the old user_id-only filter and passes now"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs a seeded team with an assigned lead in the e2e fixtures. (follow-up from US-588)"
+    },
+    {
+      "id": "US-589",
+      "lane": "profile",
+      "round": 16,
+      "title": "Listing cards in a page-builder block on the agent's public page were not clickable",
+      "description": "A page-builder listings block shows on /:username through CustomBlocksSection (src/pages/public/FullProfilePage.tsx:553). Its cards had cursor-pointer and a hover shadow (old ListingsBlock.tsx:142), but nothing happened when a visitor tapped one, so they never reached the listing page with its gallery, open houses and contact bar. Each card is now a real stretched link to /:username/listing/:id. A card only links when that page would actually show the listing. The same change fixes three smaller defects in the block: it ignored the agent's sort order, it printed \", null\" for a listing with no state, and it printed a stray \"0\" when beds was 0.",
+      "acceptanceCriteria": [
+        "On the public profile, each listings-block card the listing page would show is a real link (<a href>) to /:username/listing/:id, and the whole card is the click target",
+        "A listing the listing page would refuse (sold while show_sold_properties=false, or anything while show_listings=false) is shown but not linked, so no link leads to 'not found'",
+        "The page-builder canvas (isEditing) renders no links",
+        "Block order matches the profile gallery: sort_order, created_at desc, id",
+        "A missing state or city is left out of the address (no ', null'), and a count of 0 renders nothing"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Fresh audit of the visitor path on /:username. The highest-value broken flow I found is a page-builder listings block on the public page whose cards could not be opened.\n\nEvidence:\n- src/components/profile/CustomBlocksSection.tsx renders BlockRenderer, then ListingsBlock, on the public page.\n- In the old ListingsBlock.tsx, each card was a div with cursor-pointer and hover:shadow-lg but no link or click handler.\n- The block ordered by created_at only (old line 74), so it ignored the agent's sort_order.\n- formatAddress produced `${state}` even when state is null, so a listing without a state showed ', null'.\n- `listing.bedrooms && ...` rendered '0' when beds was 0.\n- Two of these were already logged by the security lane in round 15 as profile-lane findings.\n\nChanges:\n- src/lib/publicListingVisibility.ts: new reachableListingHref(username, settings). It returns a listing's page path only when selectListingForPage would serve that listing; otherwise null.\n- FullProfilePage builds blockListingHref with useMemo and passes it as a listingHref prop through CustomBlocksSection and BlockRenderer to ListingsBlock (prop chain, no context).\n- ListingsBlock:\n  - The card's address is a react-router Link whose ::after covers the whole card, with sr-only text 'View listing:'. This is the pattern ListingCard uses (US-408).\n  - The hover shadow appears only when the card is a link.\n  - No links when isEditing.\n  - Orders by sort_order asc, created_at desc, id asc, matching usePublicProfile.ts:369-371.\n  - listingsBlockAddress joins only the address parts that exist.\n  - positive() hides counts of 0.\n  - Carousel cards get w-72 shrink-0 snap-start, so they no longer shrink to nothing in the flex row.\n  - Icons are aria-hidden.\n- The PageBuilder editor does not pass listingHref, so its cards stay inert.\n\nTests: 5 new in src/components/pageBuilder/blocks/ListingsBlock.test.tsx and 3 in src/lib/publicListingVisibility.test.ts.\n\nI did not take US-525 or US-544. They are still open and are lower value than a broken tap-through on the visitor path.\n\nVERIFIED: - `npx tsc --noEmit`: passed with no output.\n- `npx vitest run src/lib/publicListingVisibility.test.ts src/components/pageBuilder src/components/profile src/pages/public functions`: 78 files, 901 tests passed.\n- `npx vitest run` (full suite): 307 files passed; 3012 tests passed, 1 skipped.\n- `npx eslint` on the 7 changed files: no output (clean).\n- `prettier --write` applied, and lint-staged ran eslint --fix and prettier on commit.\n- No migration, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-600",
+      "lane": "profile",
+      "round": 16,
+      "title": "Count a listing view from a listings-block card the same way as gallery cards",
+      "description": "Check that a tap from a page-builder listings-block card to /:username/listing/:id is counted in analytics like a tap from a ListingGallery card (listing_view is recorded on ListingPage). Confirm that funnel reports do not attribute it differently.",
+      "acceptanceCriteria": [
+        "A listing view reached from the block is counted once on ListingPage",
+        "A test covers it"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "This is a follow-up from US-589. It may need no code change at all, only verification. (follow-up from US-589)"
+    },
+    {
+      "id": "US-590",
+      "lane": "uiux",
+      "round": 16,
+      "title": "Overview hid due follow-ups and showed zeros when its blocks failed to load",
+      "description": "This round's audit covered the dashboard Overview. US-246 had already fixed the stats row, but every other Overview block still showed a failed query as \"nothing here\". On a phone moving between networks, an agent with overdue follow-ups saw a clean dashboard. An agent with twenty links was told to \"Add your first link\". The funnel showed zero visitors. Each block now says, in place, that it did not load and offers a Retry button. Coming up names the sources that failed and still shows the ones that loaded.",
+      "acceptanceCriteria": [
+        "When the due-tasks query fails, Due today shows 'Your follow-ups did not load.' with a Retry button instead of rendering nothing",
+        "When any of key dates, contacts due or open houses fails, Coming up names each failed source, Retry refetches only those sources, and whatever did load still shows",
+        "When the links query fails, the Link Clicks stat shows a dash instead of 0, and Top Links shows a 'did not load' line with Retry instead of 'Add your first link'",
+        "When the analytics_views count fails, the conversion funnel shows an error with Retry instead of drawing 0 visitors; a failed leads query does the same",
+        "When nothing is due and every query succeeded, Due today and Coming up still render nothing"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What was wrong (before this change):\n- src/components/dashboard/DueFollowUps.tsx:27 had `if (isLoading || tasks.length === 0) return null`. A failed useDueLeadTasks query left tasks at [], so the block disappeared.\n- src/components/dashboard/ComingUp.tsx:35-43 read only isLoading from useKeyDates, useContactsDueForTouch and useOpenHouses. A failed source counted as empty, and if all three failed the block returned null.\n- src/pages/dashboard/Overview.tsx:31 took only `links` from useLinks. A failure gave Link Clicks = 0 and the 'Add Your First Link' empty state.\n- src/components/dashboard/ConversionFunnel.tsx:68-79 wrapped the analytics_views count in try/catch and set visitors = 0, without reading the returned `error`. A failed leads query had no isError branch either, so the funnel drew zero bars.\n\nWhat changed:\n- New src/components/dashboard/SectionLoadError.tsx: an inline role=\"alert\" line with the message, 'Nothing has been lost.' and an outline Retry button. The button is at least 44px tall and has an optional aria-label so pages with several Retry buttons can tell them apart. It uses theme tokens (text-destructive, text-muted-foreground), so it works in dark mode.\n- DueFollowUps: on isError it renders the 'Due today' card with the error line. It still renders nothing when there is nothing due.\n- ComingUp: builds a list of the failed sources, shows 'Your open houses and client dates did not load.' (joined naturally), Retry refetches only the failed ones, and the sections that loaded still render.\n- useKeyDates (src/hooks/useContacts.ts:440) now returns refetch, which ComingUp needs.\n- ConversionFunnel: reads `error` from the count query and throws it. On isError it shows SectionLoadError.\n- Overview: the Link Clicks stat shows '—' and Top Links shows SectionLoadError when linksFailed.\n\nTests:\n- New: ComingUp.test.tsx (3 tests) and ConversionFunnel.test.tsx (3 tests, with a stubbed supabase chain).\n- Updated: DueFollowUps.test.tsx (+2: the error state, and nothing renders when nothing is due) and Overview.test.tsx (+1: links failure).\n\nVERIFIED: npx tsc --noEmit: passed, no output.\nnpx vitest run src/components/dashboard src/pages/dashboard/Overview.test.tsx: 9 files, 38 tests, all passed.\nnpx eslint on all 10 changed files: no warnings or errors.\nFull npx vitest run: 309 files passed, 3013 tests passed, 1 skipped.\nPre-commit lint-staged (eslint --fix and prettier) only reformatted two lines in SectionLoadError.tsx and ComingUp.test.tsx.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-601",
+      "lane": "uiux",
+      "round": 16,
+      "title": "Clients, Testimonials and Settings: check the remaining dashboard blocks for failed-load-as-empty",
+      "description": "Run the same audit on the blocks inside Clients (the key-dates and interactions panels in the contact detail), Settings sub-panels and PlanUsageCard. PlanUsageCard.tsx:26 returns null when usePlanUsage fails, so on a failure the agent loses the view of their limits without being told. Reuse SectionLoadError.",
+      "acceptanceCriteria": [
+        "Each audited block shows SectionLoadError with Retry on query failure instead of an empty state or nothing",
+        "Tests cover the error state for each block changed"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-590)"
+    },
+    {
+      "id": "US-602",
+      "lane": "uiux",
+      "round": 16,
+      "title": "Overview: theme the Recent Leads status pills and the empty-state icons",
+      "description": "Overview.tsx's recent-lead status pills (bg-blue-100/text-blue-700 and similar) and the empty-state icon circles (bg-blue-100, bg-purple-100) are hard-coded light colours that ignore dark mode. The StatCard has cursor-pointer and active:scale but no click action.",
+      "acceptanceCriteria": [
+        "Status pills use the shared lead status badge or theme tokens and read correctly in dark mode",
+        "StatCard drops the clickable affordances, or links to the matching page"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-590)"
+    },
+    {
+      "id": "US-591",
+      "lane": "performance",
+      "round": 16,
+      "title": "The public profile served the agent's original headshot (often several MB) for a 128px circle",
+      "description": "Avatars and brokerage logos had no resized versions, because optimize-image only runs on listing photos. So every public profile drew the agent's uploaded phone photo, often 3-5 MB at 3000-4000px, above the fold at 96-128 CSS px. That was usually the biggest request on the page, and it competed with the LCP. They are now downscaled in the browser before upload and stored with a one-year Cache-Control.",
+      "acceptanceCriteria": [
+        "A new avatar upload (dashboard and onboarding wizard) is stored at most 800px on its longest side, as WebP, or JPEG where the browser cannot encode WebP",
+        "A new brokerage logo is stored at most 400px, as WebP or as uploaded; it is never flattened to JPEG",
+        "The original is stored unchanged when the browser cannot decode or encode the image, or when the re-encode is not smaller",
+        "Home-screen app icons are still rendered from the full-resolution original",
+        "Avatar, logo and app-icon objects are uploaded with cacheControl 31536000 (each has a unique timestamped name and is never rewritten) and an explicit contentType",
+        "tsc, eslint and the full vitest suite pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Audit first. Caching headers in public/_headers were already fixed in US-381. Listing photos already have 200/400/800 WebP variants and fetchpriority (src/lib/images.ts:27-63, 167-191). The gap was the avatar. src/components/profile/ProfileHeader.tsx:68-78 and StickyActionBar.tsx:227 rendered profile.avatar_url as uploaded. The old comment there said so: 'Avatars have no resized variants ... still the uploaded file'. The avatars bucket allows 5 MB (supabase/migrations/20260808000005:36), and uploads used cacheControl '3600' (useProfileImageUpload.ts:73, storeAvatarAppIcons.ts:33).\n\nChanges:\n- New src/lib/shrinkProfileImage.ts. Pure helpers: scaledSize, candidateTypes, shouldReplace, renameForType. shrinkProfileImage uses createImageBitmap with imageOrientation 'from-image' and a canvas. It tries WebP first, then JPEG for opaque photos only. It refuses the silent PNG fallback from toBlob, and keeps the original on any failure or when the result is not smaller. It also defines AVATAR_SHRINK (800px, opaque), LOGO_SHRINK (400px, keeps transparency) and PROFILE_IMAGE_CACHE_CONTROL ('31536000').\n- src/hooks/useProfileImageUpload.ts has a new `shrink` option. The file is shrunk after magic-number validation and before upload. The object name takes the new file's extension, and contentType is set explicitly. App icons are still drawn from the original.\n- useAvatarUpload.ts uses AVATAR_SHRINK; useBrokerageLogoUpload.ts uses LOGO_SHRINK.\n- src/pages/onboarding/OnboardingWizardPage.tsx shrinks the same way. It uses the same cache-control and content type, and draws icons from the original.\n- src/lib/storeAvatarAppIcons.ts: the icons get a one-year cache.\n- The comment in ProfileHeader.tsx is updated.\n\nNo schema, URL scheme or server change: the stored object is simply smaller. Existing avatars are unchanged; see nextSlices.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output. npx eslint on all 9 changed files: no output (0 warnings). npx vitest run src/lib/shrinkProfileImage.test.ts src/hooks/useProfileImageUpload.test.ts src/pages/onboarding src/components/profile/ProfileHeader.test.tsx: 4 files, 46 tests passed. Full npx vitest run: 308 files passed, 3018 tests passed, 1 skipped. The lint-staged pre-commit hook (eslint --fix, prettier) ran clean on commit.\n\nREVIEW: fix_required; fix-up: The reviewer was right. supabase/functions/submit-lead/index.ts:472 passes profiles.avatar_url into the lead auto-reply email as agent.photoUrl, and _shared/email.ts:326 renders it as a 48x48 <img>. functions/_lib/social-meta.ts:348 also falls back to avatar_url for og:image when og_image is unset. Because candidateTypes(true) tried WebP first, every avatar uploaded from a modern browser was saved as .webp. Classic Outlook for Windows and some share crawlers cannot show WebP.\n\nFix: in src/lib/shrinkProfileImage.ts, candidateTypes(opaque) now returns ['image/jpeg'] for the avatar. The logo still gets ['image/webp'], which keeps its transparency; only the app reads brokerage_logo. I rewrote the doc comments to give the reason.\n\nTest changes in src/lib/shrinkProfileImage.test.ts:\n- The candidateTypes assertion now expects JPEG for the avatar.\n- 'stores a downscaled WebP' became 'stores a downscaled JPEG named to match', using a .png input so the rename to .jpg is actually checked.\n- The old WebP-to-JPEG fallback case is gone. In its place, one test checks that only image/jpeg is ever requested for a photo, and another checks that the original is kept when JPEG cannot be encoded.\n\nIn src/hooks/useProfileImageUpload.test.ts, the test now expects 'u1/avatar-1700000000000.jpg' and contentType image/jpeg.\n\nCommitted as 830fe3f and moved loop/r16-performance to HEAD. Not pushed."
+    },
+    {
+      "id": "US-603",
+      "lane": "performance",
+      "round": 16,
+      "title": "Backfill: shrink headshots uploaded before US-591",
+      "description": "Avatars stored before this change are still the full-size originals, and so are logos. One-time backfill: when the owner opens the dashboard, re-shrink their current avatar_url (and brokerage_logo) if it is over a size threshold, then repoint the profile. The existing useAvatarAppIconBackfill / backfillAvatarAppIcons.ts pattern could be reused. Alternatively, an edge function could resize server-side for agents who never log in.",
+      "acceptanceCriteria": [
+        "An agent whose stored avatar is over ~300 KB gets it replaced by a shrunk copy under a new timestamped name, with app icons regenerated to match",
+        "The profile only points at the new object once it has been stored; the old object is removed afterwards",
+        "No-op for avatars already small or not in our avatars bucket"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-591)"
+    },
+    {
+      "id": "US-604",
+      "lane": "performance",
+      "round": 16,
+      "title": "Serve the avatar with srcset or a 256px variant for the 96-128px circle",
+      "description": "After US-591 the stored avatar is at most 800px. That is still about 3x what a 1x phone needs for a 96px circle. A 256px WebP companion (like the listing variants), used through srcset in ProfileHeader and StickyActionBar, would cut the LCP-region bytes further.",
+      "acceptanceCriteria": [
+        "ProfileHeader and StickyActionBar request at most a ~256px image on a DPR 2 phone",
+        "Falls back to the original on error, as fallBackToOriginal does for listings"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-591)"
+    },
+    {
+      "id": "US-592",
+      "lane": "security",
+      "round": 16,
+      "title": "Visitors could list every agent's uploaded photos, including unpublished pages and draft listings",
+      "description": "The public media buckets (avatars, listing-photos, brokerage-logos) had a SELECT policy on storage.objects that reached anon and authenticated. Public image URLs never check that policy. All it added was the storage list API. So anyone with the anon key from the bundle could list every uploader's user id, every listing folder (drafts included) and every photo name, even for unpublished pages that US-308 hides everywhere else. SELECT is now limited to the owner's own folder, the same rule the write policies already use.",
+      "acceptanceCriteria": [
+        "No storage.objects SELECT policy reaches anon, and none lacks a TO clause (an omitted TO means PUBLIC)",
+        "Every SELECT policy on storage.objects is limited to the owner folder: (storage.foldername(name))[1] = auth.uid()::text",
+        "A signed-in agent can still list, upsert and remove files in their own folder in all three media buckets",
+        "Public image URLs keep working: the public-object route checks only buckets.public, not RLS",
+        "verify:schema checks this behaviour against a real Postgres: anon lists 0 objects, an agent lists only their own"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Fresh audit first:\n- The edge functions without a user-auth import are all gated another way. The cron and service jobs use isServiceRoleRequest. resend-webhook checks a Svix signature. submit-lead and submit-review have rate limits. Functions that fetch a user-supplied URL use ssrf-guard or isPublicFetchableUrl behind requireAdmin.\n- Tables added in recent migrations (digest_runs, email_suppressions, the gdpr-exports bucket) are scoped correctly.\n- The storage policies had a real hole.\n\nEvidence: supabase/migrations/20260808000005_storage_buckets_and_policies.sql:55-59 created \"Public read of public media buckets\" FOR SELECT TO anon, authenticated USING (bucket_id IN (...)). Upload paths are `<uid>/<listingId|ts>/<random>.ext` (src/hooks/useListingImageUpload.ts:74) and `<uid>/<name>` (useProfileImageUpload.ts:70, OnboardingWizardPage.tsx:74,172). So `storage.from('listing-photos').list('')` returned every agent's id, and `list('<uid>')` returned their listing folders.\n\nWhat the browser needs is only its own folder:\n- `list(user.id)` in useProfileImageUpload.ts:98\n- upsert in useProfileImageUpload.ts:74 and storeAvatarAppIcons.ts:35\n- remove in useListings.ts:52 and useListingImageUpload.ts:181\nAll of these are covered by the owner-only SELECT. optimize-image and the gdpr export use the service role, so they bypass RLS.\n\nChanges:\n- New migration supabase/migrations/20261108000592_storage_media_not_listable.sql: drops the visitor-wide read and creates \"Users read their own media\" FOR SELECT TO authenticated, limited to the owner folder.\n- scripts/verify-schema.mjs: new check 12b, 'media buckets are not listable beyond the owner (US-592)'. It inserts objects for two users, then asserts anon sees 0, the owner sees their own, and neither sees the other's.\n- src/lib/storageMediaPolicies.test.ts: replays every DROP/CREATE POLICY on storage.objects in migration order and holds the policies left standing to the rule above. It fails with 4/4 tests when the new migration is removed and passes with it.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output.\n- `npx vitest run src/lib/storageMediaPolicies.test.ts src/lib/unpublishedVisibility.test.ts src/schema-references.test.ts`: 3 files, 19 tests passed.\n- Negative control: with the migration moved out, storageMediaPolicies.test.ts fails 4/4.\n- `npm run verify:migrations`: \"OK — 89 migration files structurally valid.\"\n- `npx eslint src/lib/storageMediaPolicies.test.ts`: clean.\n- `node --check scripts/verify-schema.mjs`: OK.\n- Full `npx vitest run`: 308 files passed; 3008 tests passed, 1 skipped.\n- Not run: `npm run verify:schema`. The sandbox refused runuser/su, which a scratch Postgres cluster would need (initdb will not run as root), and the existing local cluster needs a password. CI's verify-backend workflow will run the new check 12b.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261108000592_storage_media_not_listable.sql to production. | After applying, smoke test: (1) a public avatar or listing photo URL still loads while signed out; (2) an agent can replace their avatar (this uses upload with upsert and list on their own folder); (3) with the anon key, supabase.storage.from('listing-photos').list('') returns []."
+    },
+    {
+      "id": "US-593",
+      "lane": "enterprise",
+      "round": 16,
+      "title": "A late payment-failed webhook marked paid-up agents as in dunning and emailed them to fix a card that had already worked",
+      "description": "I audited billing webhook correctness first. One gap was left from US-251. Every subscription event in supabase/functions/stripe-webhook/handler.ts asks Stripe for the subscription's current state and stores that, except invoice.payment_failed, which still wrote status 'past_due' straight into user_subscriptions and subscriptions. It then always posted a 'Payment Failed' notification and sent the dunning email.\n\nStripe can deliver events out of order and retries a failed delivery for up to three days, so the failure of a renewal's first attempt can arrive after the retry that paid the invoice. When that happened, a paid-up agent was:\n- left recorded as past_due, so get_user_plan kept their plan only through the 7-day grace window, until the next renewal sync;\n- counted as in dunning on the admin health dashboard;\n- sent a notice and an email telling them to fix their card.\n\ninvoice.payment_failed now calls syncSubscription like the other events. The notice and the email go out only when the stored status still owes the payment: past_due, which unpaid is also stored as, or incomplete. A canceled subscription stays canceled because the Stripe read returns it that way. This replaces the old .neq('status','canceled') guard.",
+      "acceptanceCriteria": [
+        "invoice.payment_failed writes Stripe's current subscription state (via syncSubscription), not a hard-coded past_due",
+        "If Stripe now reports the subscription active/trialing, the row stays active and no notification or dunning email is sent",
+        "If Stripe reports canceled, the row stays canceled (plan free) and no dunning is sent",
+        "past_due/unpaid/incomplete still store past_due (or incomplete) and send the notification and email once",
+        "A failed Stripe lookup or failed status write answers 500 (claim released, Stripe retries) and sends nothing"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Change: supabase/functions/stripe-webhook/handler.ts.\n- Added an exported DUNNING_STATUSES set ('past_due', 'incomplete'), placed just above the `iso` helper.\n- The invoice.payment_failed case (around line 506) now runs `const status = await syncSubscription(deps, subscriptionId)` and returns early with a log line when the status is not in DUNNING_STATUSES. The two blind past_due updates are gone.\n\nTests: supabase/functions/stripe-webhook/handler.test.ts. The existing payment_failed tests now have Stripe return past_due. New cases:\n- the failure arrives after the invoice was paid: the row stays active and nothing is sent;\n- the failure arrives after the subscription was deleted: the row stays canceled and plan_name is free;\n- unpaid is stored as past_due and the agent is emailed once;\n- a failed Stripe lookup answers 500 and nothing is written or sent;\n- a failed status write answers 500 and no email is sent.\n\nI first wrote in a comment that the agent saw a payment banner. There is none: grep found past_due only in admin HealthDashboard and revenueMetrics, so I corrected the comment.\n\nOther areas checked during the audit:\n- scheduled-maintenance/index.ts already reports failed tasks with a 207 response.\n- stripe-webhook already sends every event to log_audit_event.\n\nVERIFIED: - npx tsc --noEmit: exit 0, no output.\n- npx vitest run supabase/functions/stripe-webhook: 1 file, 33 tests passed.\n- Full npx vitest run: 307 files passed; 3008 tests passed, 1 skipped.\n- npx eslint on the two changed files: 0 errors and 2 \"File ignored because of a matching ignore pattern\" warnings. supabase/functions is in the eslint ignore list, so these files add nothing to the CI warning count.\n- No migration, so verify:migrations does not apply.\n- The lint-staged pre-commit hook ran eslint --fix and prettier and wrote a backup entry (7e8380b) into the git stash that all worktrees share.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the stripe-webhook edge function (functions.agentbio.net Coolify app, see docs/deploy/edge-functions.md)"
+    },
+    {
+      "id": "US-605",
+      "lane": "enterprise",
+      "round": 16,
+      "title": "Past-due grace should run from the paid period, not the unpaid one",
+      "description": "When a renewal fails, Stripe has already advanced current_period_end to the end of the new, unpaid period, and syncSubscription stores that for past_due rows (customer.subscription.updated did this before this change). get_user_plan (20260902000015_subscription_grace.sql:69-73) grants past_due until current_period_end + 7 days, which is about 37 days of paid features without payment if the Stripe account leaves subscriptions past_due after retries instead of cancelling. The migration comment intends 7 days from the end of the paid period. Store current_period_start (the paid period's end) as the grace anchor for past_due, or change get_user_plan to use current_period_start + 7 days for past_due.",
+      "acceptanceCriteria": [
+        "A past_due subscription keeps its plan for 7 days after the last paid period ends, not after the unpaid one ends",
+        "A test covers a failed renewal where Stripe has advanced the period",
+        "verify:schema passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Check the Stripe dashboard's 'after all retries fail' setting first: if it is set to cancel, the deleted event already cuts access (storedPeriodEnd), so the exposure is limited to the retry window. (follow-up from US-593)"
+    },
+    {
+      "id": "US-594",
+      "lane": "marketing",
+      "round": 16,
+      "title": "Google and Apple signups lost their referral and signup source",
+      "description": "Fresh audit of the signup funnel. Agents who signed up with Google or Apple were saved with no attribution. The email signup sends ?ref= (from the \"Powered by AgentBio\" badge, US-232) and the first-touch utm_source as user metadata, and handle_new_user saves them to profiles.referred_by and signup_source. Social sign-in goes through oauth-proxy instead, and that function created the user with provider metadata only. So every badge referral and campaign source on a social signup was lost. Now the frontend passes ref and signup_source on the authorize step. oauth-proxy checks them, carries them in its HMAC-signed state and adds them to the new user's metadata, so handle_new_user records them as it does for email signups.",
+      "acceptanceCriteria": [
+        "A visitor who arrives with ?ref=<username> (or a utm_source) and signs up with Google or Apple gets profiles.referred_by and signup_source set, the same as an email signup",
+        "ref and source travel inside the HMAC-signed OAuth state, so changing them breaks the signature and the state is refused",
+        "Values that do not match the client's ref pattern, or a source over 100 characters or containing control characters, are dropped, not truncated",
+        "An existing account signing in is not changed, and states signed before this change still verify",
+        "useAuthStore builds both provider URLs through signupIntent.oauthAuthorizeUrl, and edge-function-routing.test still finds the oauth-proxy call site"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence (line numbers before the change):\n- supabase/functions/oauth-proxy/index.ts:215-226: admin.createUser user_metadata was { full_name, avatar_url, provider } only, with no ref or signup_source.\n- supabase/migrations/20260930000010_signup_referral.sql:27-46: handle_new_user reads raw_user_meta_data ->> 'ref' and 'signup_source'.\n- src/stores/useAuthStore.ts:326-344: email signUp sends both. signInWithGoogle and signInWithApple (around lines 538 and 577) built `${functionsUrl}/oauth-proxy?action=authorize&provider=...&redirect_to=...` with neither.\n- guard_profile_referral stops a later client-side fix, so attribution has to be set when the user is created.\n\nChanges:\n- supabase/functions/oauth-proxy/oauth.ts: new sanitizeSignupAttribution (the REF_RE pattern from src/lib/signupIntent.ts, and a source of at most 100 characters with no control characters). StatePayload now extends SignupAttribution. signState signs `f` and `s` when they are present, and verifyState re-sanitises them on the way out. New newSocialUserMetadata builds the createUser metadata.\n- supabase/functions/oauth-proxy/index.ts: the authorize step reads ref and signup_source into the signed state. The callback passes them to newSocialUserMetadata, and they are only used when a user is created.\n- src/lib/signupIntent.ts: new oauthAuthorizeUrl(functionsUrl, provider, redirectTo, referral, fallbackSource). It uses the shape `${functionsBase}/oauth-proxy` because the routing guard test reads call sites in that form.\n- src/stores/useAuthStore.ts: both providers now use oauthAuthorizeUrl with readReferral() and getAttribution()?.utm_source.\n- src/edge-function-routing.test.ts: updated the comment to name the new call site.\n- Tests: oauth.test.ts gains 6 tests (round trip, tamper refused, sanitising, legacy state, metadata keys matched to the migration, source guard on index.ts). signupIntent.test.ts gains 3.\n\nNo migration. The first full run failed in edge-function-routing.test (my first helper used `${functionsUrl.replace(...)}`, which the call-site regex did not match). I fixed it and the full suite then passed. The pre-commit hook ran prettier, so I re-ran the touched suites and tsc afterwards and both passed.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, before the commit and again after the pre-commit prettier pass.\n- `npx vitest run supabase/functions/oauth-proxy src/lib/signupIntent.test.ts src/edge-function-routing.test.ts src/stores/useAuthStore.test.ts`: 4 files, 63 tests passed (after the commit).\n- Full `npx vitest run`: 307 files passed, 3013 tests passed, 1 skipped. The earlier run had 1 failure, edge-function-routing 'found the call sites at all', which I fixed before committing.\n- `npx eslint src/lib/signupIntent.ts src/lib/signupIntent.test.ts src/stores/useAuthStore.ts src/edge-function-routing.test.ts`: 0 errors. useAuthStore.ts has 9 warnings, the same 9 as the base file when linted via stdin, so nothing new. The supabase/functions files are in eslint's ignore patterns.\n- No migration, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the edge functions: the functions.agentbio.net Coolify app (root Dockerfile, edge-functions-server.ts), so oauth-proxy reads ref/signup_source and puts them on new users. No migration and no new secrets. | Deploy Cloudflare Pages (frontend: useAuthStore sends ref/signup_source on the authorize URL). The order does not matter: the old proxy ignores the extra params, and the new proxy works without them."
+    },
+    {
+      "id": "US-606",
+      "lane": "marketing",
+      "round": 16,
+      "title": "Hosted-Supabase OAuth fallback still drops attribution",
+      "description": "When VITE_FUNCTIONS_URL is unset, useAuthStore falls back to supabase.auth.signInWithOAuth, which cannot carry user metadata, so a social signup on that path still has no referral. Production uses oauth-proxy, so this only affects a hosted-Supabase deployment.",
+      "acceptanceCriteria": [
+        "Decide whether the fallback is still supported. If it is, record the referral after the first session through a service-role path (for example a set-once SECURITY DEFINER RPC limited to profiles created in the last few minutes, with a REVOKE/GRANT per CLAUDE.md)."
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "src/stores/useAuthStore.ts signInWithGoogle/signInWithApple else branch (follow-up from US-594)"
+    },
+    {
+      "id": "US-595",
+      "lane": "seo",
+      "round": 16,
+      "title": "Agent and listing pages self-canonicalised on whatever host served them (the *.pages.dev alias included)",
+      "description": "Fresh indexation audit of agent and listing pages. The crawler HTML for /:username and /:username/listing/:id built its canonical, og:url and JSON-LD @ids from the request host (functions/_lib/profile-route.ts, previously `const origin = new URL(request.url).origin`). /sitemap-profiles.xml built its <loc>s the same way (functions/sitemap-profiles.xml.ts). The SPA pages FullProfilePage.tsx:212 and ListingPage.tsx:128 used getSafeOrigin(), which is window.location.origin. So on the production agentbio.pages.dev alias, which Cloudflare does not mark noindex the way it marks branch previews, every agent page and listing page said it was the original, and could be indexed a second time. The marketing pages already fixed this in US-172 with getBaseUrl(). Profiles were left on the visitor's host \"for custom domains\", but nothing routes a custom domain to a profile: grep finds no host-to-agent mapping in functions/ or the SPA. All of these now use the configured origin: VITE_APP_URL, falling back to https://agentbio.net. This closes the core of US-389 and records its decision: until custom-domain host routing exists, an agent page canonicalises to the configured origin.",
+      "acceptanceCriteria": [
+        "A crawler fetching /jane or /jane/listing/<id> on agentbio.pages.dev gets a canonical, og:url and JSON-LD ids on https://agentbio.net, and 'pages.dev' appears nowhere in the HTML",
+        "/sitemap-profiles.xml lists <loc>s on the canonical origin whatever host serves it",
+        "When VITE_APP_URL is set, canonicals follow its origin; a value that is not an absolute http(s) URL falls back to https://agentbio.net",
+        "The 301 for a mixed-case handle still redirects on the host the request came in on",
+        "FullProfilePage and ListingPage are now inside the seo-origin-sources guard, with no getSafeOrigin exception",
+        "tsc and the full vitest run pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "New file functions/_lib/site-origin.ts: siteOrigin(env) reads env.VITE_APP_URL and keeps only its origin. Anything that is not http(s) falls back to FALLBACK_SITE_ORIGIN, the same value as FALLBACK_APP_URL in src/lib/utils.ts:59 and prerender.mts:70. Changes:\n- functions/_lib/profile-route.ts: Env gains VITE_APP_URL, and the tag/body origin is now siteOrigin(env). notFoundResponse and the canonical-case 301 still use the request URL, which is correct because they fetch an asset and redirect on the same host.\n- functions/_lib/profile-sitemap.ts: ProfileSitemapEnv gains VITE_APP_URL.\n- functions/sitemap-profiles.xml.ts: passes siteOrigin(env) as the origin.\n- src/pages/public/FullProfilePage.tsx and ListingPage.tsx: getSafeOrigin() replaced with getBaseUrl().\n- src/config/seo-origin-sources.test.ts: both pages added to SEO_LAYER, and the FullProfilePage exception in ALLOWED removed.\nNew tests: functions/_tests/site-origin.test.ts (3); a 'canonical origin (US-595)' block in functions/_tests/username-route.test.ts (4), covering the profile and listing on the pages.dev alias, a VITE_APP_URL override, and the 301 staying on its host; and one sitemap test on the pages.dev host plus a VITE_APP_URL override. The existing tests use agentbio.net requests with no VITE_APP_URL, so they pass unchanged.\n\nVERIFIED: npx tsc --noEmit: exit 0 (tsconfig includes src and functions). npx vitest run functions src/config/seo-origin-sources.test.ts src/pages/public: 59 files, 767 tests passed. Full npx vitest run: 308 files passed; 3012 tests passed, 1 skipped. npx eslint on the changed files: 0 errors. Every warning is 'File ignored because no matching configuration was supplied', for the functions/ files, which the eslint config does not cover, so no new lint warnings. The lint-staged pre-commit hook ran eslint --fix and prettier and passed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages: the Functions (functions/_lib/profile-route.ts, functions/sitemap-profiles.xml.ts) and the SPA both changed. No migration, no edge-function deploy and no new secret. | Check that the Pages project's VITE_APP_URL, if set, is https://agentbio.net, since Functions now read it for canonicals. If it is unset, production is used."
+    },
+    {
+      "id": "US-607",
+      "lane": "seo",
+      "round": 16,
+      "title": "Mark the production *.pages.dev alias noindex (or 301 it to agentbio.net)",
+      "description": "Canonicals now point at agentbio.net, but agentbio.pages.dev still serves the whole site with 200s. Prerendered pages and robots.txt are identical there. A small Pages middleware (functions/_middleware.ts) could answer any host other than the configured origin with X-Robots-Tag: noindex, or a 301 for GET documents. This makes the duplicate host invisible instead of only canonicalised.",
+      "acceptanceCriteria": [
+        "A request whose host is not siteOrigin(env)'s host gets X-Robots-Tag: noindex (or a 301 to the same path on the configured origin)",
+        "agentbio.net responses are unchanged",
+        "Static assets keep working on preview hosts"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs a choice between noindex and 301. A 301 would break branch previews, so noindex on non-canonical hosts is the safe default. (follow-up from US-595)"
+    },
+    {
+      "id": "US-608",
+      "lane": "seo",
+      "round": 16,
+      "title": "Tell answer engines in llms.txt that agent pages exist and where they are listed",
+      "description": "public/llms.txt describes only AgentBio's marketing pages. It never says that agentbio.net/<username> pages and /<username>/listing/<id> pages exist, or that /sitemap-profiles.xml lists them, so an answer engine reading it learns nothing about the agent pages it can cite.",
+      "acceptanceCriteria": [
+        "llms.txt has a section describing agent and listing page URL shapes and naming /sitemap-profiles.xml",
+        "src/llms-txt.test.ts still passes (URL checks may need to allow the function-served sitemap)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-595)"
+    },
+    {
+      "id": "US-596",
+      "lane": "mobile",
+      "round": 16,
+      "title": "On phones the fixed bottom nav covered the last 64px of every dashboard page",
+      "description": "I did not take US-511 this round. Checking the installed app turned up a layout bug on every dashboard page on phones, which matters more. In DashboardLayout's <main>, `pb-24` (meant to clear the 64px fixed MobileNav) sat next to the custom `safe-area-inset-bottom` utility. Tailwind outputs custom utilities after its own, so below 640px the custom one replaced pb-24's padding with the bare `env(safe-area-inset-bottom)`. That value is 0px on Android, so the h-16 bottom nav covered the end of every dashboard page, often the Save button. The fix puts both in one rule: `pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6`. OfflineIndicator had the same clash (py-2.5 plus safe-area-inset-top, with the inset already in `top`), so I removed that class. A new guard test fails any element in src that sets padding and a safe-area-inset class on the same side.",
+      "acceptanceCriteria": [
+        "Below md, the dashboard <main> bottom padding is 6rem plus the home-indicator inset, so the last content and buttons scroll clear of the MobileNav on Android and on iPhones with or without a home indicator",
+        "From md up, the padding is unchanged (md:pb-6)",
+        "The offline/online pill keeps its py-2.5 padding; the safe-area inset is applied only through `top`",
+        "A guard test fails when any element in src combines a safe-area-inset-* class with unprefixed padding on the same side",
+        "tsc passes and the full vitest suite passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence. src/index.css:220 opens `@layer utilities`; lines 284-295 define .safe-area-inset-* as single-side `padding-*: env(...)`. Before the fix, src/components/layout/DashboardLayout.tsx:220 had `className=\"p-4 sm:p-5 md:p-6 pb-24 sm:pb-24 md:pb-6 safe-area-inset-bottom\"`. src/components/mobile/MobileNav.tsx:72-78 is `fixed bottom-0 ... md:hidden safe-area-inset-bottom`, with an inner bar of `h-16`. I compiled a test file with the project's Tailwind config (npx tailwindcss -c tailwind.config.ts) and got `.pb-24` at out.css:685 and `.safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom) }` at :707. That order means the custom class wins below 640px. sm:pb-24 sits in a media query further down, so 640-767px was fine. On phones the effective bottom padding was 0px (Android, iPhones without a home indicator) or about 34px (iPhones with one), against a 64px nav. MobileNav hides while you scroll down (useScrollDirection), but it comes back on any upward scroll and covers the end of the page again.\n\nChanges. DashboardLayout.tsx <main> now uses `p-4 sm:p-5 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6`. I compiled it and checked the output: `.pb-\\[calc\\(6rem\\+env\\(safe-area-inset-bottom\\)\\)\\] { padding-bottom: calc(6rem + env(safe-area-inset-bottom)) }`, and md:pb-6 still overrides it inside the 768px media query. In OfflineIndicator.tsx I removed the 'safe-area-inset-top' class (it replaced py-2.5's top padding). The `top: calc(1rem + env(safe-area-inset-top))` style stays, with a comment explaining why. New test: src/test/safeAreaPadding.test.ts. It reads each element's whole class list, including multi-line cn() calls. Fixtures of both pre-fix strings check that it catches them, and it also scans all of src and asserts the dashboard padding class. The lint-staged hook ran prettier, which reflowed one ternary in OfflineIndicator; the tests still pass after that.\n\nI did not do US-511 (dead offline-storage stack and the idb dependency). It is still open and unchanged.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output. npx eslint on src/test/safeAreaPadding.test.ts, src/components/layout/DashboardLayout.tsx and src/components/mobile/OfflineIndicator.tsx: no output, so 0 warnings and 0 errors. npx vitest run src/test/safeAreaPadding.test.ts: 5/5 passed, run before and after the prettier reformat. Full npx vitest run: 308 test files passed, 3009 tests passed, 1 skipped. Tailwind CLI compile of DashboardLayout.tsx confirmed the calc class is generated and md:pb-6 overrides it at >=768px. The pre-commit hook (eslint --fix, prettier) passed.\n\nREVIEW: fix_required; fix-up: The reviewer was right. In src/components/layout/DashboardLayout.tsx:226, `sm:p-5` sets all four paddings inside the 640px media query. That rule comes after the base `pb-[calc(6rem+env(safe-area-inset-bottom))]`, so from 640 to 767px the bottom padding fell to 20px while MobileNav (md:hidden, h-16) was still showing. I changed the class to `p-4 sm:px-5 sm:pt-5 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6`. Now the sm breakpoint sets only the side and top padding, and the bottom keeps the 6rem + inset value until md, where md:pb-6 takes over. In src/test/safeAreaPadding.test.ts I updated the assertion to pin the full corrected class string. I also added a check that the main-content className contains no `sm:p-5` token. Committed as 52033faa718b4099a50245321a53f22e8b82d2e3 and pointed loop/r16-mobile at it. Nothing was pushed."
     }
   ]
 }

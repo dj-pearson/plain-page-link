@@ -6172,3 +6172,89 @@ Other findings:
 - [mobile] index.html:86 still has the comment '<!-- The home-screen label iOS offers... -->'. On agent pages it now sits above nothing. It is harmless and I left it alone.
 - [mobile] functions/_tests/fixtures/prerendered-index.html was captured before US-436/US-481 and may be stale in other ways, for example the apple-touch-icon and manifest shortcuts. Regenerating it from a real prerender would keep the route tests honest.
 - [mobile] CLAUDE.md (Key Files and Mobile & PWA sections) still lists src/lib/sync-manager.ts and src/lib/offline-storage.ts. sync-manager was removed in US-494, and offline-storage is dead code (US-511).
+
+---
+
+## Continuous improvement loop — round 16 — 2026-11-08 (US-587 to US-596 done)
+
+Lanes began with a fresh audit of their scope; most found bigger problems than the leftover stories. Six approved outright; listings, performance and mobile each needed one fix-up. No merge conflicts. Closed US-527.
+Final: tsc clean (app + node config), 3100 unit tests pass (from 3004), verify:migrations OK (89 files), vite build OK, eslint 560 warnings (CI ratchet 562 -> 560).
+
+- US-587 [listings] CSV listing import drops or splits rows and says it imported listings it never saved
+- US-588 [leads] A teammate's bulk status change on assigned leads did nothing, and the page said it worked
+- US-589 [profile] Listing cards in a page-builder block on the agent's public page were not clickable
+- US-590 [uiux] Overview hid due follow-ups and showed zeros when its blocks failed to load
+- US-591 [performance] The public profile served the agent's original headshot (often several MB) for a 128px circle
+- US-592 [security] Visitors could list every agent's uploaded photos, including unpublished pages and draft listings
+- US-593 [enterprise] A late payment-failed webhook marked paid-up agents as in dunning and emailed them to fix a card that had already worked
+- US-594 [marketing] Google and Apple signups lost their referral and signup source
+- US-595 [seo] Agent and listing pages self-canonicalised on whatever host served them (the *.pages.dev alias included)
+- US-596 [mobile] On phones the fixed bottom nav covered the last 64px of every dashboard page
+
+Owner actions:
+- US-587: Deploy Cloudflare Pages so the fixed CSV import goes live (frontend only, no migration or function change)
+- US-587: Mark US-527 as passed in prd.json; this commit covers its acceptance criterion
+- US-592: Apply migration supabase/migrations/20261108000592_storage_media_not_listable.sql to production.
+- US-592: After applying, smoke test: (1) a public avatar or listing photo URL still loads while signed out; (2) an agent can replace their avatar (this uses upload with upsert and list on their own folder); (3) with the anon key, supabase.storage.from('listing-photos').list('') returns [].
+- US-593: Redeploy the stripe-webhook edge function (functions.agentbio.net Coolify app, see docs/deploy/edge-functions.md)
+- US-594: Redeploy the edge functions: the functions.agentbio.net Coolify app (root Dockerfile, edge-functions-server.ts), so oauth-proxy reads ref/signup_source and puts them on new users. No migration and no new secrets.
+- US-594: Deploy Cloudflare Pages (frontend: useAuthStore sends ref/signup_source on the authorize URL). The order does not matter: the old proxy ignores the extra params, and the new proxy works without them.
+- US-595: Redeploy Cloudflare Pages: the Functions (functions/_lib/profile-route.ts, functions/sitemap-profiles.xml.ts) and the SPA both changed. No migration, no edge-function deploy and no new secret.
+- US-595: Check that the Pages project's VITE_APP_URL, if set, is https://agentbio.net, since Functions now read it for canonicals. If it is unset, production is used.
+
+Opened:
+- US-597 [listings] CSV import: one batched insert instead of N mutateAsync calls
+- US-598 [listings] CSV import: optional photo URL column
+- US-599 [leads] A Playwright test for a teammate's bulk status change on assigned leads
+- US-600 [profile] Count a listing view from a listings-block card the same way as gallery cards
+- US-601 [uiux] Clients, Testimonials and Settings: check the remaining dashboard blocks for failed-load-as-empty
+- US-602 [uiux] Overview: theme the Recent Leads status pills and the empty-state icons
+- US-603 [performance] Backfill: shrink headshots uploaded before US-591
+- US-604 [performance] Serve the avatar with srcset or a 256px variant for the 96-128px circle
+- US-605 [enterprise] Past-due grace should run from the paid period, not the unpaid one
+- US-606 [marketing] Hosted-Supabase OAuth fallback still drops attribution
+- US-607 [seo] Mark the production *.pages.dev alias noindex (or 301 it to agentbio.net)
+- US-608 [seo] Tell answer engines in llms.txt that agent pages exist and where they are listed
+
+Other findings:
+- [listings] src/components/listings/CSVUploadDialog.tsx handleFileSelect: a file not ending in .csv (for example 'LISTINGS.CSV' or a .txt export) returns silently with no message to the agent. The check is also case-sensitive.
+- [listings] src/components/listings/CSVUploadDialog.tsx handleImport: if onImport throws, the catch says 'Error handling in parent' but shows nothing; the dialog just stops its spinner. handleCSVImport no longer throws, but the dialog should still show an inline error.
+- [listings] Imported listings get an empty sort_order like manual adds, so they appear wherever the default ordering puts them. That may need a product decision on whether imports go at the end.
+- [listings] US-462 (sweep existing orphaned listing photos) is still blocked on an owner decision to run it in production, as its notes say.
+- [leads] [leads] US-463 can be marked passing. src/types/lead.ts no longer declares the LegacyLead family; it was removed in 2521ff6. progress.txt:5921 and :6074 already say this.
+- [leads] [leads] src/hooks/useLeads.ts updateLead and deleteLead are still filtered on user_id alone. updateLead has no caller outside tests (grep finds only useLeads.test.ts). If an assignee-facing caller is added, it should use the same owner-or-assignee filter as bulkUpdateStatus, or its .single() will throw on zero rows.
+- [leads] [leads] src/pages/dashboard/Leads.tsx: the bulk toolbar shows Delete even to a teammate whose selection is all assigned leads. The action now explains the refusal, but the button could be hidden or disabled when no selected lead is owned.
+- [leads] [leads] AddLeadToClientsButton.tsx: when an assignee adds a lead to clients, the contact is created under the assignee's user_id, not the team owner's, so the owner never sees that client. Whether that is right is a product question about team ownership of contacts, so I did not change it.
+- [leads] [uiux] The lint-staged pre-commit hook again wrote a backup entry (8dc0e72) into the git stash that all worktrees share.
+- [profile] The lint-staged pre-commit hook again wrote a backup entry (dd64371) into the git stash that all worktrees share.
+- [profile] US-525 (dead custom_css fields in src/types/theme.ts), US-544 (fuller custom-CSS preview) and US-283's remaining ProfileCompletionWidget acceptance criterion are still open in the profile lane.
+- [profile] src/components/pageBuilder/blocks/ListingsBlock.tsx still fetches with useEffect/useState rather than TanStack Query, so a public page with two listings blocks fetches twice and nothing is cached. This could move to useQuery later.
+- [uiux] src/components/dashboard/DueFollowUps.tsx: the 'Done' button calls completeTask(task.id) with no pending state, so a double tap can send two updates. It is 32px tall (h-8), below the 44px touch target.
+- [uiux] src/components/dashboard/ConversionFunnel.tsx:44 STAGE_COLORS is an indigo-to-purple ramp (#6366f1..#a855f7), which is the purple gradient tell from the CLAUDE.md craft floor. It is also hard-coded hex, not theme tokens.
+- [uiux] src/components/dashboard/PlanUsageCard.tsx:26 returns null when usePlanUsage errors, so plan limits silently disappear from Overview.
+- [uiux] The lint-staged pre-commit hook again wrote a backup entry (1285883) into the git stash that all worktrees share.
+- [uiux] US-420 still needs an owner decision. US-546 needs a new lead_stats migration parameter. US-580 (report bulk-status skips) is still open and sliceable for the next uiux round.
+- [performance] src/hooks/useListingImageUpload.ts:81 uploads listing originals with cacheControl '3600'. optimize-image variants use a year (supabase/functions/optimize-image/index.ts:129). If listing originals also get unique names, they could get a year too. I did not check how listing originals are named.
+- [performance] src/components/profile/ProfileHeader.tsx:131 renders brokerage_logo with no width/height, so it can shift layout once it loads (CLS) on the public profile.
+- [performance] The lint-staged pre-commit hook again wrote a backup entry (c7f0f4c) into the git stash that all worktrees share.
+- [performance] US-581, US-582, US-566, US-548 are still open; I did not take them this round.
+- [security] supabase/functions/send-seo-notification/index.ts:184,213 calls fetch() on slack_webhook_url / webhook_url from seo_notification_preferences without safeFetch. Any authenticated user can write their own row ('Users can manage their own notification preferences', squashed baseline :14269). Today it is reachable only for alerts on admin-created schedules (run-scheduled-audit:358 uses schedule.created_by), so the risk is low. Switching to safeFetch from _shared/ssrf-guard.ts would make it safe by default.
+- [security] supabase/functions/test-social-webhook/index.ts:84 (admin-only) also fetches the stored webhook_url without safeFetch, so an admin could point it at internal hosts. Lower priority for the same reason.
+- [security] US-527 (CSV import failure reasons) is still open and sliceable, but it is listings UX more than security. The listings lane may be a better fit.
+- [security] US-444 and US-423 are still blocked on owner decisions, as their notes say.
+- [enterprise] supabase/functions/stripe-webhook/handler.ts dunning path: the result of deps.sendEmail is never checked. _shared/email.ts returns {ok:false} instead of throwing, so a failed dunning email is silent and nothing logs it.
+- [enterprise] supabase/functions/stripe-webhook/handler.ts invoice.payment_failed: if a later must() write fails after the notifications insert, the 500 retry inserts the 'Payment Failed' notification again, so the agent can see duplicate notices. A dedupe key on (user_id, type, data->>invoice_id) would prevent that.
+- [enterprise] US-467 (agent-chosen quiet hours) still needs the product decision recorded in prd.json, and US-528 (TimeZoneSetting.tsx says '7am' even when an operator sets DIGEST_LOCAL_HOUR) is still open. Neither was taken this round.
+- [marketing] src/pages/auth/Register.tsx: the Google/Apple buttons create an account without the agreedToTerms checkbox that the email form requires, and nothing near the buttons says 'By continuing you agree to the Terms and Privacy Policy'. This is a legal and trust gap, and the wording needs the owner's sign-off.
+- [marketing] src/pages/auth/Register.tsx:~270: 'Join thousands of top-performing agents who use AI-powered intelligence to dominate their market' is an unsourced count claim of the kind US-111 and US-406 removed elsewhere. MARKETING_COPY.joinLine is used a few lines below, but this sentence is hard-coded and src/marketing-claims.test.ts does not seem to cover it.
+- [marketing] src/pages/auth/AuthCallback.tsx: the PKCE fallback path always goes to /dashboard and ignores new users. The success screen also says 'Welcome back!' to a brand-new social signup.
+- [marketing] Open marketing stories still pending: US-507 (comparison competitor cells), US-447 (the craft-floor email HTML half can be done without the owner), US-585 (dead-export guard), US-468, US-469.
+- [marketing] The lint-staged pre-commit hook again wrote a backup entry (842b78a) into the git stash, which all worktrees share.
+- [seo] US-389's remaining acceptance criterion ('decision recorded on custom-domain canonicals') is decided in the code comment in functions/_lib/site-origin.ts and in this commit message: nothing routes a custom domain to a profile, so the configured origin is canonical. The integrator can mark US-389 passed alongside US-595.
+- [seo] functions/sitemap-profiles.xml.ts and functions/[username].ts export only onRequestGet, so a HEAD request to the profile sitemap or an agent page likely gets Pages' default handling rather than the function. Some SEO tools check with HEAD. This was not verified against the runtime.
+- [seo] functions/_lib/profile-sitemap.ts:313 and profile-route.ts filter listings by status=in.(active,pending,under_contract,sold), while CLAUDE.md lists only 'active' | 'sold' | 'pending'. This is harmless, but it is worth confirming against types.ts whether under_contract is real.
+- [seo] src/lib/seo.ts:373 still builds /p/{slug} canonicals from getSafeOrigin() 'for custom domains', which have the same non-existent routing. It should get the same decision once page-builder pages are confirmed public.
+- [seo] The lint-staged pre-commit hook again wrote a backup entry (cf0a714) into the git stash that all worktrees share.
+- [mobile] src/components/layout/DashboardLayout.tsx:147: the sticky header uses safe-area-inset-top with no padding clash today. If someone later adds py-* to the <header> element itself, the new guard test will catch it.
+- [mobile] src/components/mobile/MobileNav.tsx:72: the nav's bottom padding is the bare inset. That is correct for the bar, but any future content placed above it should use the calc pattern, not stacked classes.
+- [mobile] docs/architecture/TECH_SPEC_PWA_MOBILE.md still says 'Ready for Development' and describes a Laravel backend, an IndexedDB sync manager and FCM push. All three conflict with the owner decisions (no push) and with the code. Fold the cleanup into US-511.
