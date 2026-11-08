@@ -161,3 +161,56 @@ describe('link allowance copy (US-501)', () => {
     expect(linkAllowanceSummary().startsWith(`${free?.limits.links} on ${free?.name}`)).toBe(true);
   });
 });
+
+/**
+ * US-296: PlanFeatures carried seven keys for features that were never built
+ * (followUpSequences, marketReports, virtualStaging, predictiveAnalytics,
+ * videoTours, mortgageCalculator, cmaGenerator), read by nothing, and the file
+ * priced them per use in USAGE_PRICING alongside SMS, which has no provider.
+ * What is left must be exactly what the database sells.
+ */
+describe('plan features match the seeded plans (US-296)', () => {
+  /** Plan name → features object from the seed's jsonb_build_object(...). */
+  function seededFeatures(): Record<string, Record<string, boolean>> {
+    const sql = readFileSync(MIGRATION, 'utf8');
+    const out: Record<string, Record<string, boolean>> = {};
+    const rowPattern =
+      /\(\s*'(\w+)',\s*\d+,\s*\d+,\s*\d+,\s*true,\s*jsonb_build_object\(([\s\S]*?)\)/g;
+    for (const m of sql.matchAll(rowPattern)) {
+      const features: Record<string, boolean> = {};
+      for (const pair of m[2].matchAll(/'(\w+)',\s*(true|false)/g)) {
+        features[pair[1]] = pair[2] === 'true';
+      }
+      out[m[1]] = features;
+    }
+    return out;
+  }
+
+  // Added to every plan by 20260923000002 (planLimits.test.ts checks its values).
+  const ADDED_LATER = ['openHouseManagement'];
+  const seeded = seededFeatures();
+
+  it('parses a features object for every plan', () => {
+    expect(Object.keys(seeded).sort()).toEqual(PRICING_PLANS.map((p) => p.id).sort());
+    expect(Object.keys(seeded.free).length).toBeGreaterThan(0);
+  });
+
+  for (const plan of PRICING_PLANS) {
+    it(`${plan.id}: declares exactly the seeded keys, with the same values`, () => {
+      const dbFeatures = seeded[plan.id];
+      expect(Object.keys(plan.features).sort()).toEqual(
+        [...Object.keys(dbFeatures), ...ADDED_LATER].sort()
+      );
+      for (const [key, value] of Object.entries(dbFeatures)) {
+        expect(plan.features[key as keyof typeof plan.features], `${plan.id}.${key}`).toBe(value);
+      }
+    });
+  }
+
+  it('prices nothing per use', () => {
+    // USAGE_PRICING sold overages for market reports, virtual staging, video
+    // tours, CMA reports and SMS: none of them exists.
+    const source = readFileSync(join(process.cwd(), 'src/config/pricing-plans.ts'), 'utf8');
+    expect(source).not.toMatch(/price_per_use|USAGE_PRICING|calculateOverageCharge/);
+  });
+});
