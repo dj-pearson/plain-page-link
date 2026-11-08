@@ -50,7 +50,7 @@ type ProfileRow = ProfileMeta & { id: string };
 const PROFILE_COLUMNS =
   'id,username,full_name,bio,avatar_url,og_image,seo_title,seo_description,title,brokerage_name,service_cities,license_number,license_state,phone,email_display';
 const LISTING_COLUMNS =
-  'id,status,address,city,state,price,bedrooms,bathrooms,square_feet,description,photos,image';
+  'id,status,address,city,state,price,bedrooms,bathrooms,square_feet,description,photos,image,property_type';
 /** The profile body's listing rows (US-539): what a link label needs, no photos. */
 const BODY_LISTING_COLUMNS = 'id,status,address,city,state,price,bedrooms,bathrooms,square_feet';
 /**

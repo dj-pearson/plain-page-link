@@ -15,6 +15,11 @@
 
 // Relative, not '@/': the Pages Functions bundle does not resolve the Vite alias.
 import { isPublicListingStatus, listingStatusLabel } from '../../src/lib/listingStatus';
+import {
+  listingAvailability,
+  listingJsonLdNodes,
+  listingReference,
+} from '../../src/lib/listingJsonLd';
 
 export interface ProfileMeta {
   username: string;
@@ -49,6 +54,10 @@ export interface ListingMeta {
   description: string | null;
   photos: unknown;
   image: string | null;
+  /** Picks the property node's schema.org type (residenceType). */
+  property_type?: string | null;
+  /** 'sold' makes the offer SoldOut. */
+  status?: string | null;
 }
 
 export interface SocialTags {
@@ -241,6 +250,18 @@ function firstPhoto(listing: ListingMeta): string | null {
   return null;
 }
 
+/** The listing's photos for its JSON-LD: the gallery, else the legacy single image. */
+function listingImages(listing: ListingMeta, origin: string): string[] {
+  const gallery = Array.isArray(listing.photos)
+    ? listing.photos.filter((p): p is string => typeof p === 'string' && p.length > 0)
+    : [];
+  const sources = gallery.length ? gallery : listing.image ? [listing.image] : [];
+  return sources
+    .slice(0, 10)
+    .map((src) => absolute(src, origin))
+    .filter((src): src is string => src !== null);
+}
+
 /** `525000` and `$525,000` both occur in the price column, which is text. */
 function formatPrice(raw: string | null): string | null {
   if (!raw) return null;
@@ -267,8 +288,9 @@ function listingPageUrl(origin: string, username: string, listingId: string): st
  * declares (here and in ListingPage.tsx), so a consumer merging by @id links
  * the agent to the home's full description. Sold homes stay in the list, as
  * on the page, with availability SoldOut — the same mapping
- * realEstateListingSchema uses. The caller passes only listings already held
- * to selectListingForPage, so nothing the agent hid can reach this.
+ * listingAvailability (src/lib/listingJsonLd.ts) applies. The caller passes
+ * only listings already held to selectListingForPage, so nothing the agent
+ * hid can reach this.
  */
 function listingOffers(
   listings: readonly BodyListing[],
@@ -283,14 +305,9 @@ function listingOffers(
     return {
       '@type': 'Offer',
       url,
-      availability:
-        listing.status === 'sold' ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+      availability: listingAvailability(listing.status),
       ...(Number.isFinite(price) && price > 0 ? { price, priceCurrency: 'USD' } : {}),
-      itemOffered: {
-        '@id': `${url}#listing`,
-        name: `${address}${place ? `, ${place}` : ''}`,
-        url,
-      },
+      itemOffered: listingReference(url, `${address}${place ? `, ${place}` : ''}`),
     };
   });
 }
@@ -386,39 +403,29 @@ export function buildListingTags(
     image: absolute(firstPhoto(listing), origin) ?? agentTags.image,
     url,
     ogType: 'website',
+    // The same RealEstateListing + property model ListingPage.tsx declares
+    // (src/lib/listingJsonLd.ts), so the two renderings agree on the type of
+    // the `#listing` node the agent's page links to (US-578).
     jsonLd: {
       '@context': 'https://schema.org',
-      '@type': 'SingleFamilyResidence',
-      // The id the agent's page links each offered home to (US-551).
-      '@id': `${url}#listing`,
-      name: address,
-      url,
-      ...(listing.description ? { description: summarise(listing.description, 500) } : {}),
-      address: {
-        '@type': 'PostalAddress',
-        streetAddress: address,
-        ...(listing.city ? { addressLocality: listing.city } : {}),
-        ...(listing.state ? { addressRegion: listing.state } : {}),
-      },
-      ...(listing.bedrooms ? { numberOfRooms: listing.bedrooms } : {}),
-      ...(listing.square_feet
-        ? {
-            floorSize: {
-              '@type': 'QuantitativeValue',
-              value: listing.square_feet,
-              unitCode: 'FTK',
-            },
-          }
-        : {}),
-      ...(price
-        ? {
-            offers: {
-              '@type': 'Offer',
-              price: Number(String(listing.price).replace(/[^0-9.]/g, '')),
-              priceCurrency: 'USD',
-            },
-          }
-        : {}),
+      '@graph': listingJsonLdNodes({
+        pageUrl: url,
+        // The name ListingPage.tsx gives the node: address and city.
+        name:
+          [listing.address?.trim(), listing.city?.trim()].filter(Boolean).join(', ') ||
+          'Property listing',
+        description: listing.description ? summarise(listing.description, 500) : null,
+        images: listingImages(listing, origin),
+        streetAddress: listing.address,
+        city: listing.city,
+        state: listing.state,
+        bedrooms: listing.bedrooms,
+        bathrooms: listing.bathrooms,
+        squareFeet: listing.square_feet,
+        price: Number(String(listing.price ?? '').replace(/[^0-9.]/g, '')),
+        status: listing.status,
+        propertyType: listing.property_type,
+      }),
     },
   };
 }
