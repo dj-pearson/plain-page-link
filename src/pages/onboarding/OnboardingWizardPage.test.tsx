@@ -15,6 +15,7 @@ const listingInsert = vi.fn();
 const upload = vi.fn();
 const invoke = vi.fn();
 const toast = vi.fn();
+const renderAppIcons = vi.fn();
 
 vi.mock('@/stores/useAuthStore', () => ({
   useAuthStore: () => ({
@@ -30,6 +31,10 @@ vi.mock('@/hooks/use-toast', () => ({
 
 vi.mock('@/lib/edgeFunctions', () => ({
   edgeFunctions: { invoke: (...args: unknown[]) => invoke(...args) },
+}));
+
+vi.mock('@/lib/renderAppIcons', () => ({
+  renderAppIcons: (...args: unknown[]) => renderAppIcons(...args),
 }));
 
 vi.mock('@/lib/signupIntent', () => ({
@@ -80,6 +85,7 @@ describe('OnboardingWizardPage', () => {
     upload.mockReset().mockResolvedValue({ error: null });
     invoke.mockReset().mockResolvedValue({});
     toast.mockReset();
+    renderAppIcons.mockReset().mockRejectedValue(new Error('This browser cannot draw images'));
     window.history.pushState({}, '', '/onboarding/wizard');
   });
 
@@ -164,6 +170,80 @@ describe('OnboardingWizardPage', () => {
     expect(listingInsert).not.toHaveBeenCalled();
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Your first listing was not saved' })
+    );
+  });
+
+  // US-493: the onboarding photo is most agents' first, and it used to get no
+  // home-screen icons, so their installed page showed the AgentBio logo.
+  it('stores the home-screen icons named after the onboarding photo, before saving the profile', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    const icon192 = new Blob(['192'], { type: 'image/png' });
+    const icon512 = new Blob(['512'], { type: 'image/png' });
+    renderAppIcons.mockResolvedValue(
+      new Map([
+        [192, icon192],
+        [512, icon512],
+      ])
+    );
+    updateProfile.mockResolvedValueOnce(undefined);
+
+    renderWithProviders(<OnboardingWizardPage />);
+    const user = await fillToPreview({ address: '123 Main St', city: 'Austin', price: '$750,000' });
+    await user.click(screen.getByRole('button', { name: /Save & publish/ }));
+    expect(await screen.findByText(/Your Profile is Live/)).toBeInTheDocument();
+
+    expect(upload.mock.calls.map((c) => c[0])).toEqual([
+      'user-1/avatar-1700000000000.png',
+      'user-1/avatar-1700000000000-app-icon-192.png',
+      'user-1/avatar-1700000000000-app-icon-512.png',
+    ]);
+    expect(upload.mock.calls[1][1]).toBe(icon192);
+    expect(upload.mock.calls[2][1]).toBe(icon512);
+    expect(upload.mock.calls[2][2]).toMatchObject({ contentType: 'image/png', upsert: true });
+    // The icons are in place before avatar_url points at the photo.
+    expect(upload.mock.invocationCallOrder[2]).toBeLessThan(
+      updateProfile.mock.invocationCallOrder[0]
+    );
+    expect(updateProfile.mock.calls[0][0]).toMatchObject({
+      avatar_url: 'https://cdn.test/user-1/avatar-1700000000000.png',
+    });
+    vi.mocked(Date.now).mockRestore();
+  });
+
+  it('still saves the onboarding photo when its icons cannot be rendered or stored', async () => {
+    // beforeEach: renderAppIcons rejects, as on a browser that cannot draw it.
+    updateProfile.mockResolvedValueOnce(undefined);
+
+    renderWithProviders(<OnboardingWizardPage />);
+    const user = await fillToPreview({ address: '123 Main St', city: 'Austin', price: '$750,000' });
+    await user.click(screen.getByRole('button', { name: /Save & publish/ }));
+    expect(await screen.findByText(/Your Profile is Live/)).toBeInTheDocument();
+
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(updateProfile.mock.calls[0][0].avatar_url).toMatch(
+      /^https:\/\/cdn\.test\/user-1\/avatar-\d+\.png$/
+    );
+    expect(toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Profile photo upload failed' })
+    );
+  });
+
+  it('still saves the onboarding photo when an icon upload fails', async () => {
+    renderAppIcons.mockResolvedValue(new Map([[192, new Blob(['192'], { type: 'image/png' })]]));
+    upload
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: new Error('storage quota') });
+    updateProfile.mockResolvedValueOnce(undefined);
+
+    renderWithProviders(<OnboardingWizardPage />);
+    const user = await fillToPreview({ address: '123 Main St', city: 'Austin', price: '$750,000' });
+    await user.click(screen.getByRole('button', { name: /Save & publish/ }));
+    expect(await screen.findByText(/Your Profile is Live/)).toBeInTheDocument();
+
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(updateProfile.mock.calls[0][0].avatar_url).toMatch(/avatar-\d+\.png$/);
+    expect(toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Profile photo upload failed' })
     );
   });
 });
