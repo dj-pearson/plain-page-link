@@ -20,12 +20,12 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: "What's the difference between AgentBio and Linktree for real estate agents?",
     answer:
-      'AgentBio includes property listing galleries with photos and pricing, real estate-specific lead capture forms, calendar booking for showings, testimonials display, and the Equal Housing logo with your license number and the MLS number on each listing. Linktree only offers basic link organization without these real estate features.',
+      'AgentBio includes property listing galleries with photos and pricing, real estate-specific lead capture forms, calendar booking for showings, testimonials display, and the Equal Housing logo with your license number and the MLS number on each listing. Linktree is a general-purpose link page for anyone with an audience; it is not built around listings or real estate enquiries, so compare its features on linktr.ee against what you need.',
   },
   {
     question: 'Is AgentBio better than Linktree for realtors?',
     answer:
-      "Yes, for real estate professionals. AgentBio is purpose-built for agents with features like property galleries, buyer/seller lead forms, and showing appointment booking. Linktree is a generic link tool that wasn't designed for real estate workflows.",
+      'For an agent collecting leads from a bio link, usually yes. AgentBio is purpose-built for agents, with property galleries, buyer and seller lead forms and showing booking. Linktree is built to be general, and it is very good at that: if you only need somewhere to point your followers, it may be all you need.',
   },
 ];
 
@@ -55,7 +55,7 @@ export default function VsLinktree() {
         url: getCanonicalUrl('/vs/linktree'),
         name: 'AgentBio vs Linktree for Real Estate Agents: Which is Better?',
         description:
-          "Compare AgentBio and Linktree for real estate agents. AgentBio includes property listings, lead capture, and calendar booking—features Linktree doesn't offer.",
+          'Compare AgentBio and Linktree for real estate agents. AgentBio is built around property listings, buyer and seller lead capture and showing booking; Linktree is a general-purpose link page.',
       },
       faqPageSchema(FAQ_ENTRIES),
     ],
@@ -65,7 +65,7 @@ export default function VsLinktree() {
     <>
       <SEOHead
         title="AgentBio vs Linktree for Real Estate Agents: Which is Better?"
-        description="Compare AgentBio and Linktree for real estate agents. AgentBio includes property listings, lead capture, and calendar booking—features Linktree doesn't offer."
+        description="Compare AgentBio and Linktree for real estate agents. AgentBio is built around property listings, buyer and seller lead capture and showing booking; Linktree is a general-purpose link page."
         keywords={[
           'AgentBio vs Linktree',
           'Linktree for real estate agents',
@@ -87,10 +87,10 @@ export default function VsLinktree() {
                 <strong>AgentBio is better than Linktree for real estate agents</strong> because it
                 includes property listing galleries with photos and pricing, real estate-specific
                 lead capture forms, calendar booking for showing appointments, testimonials display,
-                and the Equal Housing logo with your license number—capabilities that generic
-                link-in-bio tools like Linktree simply don't offer. Linktree works for general link
-                organization, but AgentBio is purpose-built for converting Instagram followers into
-                qualified buyer and seller leads.
+                and the Equal Housing logo with your license number, all built around how agents get
+                enquiries. Linktree is built for general link organization, and AgentBio is
+                purpose-built for converting Instagram followers into qualified buyer and seller
+                leads.
               </p>
             </div>
           </div>
@@ -99,8 +99,8 @@ export default function VsLinktree() {
         {/* Hero */}
         <HeroSectionLazy
           title="AgentBio vs Linktree for Real Estate Agents"
-          subtitle="What a real estate agent gets that a general link tool does not"
-          description="Linktree wasn't designed for real estate. AgentBio was. Discover the features real estate professionals need that generic link tools can't provide."
+          subtitle="What each tool is built for, and what an agent's page needs"
+          description="Linktree is built to be general. AgentBio is built for real estate. Here is what each one is for, and which features an agent's page uses."
           primaryCta={{
             text: 'Try AgentBio Free',
             href: '/auth/register',
@@ -158,7 +158,9 @@ export default function VsLinktree() {
                     <th className="text-center p-6 glass-body font-light text-lg">
                       <div className="flex flex-col items-center gap-2">
                         <span>Linktree</span>
-                        <span className="text-sm text-muted-foreground">Generic Link Tool</span>
+                        <span className="text-sm text-muted-foreground">
+                          General-purpose link page
+                        </span>
                       </div>
                     </th>
                   </tr>
@@ -322,28 +324,31 @@ export default function VsLinktree() {
             </header>
 
             <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
+              {/* These three cards said what Linktree "can't" do and that its forms
+                  "don't" qualify leads. Nothing recorded checking that (US-648,
+                  following US-507), so they now say what AgentBio does. */}
               <ReasonCard
                 icon={<Home />}
-                title="Can't Showcase Property Listings"
-                description="Linktree can't display property galleries with photos, pricing, and details. You're limited to external links that send visitors away from your profile, creating friction in the buying process."
+                title="Listings on Your Page"
+                description="Each property shows its photos, price, beds and baths, status and MLS number on your AgentBio page, so a follower can look at the home before they enquire."
               />
 
               <ReasonCard
                 icon={<Home />}
-                title="No Lead Capture Forms"
-                description="Linktree's contact forms don't differentiate buyers from sellers or ask pre-qualification questions. AgentBio's forms are built specifically for real estate lead generation."
+                title="Buyer and Seller Lead Forms"
+                description="Separate buyer and seller forms ask timeline, price range and pre-approval, and every enquiry lands in your AgentBio lead inbox."
               />
 
               <ReasonCard
                 icon={<Home />}
-                title="No Real Estate-Specific Features"
-                description="Equal Housing and license disclosures, sold properties showcase, testimonials, and virtual tour integration are all missing from generic link tools. AgentBio includes everything real estate agents need."
+                title="Real Estate Details Built In"
+                description="Equal Housing and license disclosures, a sold properties showcase, testimonials and a virtual tour link on each listing are part of the page, not something you assemble from links."
               />
 
               <ReasonCard
                 icon={<DollarSign />}
                 title="Price, honestly"
-                description="Linktree is cheaper, and for a lot of people it is the right call. What you are paying us for is the property gallery, the lead forms and the booking — the things you would otherwise pay a web developer to build. If you are not capturing leads from Instagram, do not pay us for the ability to."
+                description="Linktree has a free tier that covers a lot of people, and for them it is the right call. What you are paying us for is the property gallery, the lead forms and the booking — the things you would otherwise pay a web developer to build. If you are not capturing leads from Instagram, do not pay us for the ability to."
               />
             </div>
           </div>
@@ -369,40 +374,54 @@ export default function VsLinktree() {
           the site.
         */}
 
-        {/* When Linktree Makes Sense (and When It Doesn't) */}
+        {/* Was "When Linktree Makes Sense (and When It Doesn't)", with a
+            "Linktree Fails If You..." column. The left column now reads
+            COMPETITORS.linktree.betterWhen, written to be fair to them, and the
+            right column says when AgentBio fits rather than when they fail
+            (US-648). */}
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">
-                  When Linktree Makes Sense (and When It Doesn't)
-                </span>
+                <span className="glass-heading">When to Choose Linktree, and When AgentBio</span>
               </h2>
+              <p className="text-xl glass-body max-w-3xl mx-auto">
+                {COMPETITORS.linktree.builtFor}
+              </p>
             </header>
 
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8">
-                <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-green-500/20">
-                  <h3 className="text-xl font-light text-green-700 mb-4">
-                    ✓ Linktree Works If You...
+                <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                  <h3 className="text-xl font-light text-foreground mb-4">
+                    Choose Linktree if&hellip;
                   </h3>
                   <ul className="space-y-3">
-                    <li className="glass-body">• Just need to organize social media links</li>
-                    <li className="glass-body">• Don't sell products or services directly</li>
-                    <li className="glass-body">• Are an influencer or content creator</li>
-                    <li className="glass-body">• Don't need lead capture or scheduling</li>
+                    {COMPETITORS.linktree.betterWhen.map((reason) => (
+                      <li key={reason} className="glass-body">
+                        &bull; {reason}
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
-                <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-red-500/20">
-                  <h3 className="text-xl font-light text-red-700 mb-4">
-                    ✗ Linktree Fails If You...
+                <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                  <h3 className="text-xl font-light text-foreground mb-4">
+                    Choose AgentBio if&hellip;
                   </h3>
                   <ul className="space-y-3">
-                    <li className="glass-body">• Sell real estate or services</li>
-                    <li className="glass-body">• Need to showcase products/listings</li>
-                    <li className="glass-body">• Want to capture qualified leads</li>
-                    <li className="glass-body">• Need appointment booking integration</li>
+                    <li className="glass-body">
+                      &bull; Your bio link is where buyers and sellers first contact you
+                    </li>
+                    <li className="glass-body">
+                      &bull; You want your listings on the page, not behind links
+                    </li>
+                    <li className="glass-body">
+                      &bull; You want buyer and seller enquiries kept apart in one lead inbox
+                    </li>
+                    <li className="glass-body">
+                      &bull; You want followers to book showings from your page
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -453,10 +472,10 @@ export default function VsLinktree() {
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-4">
-              <span className="glass-heading">Ready to Upgrade from Linktree?</span>
+              <span className="glass-heading">Ready to Try AgentBio?</span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Switch from a generic link tool to AgentBio's real estate platform
+              Put your listings, lead forms and booking behind your bio link
             </p>
             <Link
               to="/auth/register"
