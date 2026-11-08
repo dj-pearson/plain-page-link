@@ -1,4 +1,4 @@
-import { format as dateFnsFormat, formatDistance } from 'date-fns';
+import { formatDistanceWithSuffix } from './relativeTime';
 
 /**
  * Format currency (USD)
@@ -63,17 +63,14 @@ export function formatPhone(phone: string): string {
 }
 
 /**
- * Format date
- */
-export function formatDate(date: string | Date, formatStr: string = 'MMM d, yyyy'): string {
-  return dateFnsFormat(new Date(date), formatStr);
-}
-
-/**
- * Format relative time (e.g., "2 days ago")
+ * Format relative time (e.g., "2 days ago").
+ *
+ * No date-fns here (US-558): this module is shared by every route that shows a
+ * price, and a date-fns import put date-vendor on all of them. The unused
+ * formatDate went with it; format dates with Intl or src/lib/localDate.ts.
  */
 export function formatRelativeTime(date: string | Date): string {
-  return formatDistance(new Date(date), new Date(), { addSuffix: true });
+  return formatDistanceWithSuffix(new Date(date), new Date());
 }
 
 /**

@@ -57,12 +57,15 @@ const LAYOUT_SRC = 'src/components/layout/DashboardLayout.tsx';
  *   ApiKeys 5.3       Team 9.6          DeleteAccount 3.6 Workflows 14.3
  *   WorkflowBuilder 16.8                LeadDetailModal 26.2 (beyond Leads)
  *   DashboardLayout itself: 48.9 beyond the entry (ui-vendor is most of it)
+ * US-558 (2026-11-08): Analytics 47.4 -> 36.7 (Reports tab, UpgradeModal and
+ *   date-fns off first paint), Listings 38.2 -> 32.3 (format.ts no longer
+ *   imports date-fns). Budgets for both lowered to match.
  */
 export const DASHBOARD_ROUTES = [
   // What every dashboard route pays first; measured beyond the entry only.
   { src: LAYOUT_SRC, isLayout: true, maxKb: 54 },
   { src: 'src/pages/dashboard/Overview.tsx', maxKb: 42 },
-  { src: 'src/pages/dashboard/Listings.tsx', maxKb: 44 },
+  { src: 'src/pages/dashboard/Listings.tsx', maxKb: 37 },
   { src: 'src/pages/dashboard/Leads.tsx', maxKb: 35 },
   { src: 'src/pages/dashboard/Clients.tsx', maxKb: 24 },
   { src: 'src/pages/dashboard/OpenHouses.tsx', maxKb: 33 },
@@ -70,9 +73,10 @@ export const DASHBOARD_ROUTES = [
   { src: 'src/pages/dashboard/Theme.tsx', maxKb: 23 },
   { src: 'src/pages/dashboard/Links.tsx', maxKb: 18 },
   { src: 'src/pages/dashboard/Testimonials.tsx', maxKb: 15 },
-  // The heaviest agent route: useLeadStats, date-fns and the CSV writer load
-  // on open (US-535 nextSlices). Lower this when they move.
-  { src: 'src/pages/dashboard/Analytics.tsx', maxKb: 54 },
+  // The report builder (date-fns, the PDF writer) and the upgrade dialog load
+  // when opened (US-558). useLeadStats (the shared useLeads chunk) is still
+  // on first paint: the funnel numbers and insights are computed from it.
+  { src: 'src/pages/dashboard/Analytics.tsx', maxKb: 42 },
   { src: 'src/pages/dashboard/Settings.tsx', maxKb: 18 },
   { src: 'src/pages/dashboard/SubscriptionPage.tsx', maxKb: 10 },
   { src: 'src/pages/dashboard/ApiKeysPage.tsx', maxKb: 7 },
