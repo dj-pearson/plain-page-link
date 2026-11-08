@@ -3,6 +3,11 @@
  * hour the agent picks under Lead Notifications, US-518), and
  * "due today" means today here. Until the agent saves one, the picker shows
  * this device's zone and says it is not saved yet.
+ *
+ * US-631: a failed read also leaves timeZone null. That null means unknown,
+ * not unset, so the card says the read failed and offers Retry instead of the
+ * "Not saved yet" prompt, which would push the agent to save the device's zone
+ * over one that may already be stored.
  */
 import { useMemo } from 'react';
 import { Globe } from 'lucide-react';
@@ -10,6 +15,7 @@ import { useAgentTimeZone } from '@/hooks/useAgentTimeZone';
 import { useToast } from '@/hooks/use-toast';
 import { listTimeZones, localTimeIn, timeZoneLabel } from '@/lib/timeZone';
 import { Button } from '@/components/ui/button';
+import { SectionLoadError } from '@/components/dashboard/SectionLoadError';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
@@ -21,10 +27,10 @@ import {
 
 export function TimeZoneSetting() {
   const { toast } = useToast();
-  const { timeZone, detected, isLoading, update } = useAgentTimeZone();
+  const { timeZone, detected, isLoading, isKnown, isError, refetch, update } = useAgentTimeZone();
 
   const shown = timeZone ?? detected ?? 'UTC';
-  const unsaved = !isLoading && timeZone === null;
+  const unsaved = isKnown && timeZone === null;
   const zones = useMemo(() => listTimeZones([timeZone, detected]), [timeZone, detected]);
   const labels = useMemo(() => {
     const now = new Date();
@@ -63,37 +69,47 @@ export function TimeZoneSetting() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Select value={shown} onValueChange={save} disabled={isLoading || update.isPending}>
-          <SelectTrigger className="w-full sm:w-96" aria-labelledby="timezone-label">
-            <SelectValue placeholder="Select your time zone" />
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            {zones.map((zone) => (
-              <SelectItem key={zone} value={zone}>
-                {labels.get(zone)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isError ? (
+          <SectionLoadError
+            message="Your time zone did not load."
+            onRetry={() => void refetch()}
+            retryLabel="Retry loading your time zone"
+          />
+        ) : (
+          <>
+            <Select value={shown} onValueChange={save} disabled={isLoading || update.isPending}>
+              <SelectTrigger className="w-full sm:w-96" aria-labelledby="timezone-label">
+                <SelectValue placeholder="Select your time zone" />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                {zones.map((zone) => (
+                  <SelectItem key={zone} value={zone}>
+                    {labels.get(zone)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        {now && <p className="text-xs text-muted-foreground">It is {now} there now.</p>}
+            {now && <p className="text-xs text-muted-foreground">It is {now} there now.</p>}
 
-        {unsaved && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <p className="text-sm text-muted-foreground" role="status">
-              Not saved yet{detected ? ' — this is the zone your device is set to' : ''}. Until you
-              save one, your morning email follows UTC time.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="min-h-[44px] sm:min-h-0 shrink-0"
-              onClick={() => save(shown)}
-              disabled={update.isPending}
-            >
-              Use this time zone
-            </Button>
-          </div>
+            {unsaved && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <p className="text-sm text-muted-foreground" role="status">
+                  Not saved yet{detected ? ' — this is the zone your device is set to' : ''}. Until
+                  you save one, your morning email follows UTC time.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="min-h-[44px] sm:min-h-0 shrink-0"
+                  onClick={() => save(shown)}
+                  disabled={update.isPending}
+                >
+                  Use this time zone
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
