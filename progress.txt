@@ -5802,3 +5802,77 @@ Other findings:
 - [mobile] public/manifest.json theme_color (#2563eb) and index.html theme-color (#0ea5e9) still differ, as already recorded under US-283 (profile lane). profile-manifest.ts also hard-codes #2563eb.
 
 Owner decisions 2026-11-08: agents can add custom CSS (keep, scoped and sanitised; unblocks US-488); self-hosted storage should answer HEAD with 200.
+
+---
+
+## Continuous improvement loop — round 11 — 2026-11-08 (US-494 to US-503 done)
+
+Ten lanes; eight approved outright, uiux and marketing each needed one fix-up. Closed US-319, US-384, US-424, US-482, US-483, US-485, US-487, US-489, US-493; slice of US-443.
+One merge conflict (VsLater imports from marketing and seo) resolved by keeping both. CLAUDE.md no longer lists the deleted sync-manager.
+Final: tsc clean (app + node config), 2686 unit tests pass (from 2582), verify:migrations OK (82 files), vite build OK, eslint 567 warnings (CI ratchet 583 -> 567).
+
+- US-494 [listings] US-494: Remove the dead listing deletes that skipped ownership scoping and photo cleanup (closes US-482 and US-483)
+- US-495 [leads] Leads marked Closed were left out of the conversion figures on Analytics
+- US-496 [profile] The profile-completion widget showed 100% and disappeared while the agent's page was still unpublished
+- US-497 [uiux] Leads page: show who holds a lead, and let the owner reassign it (closes US-489)
+- US-498 [performance] The Settings page downloaded react-hook-form and zod (23.4 KB gzip) to check a username
+- US-499 [security] Revoked API keys still read is_active = true (US-384)
+- US-500 [enterprise] Downloading your data directly no longer marks a queued export "Completed" with no link
+- US-501 [marketing] Comparison pages quoted unsourced competitor prices and made AgentBio claims the product does not back
+- US-502 [seo] AgentBio's own price offers say they expire on 2026-12-31, and /blog describes a second, unlinked AgentBio in its structured data
+- US-503 [mobile] Onboarding avatar upload also stores the home-screen icons (US-493)
+
+Owner actions:
+- US-495: Apply migration supabase/migrations/20261108000495_won_statuses_count_as_conversions.sql (it only recreates two functions; no data changes, no edge function redeploys)
+- US-497: Apply migration supabase/migrations/20261108000497_lead_assignee_must_be_teammate.sql (adds the guard_lead_assignee trigger on leads; no data change)
+- US-497: Deploy Cloudflare Pages for the frontend change; no edge function changes
+- US-497: verify:schema was not run locally (no Postgres could be started in the sandbox). Watch CI verify-backend for the new check 'a lead can be assigned only to an accepted teammate'
+- US-499: Apply migration supabase/migrations/20261108000499_api_keys_revoked_is_inactive.sql to production. It fixes the existing revoked rows, then adds the CHECK. No edge function needs redeploying: api-auth.ts changed only a comment.
+- US-500: Redeploy the gdpr-export edge function (functions.agentbio.net Coolify app, which serves supabase/functions/ via edge-functions-server.ts) so the GET stops closing queued exports.
+
+Opened:
+- US-504 [uiux] Leads page: filter by assignee for team owners
+- US-505 [uiux] Bulk reassign selected leads
+- US-506 [performance] Settings route: load the below-the-fold security sections on demand (31.2 KB beyond layout)
+- US-507 [marketing] Comparison-table competitor feature cells are unverified
+- US-508 [marketing] VsLater and VsBeacons AgentBio rows: 'Advanced' analytics, 'Real Estate Templates', setup-time claims
+- US-509 [seo] Delete the unused HOMEPAGE_FAQS, PRICING_FAQS and COMPARISON_FAQS FAQ sets in src/lib/faq-schema.ts
+- US-510 [seo] Give the /blog WebSite one name across pages
+- US-511 [mobile] Dead offline-storage stack
+
+Other findings:
+- [listings] CLAUDE.md still lists src/lib/sync-manager.ts as a key file ('Sync manager for offline data synchronization' under Mobile Optimization, and in Key Files to Reference > Mobile & PWA). I did not edit CLAUDE.md; the owner or the loop's recorder should drop those lines now that the file is gone.
+- [listings] src/hooks/useOfflineStorage.ts and src/lib/offline-storage.ts (241 lines, plus the idb dependency in package.json:78) are also dead: the hook has no importers and is offline-storage's only consumer (App.tsx:157-162). I left them because offline storage is in the mobile lane and whether to build offline editing is an owner product decision. If no offline story is planned, the mobile lane could delete them and drop idb.
+- [listings] docs/reviews/CODE_REVIEW_FINDINGS.md:112 and docs/architecture/TECH_SPEC_PWA_MOBILE.md still describe sync-manager. Both are review and spec history, but TECH_SPEC_PWA_MOBILE may read as current.
+- [listings] src/lib/security/index.ts re-exports useSecurity. useSecureListings was its only hook consumer in src/hooks; another lane could check whether useSecurity is still used anywhere (security or uiux lane).
+- [listings] US-276 (visitor_id on leads, and 'Viewed N listings') remains open and needs coordinating with the leads lane, since it touches submit-lead and the lead detail.
+- [leads] US-463 is still open: src/types/lead.ts still declares LegacyLead, LeadFormType, LeadStatus, LeadPriority and ContactMethod. It is a contained cleanup for the next leads round.
+- [leads] verify:schema's 'every table referenced in code exists' check still fails on the loop branch because of the hex-string fixtures in supabase/functions/_shared/resend-webhook.test.ts (already recorded at progress.txt:5781). CI verify-backend stays red until that is fixed.
+- [leads] Local verify:schema: the system Postgres on :5432 needs a password. A trust-auth scratch cluster started via Node spawnSync as uid 102/gid 104 under /var/tmp, with -k set to that directory, works, and auth.uid() in the prelude reads request.jwt.claim.sub, not request.jwt.claims.
+- [profile] src/components/dashboard/ProfileCompletionWidget.tsx (next-step badge): the number shown is completedSteps + 1, but nextCompletionStep picks by priority, so the number does not match the step's place in the list. Dropping the number or using the step's index would fix it.
+- [profile] src/lib/profileCompletion.ts theme step: completed is !!profile.theme. If the profiles.theme column has a default value, this step is always ticked and means nothing. Worth checking the column default in types.ts or the migrations before relying on it.
+- [profile] The widget is hard-coded light (border-blue-200 bg-blue-50/50, bg-white, text-gray-*), so it ignores dark mode. Belongs to the uiux lane.
+- [uiux] US-420 still needs an owner decision (one team per user, or a team switcher). Until then useLeadAssignees, like TeamPage, looks only at the single team the viewer owns (teams.owner_id = user, maybeSingle).
+- [uiux] src/components/leads/LeadDetailModal.tsx:~492: the AI Lead Score panel uses bg-gradient-to-r and hard-coded text-red-500 and text-amber-500. That breaks the craft floor rule against gradients, and those colours are not theme tokens. This is an existing issue and was not touched.
+- [uiux] src/pages/dashboard/Leads.tsx:~960-985: the lead row's checkbox button uses hover:bg-gray-100 and text-gray-400, and the loading skeleton uses bg-gray-200. These hard-coded grays ignore dark mode.
+- [uiux] Team members appear by email (team_members.email) because the owner cannot read teammates' profiles.full_name through the column grants. If names are wanted, a SECURITY DEFINER roster function that applies assert_caller_is would be needed.
+- [performance] src/lib/usernameValidation.ts: the profanity check is a substring match, so 'classic', 'hello' and 'assistant'-style usernames are rejected as inappropriate ('ass', 'hell'). I kept this unchanged and the test pins it, but it is a real signup and rename irritant; the fix needs a product decision on the word list or on whole-word matching.
+- [performance] src/lib/usernameValidation.ts: the max-length message says 'less than 30 characters', but 30 is allowed. The test pins the old wording; a copy fix would need the test updated.
+- [performance] src/utils/validation.ts:37 has a second usernameSchema (used by Register) next to usernameValidation.ts. The two rule sets can drift; Register could reuse usernameError inside a zod refine.
+- [security] US-342 is still open and small: useSecureListings and ListingsBlock select('*') on listings. src/hooks/useListings.ts does too (progress.txt:5698). src/hooks/useLinks.ts:37 select('*') on links follows the same pattern (progress.txt:5717).
+- [security] US-466 (map listings_virtual_tour_url_scheme with urlSchemeErrorFrom in the listing save path) is a contained follow-up slice for the next round.
+- [security] scripts/verify-schema.mjs has 14 eslint errors that were already there (missing node globals and no-control-regex at :481). An eslint env override for scripts/*.mjs would clear them if CI ever lints scripts/.
+- [security] Operator note: verify:schema cannot run in this agent sandbox because the local Postgres 16 cluster needs a password for postgres. A trust-auth scratch database for agents would let lanes run verify:schema before committing.
+- [enterprise] src/components/profile/LazyModal.test.tsx:35: in the full vitest run, the simulated failed dynamic import surfaces as an unhandled error ('Failed to fetch dynamically imported module'), even though every test passes. The file passes cleanly on its own. Worth handling the rejection inside the test so CI output stays clean (profile lane).
+- [enterprise] supabase/functions/gdpr-export/index.ts still uses console.error in several places (for example the export-incomplete path and the audit-write failure) rather than a shared logger. That is acceptable for Deno functions but inconsistent with reportError use elsewhere.
+- [enterprise] US-405 (stream large queued exports instead of holding the whole JSON in memory) remains the most valuable open enterprise export story, but it is too large for this session.
+- [marketing] US-297 (planLimits.ts:150 METERED_KEYS still includes emails_per_month, so the dashboard meters emails that never send) is still open. It is a small, self-contained next slice for this lane.
+- [marketing] US-296 (dead USAGE_PRICING with SMS prices, src/config/pricing-plans.ts:~300-350) is still open. This change added linkAllowanceSummary next to it but did not touch it.
+- [marketing] src/lib/faq-schema.ts:210 FEATURE/COMPARISON FAQ says 'testimonial showcases with schema markup' and 'lead capture forms with pre-qualification scoring'. It belongs to US-369 (dead modules) if nothing imports it; check before deleting.
+- [marketing] The target=_blank links that link to competitors (here and on VsLinktree) use rel='nofollow noopener' without noreferrer. This is harmless, but the same pattern repeats on all four pages.
+- [seo] src/components/blog/BlogListSEO.tsx og:image and twitter:image still hard-code `${siteUrl}/Cover.png` instead of DEFAULT_SOCIAL_IMAGE.path or getOgImageUrl(). The value is correct today but it is a second copy of the path.
+- [seo] src/lib/seo.ts generateEnhancedLocalBusinessSchema still emits a ProfessionalService node with no @id and logo { url } but no size, next to the Organization node on the homepage. It is now linked to the Organization through provider, but it should get an @id (for example `${origin}/#service`) or be merged into the Organization.
+- [seo] US-389 and the rest of US-371 are still blocked on the owner deciding whether profiles on custom domains should use the custom domain as their canonical (src/pages/public/FullProfilePage.tsx still uses getSafeOrigin()).
+- [seo] Prerendered pages carry build date plus one year as priceValidUntil. If the site went a year without a rebuild the date would lapse again. The deploy cadence makes this moot, but the seo-audit script could flag a priceValidUntil that is in the past.
+- [mobile] src/pages/onboarding/OnboardingWizardPage.tsx: the onboarding photo is uploaded without validateUpload (magic-number check, US-076) and without a size check, unlike useProfileImageUpload. The bucket's file_size_limit and allowed_mime_types are the only guard (security/uiux lane).
+- [mobile] src/pages/onboarding/OnboardingWizardPage.tsx: on a 'Try again' after a failed save, handleComplete uploads the photo (and now its icons) again under a new timestamp, leaving orphaned objects in avatars/<uid>/. The next dashboard avatar upload deletes them, but an agent who never uploads again keeps them.

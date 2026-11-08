@@ -4991,8 +4991,8 @@
       "description": "The ForRealEstateAgents comparison table states Linktree $24 and Beacons $10 a month, with nothing behind either figure. Competitor pricing changes and is a comparative-advertising risk. Source and date the figures, or remove the price row for competitors.",
       "acceptanceCriteria": ["Each competitor price is removed, or shown with a source and a date"],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-310)"
+      "passes": true,
+      "notes": " (follow-up from US-310) DONE in round 11 as US-501."
     },
     {
       "id": "US-311",
@@ -5961,8 +5961,8 @@
         "verify:schema or a migration test asserts this"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "The partial indexes idx_api_keys_key_hash and idx_api_keys_expires_at filter on is_active = true (follow-up from US-377)"
+      "passes": true,
+      "notes": "The partial indexes idx_api_keys_key_hash and idx_api_keys_expires_at filter on is_active = true (follow-up from US-377) DONE in round 11 as US-499."
     },
     {
       "id": "US-385",
@@ -6609,8 +6609,8 @@
         "The settings list shows an accurate status after a direct download"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-414)"
+      "passes": true,
+      "notes": " (follow-up from US-414) DONE in round 11 as US-500."
     },
     {
       "id": "US-415",
@@ -6872,7 +6872,7 @@
       "acceptanceCriteria": ["Before/after closure numbers", "Settings.test.tsx passes"],
       "priority": 2,
       "passes": false,
-      "notes": " (follow-up from US-431)"
+      "notes": " (follow-up from US-431) Slice done in round 11 as US-498."
     },
     {
       "id": "US-432",
@@ -7427,8 +7427,8 @@
         "The delete is scoped to the caller's user_id"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-472)"
+      "passes": true,
+      "notes": " (follow-up from US-472) DONE in round 11 as US-494."
     },
     {
       "id": "US-483",
@@ -7438,8 +7438,8 @@
       "description": "The lane brief reports src/hooks/useSecureListings.ts as dead code. Confirm it has no importers and delete it, so nobody copies its older patterns.",
       "acceptanceCriteria": ["No importers remain", "tsc and the listings suites still pass"],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-472)"
+      "passes": true,
+      "notes": " (follow-up from US-472) DONE in round 11 as US-494."
     },
     {
       "id": "US-484",
@@ -7483,8 +7483,8 @@
         "verify:migrations and verify:schema pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-473)"
+      "passes": true,
+      "notes": " (follow-up from US-473) DONE in round 11 as US-495."
     },
     {
       "id": "US-474",
@@ -7526,8 +7526,8 @@
         "Tests cover each new item"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-474)"
+      "passes": true,
+      "notes": " (follow-up from US-474) DONE in round 11 as US-496."
     },
     {
       "id": "US-488",
@@ -7570,8 +7570,8 @@
         "Tests"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-475)"
+      "passes": true,
+      "notes": " (follow-up from US-475) DONE in round 11 as US-497."
     },
     {
       "id": "US-476",
@@ -7725,8 +7725,285 @@
         "An onboarding upload still succeeds when icons cannot be rendered"
       ],
       "priority": 2,
+      "passes": true,
+      "notes": " (follow-up from US-481) DONE in round 11 as US-503."
+    },
+    {
+      "id": "US-494",
+      "lane": "listings",
+      "round": 11,
+      "title": "US-494: Remove the dead listing deletes that skipped ownership scoping and photo cleanup (closes US-482 and US-483)",
+      "description": "US-482 asked for the offline listing delete in src/lib/sync-manager.ts to be fixed. Its old code at :162-170 ran `.from('listings').delete().eq('id', id)` with no user_id filter, no `.select`, and no photo cleanup. Nothing imports sync-manager.ts. The only possible callers are App.tsx, useOfflineStorage and offline-storage, and none of them imports it; the App.tsx:157-161 comment (US-260) already says so. src/hooks/useSecureListings.ts had no importers either, and its admin-wide delete (:257) also skipped photo cleanup. So both deletes were unreachable, but both were ready to be copied or wired back in. Fixing dead code would add little, so I deleted both files. I also added a repo guard test, src/listing-delete-guard.test.ts. It fails on any `.from('listings') ... .delete(` in the browser bundle outside src/hooks/useListings.ts. It also checks that deleteListing keeps `.eq('user_id', ...)` and `.select('id')`, the zero-rows check that controls photo cleanup.",
+      "acceptanceCriteria": [
+        "src/lib/sync-manager.ts and src/hooks/useSecureListings.ts are deleted and have no importers (tsc passes)",
+        "The only browser-side listings delete is useListings.deleteListing, and a guard test enforces this",
+        "The guard test requires deleteListing to be user_id-scoped and to select the removed ids, so a refused delete leaves storage alone",
+        "The guard's matcher is tested against the sync-manager shape. Restoring the two deleted files makes the guard fail and name both of them",
+        "Full vitest and tsc pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence: grep across src, scripts, .github and the vite/vitest config found no importer of sync-manager or useSecureListings (only comments in App.tsx:160 and scripts/check-bundle-size.mjs:274). The old sync-manager.ts:162-170 deleted unscoped and did no photo cleanup. useSecureListings.ts:257 was an admin-wide delete. Changes: deleted those two files (618 lines); updated the comments in src/App.tsx:157-162 and src/lib/offline-storage.ts:23-25 so they no longer describe sync-manager as live; added src/listing-delete-guard.test.ts. The guard walks every non-test .ts/.tsx file under src. For each `.delete(` it finds the nearest preceding `.from(`, and if that table is 'listings' it records the statement. Every such delete must be in hooks/useListings.ts, and there must be exactly one there, with user_id scoping and `.select('id')`. To check the guard actually bites, I temporarily restored both deleted files: the guard failed and listed exactly `hooks/useSecureListings.ts` and `lib/sync-manager.ts`. I then removed them again. US-482's alternative, moving removeListingPhotoObjects and discardUnsavedPhotos into a non-hook module, is now only needed if offline sync is ever built. I did not do it.\n\nVERIFIED: npx tsc --noEmit: passed, no output (TSC_OK). npx vitest run src/listing-delete-guard.test.ts src/hooks/useListings.test.ts src/lib/listingPhotoCleanup.test.ts: 3 files, 38 tests passed. Guard check with both deleted files temporarily restored: 1 failed and 3 passed; the failing test listed ['hooks/useSecureListings.ts', 'lib/sync-manager.ts']; the files were removed afterwards. Full npx vitest run: 273 files passed, 2586 tests passed, 1 skipped. npx eslint src/listing-delete-guard.test.ts src/App.tsx src/lib/offline-storage.ts: 0 errors and 3 warnings, all in offline-storage.ts at 82:25 (empty constructor), 130:9 and 235:7 (console). I only changed a comment in that file and did not compare against the pre-change lint output, so I can't confirm the warnings are old. The new test and App.tsx are clean, and the two deleted files' warnings leave the repo total. No migration, so verify:migrations does not apply. The pre-commit hook (lint-staged: eslint --fix and prettier) passed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-495",
+      "lane": "leads",
+      "round": 11,
+      "title": "Leads marked Closed were left out of the conversion figures on Analytics",
+      "description": "Implements open story US-485. lead_stats() (supabase/migrations/20260930000005_lead_stats.sql:35) counted by_source.converted with status = 'converted', and analytics_summary() (supabase/migrations/20261028000007_analytics_summary.sql:69) did the same for 'conversions'. So when an agent moved a lead to the won status 'closed', it dropped out of the per-source conversion column, the Analytics conversion rate and the previous-period comparison. The dashboard's Won chip and the funnel already count both statuses through WON_STATUSES. A new migration recreates both functions with status IN ('converted', 'closed') and changes nothing else.",
+      "acceptanceCriteria": [
+        "by_source.converted and analytics_summary conversions count converted and closed",
+        "A test reads the migration and holds its won list equal to WON_STATUSES in src/lib/leadStatus.ts",
+        "verify:migrations and verify:schema pass (verify:schema: the lead_stats/analytics_summary/RPC/DEFINER checks pass; the only failure on a fresh database is the pre-existing resend-webhook fixture check from progress.txt:5781)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Files:\n- /home/user/plain-page-link/.claude/worktrees/wf_56090af3-693-2/supabase/migrations/20261108000495_won_statuses_count_as_conversions.sql: CREATE OR REPLACE for public.lead_stats(timestamptz, integer) and public.analytics_summary(timestamptz, timestamptz, text). I diffed both bodies against the originals with comments and whitespace stripped. Only the two won filters changed. Both stay SECURITY INVOKER with SET search_path = public, extensions, pg_temp, and the REVOKE FROM PUBLIC, anon / GRANT TO authenticated, service_role lines are restated. Neither function takes a user-id argument (the caller is auth.uid()), so assert_caller_is does not apply.\n- /home/user/plain-page-link/.claude/worktrees/wf_56090af3-693-2/src/lib/wonStatusesSql.test.ts: finds the latest migration that defines each function, so a later redefinition is also checked. For each one it asserts there is no status = 'converted' filter, that every status IN (...) list containing 'converted' equals WON_STATUSES, and that SECURITY INVOKER, the pinned search_path and the REVOKE are still there. With the new migration moved aside, 4 of its 6 tests fail.\n- No frontend change: useLeadStats.ts:24/34 and useAnalytics.ts:154 read the fields as they are, so the Analytics source table and conversion rate pick up the fix once the migration is applied.\nBehaviour check on a scratch Postgres 16 with every migration applied: one owner has zillow leads that are converted, closed and lost, plus one website lead that is new. lead_stats().by_source returned zillow {leads:3, converted:2} and website {leads:1, converted:0}; analytics_summary(now()-1 day).conversions returned 2.\n\nVERIFIED: npx tsc --noEmit: passed, no errors.\nnpx vitest run src/lib/wonStatusesSql.test.ts src/lib/leadStatus.test.ts src/hooks: 30 files, 215 tests passed.\nFull npx vitest run: 273 files passed; 2588 tests passed, 1 skipped.\nnpm run verify:migrations: \"[migrations] OK — 80 migration files structurally valid.\"\nnpx eslint src/lib/wonStatusesSql.test.ts: no output (no warnings). Prettier reformatted the test in the pre-commit hook; re-run afterwards: 6/6 pass.\nverify:schema: run against a scratch Postgres 16 cluster (scripts/supabase-prelude.sql plus every migration in one pass with ON_ERROR_STOP=1, all applied). These checks pass: \"lead_stats counts every lead the caller owns, and only those\", \"analytics_summary counts past the old row caps, inside the plan history window\", \"every RPC referenced in code exists\", \"every rpc() call's named arguments exist on the function\", \"SECURITY DEFINER functions pin search_path\", \"SECURITY DEFINER functions are not callable by anon/authenticated unless allowed\", \"every rpc() the browser calls is executable by authenticated\". On the fresh database exactly 1 check failed. A second run showed two failures, both pre-existing and not related to this change: \"every table referenced in code exists\" (resend-webhook.test.ts hex fixtures, progress.txt:5781) and \"zip routing ... left no audit row\", which only happens when re-running on the same database (progress.txt:5783).\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261108000495_won_statuses_count_as_conversions.sql (it only recreates two functions; no data changes, no edge function redeploys)"
+    },
+    {
+      "id": "US-496",
+      "lane": "profile",
+      "round": 11,
+      "title": "The profile-completion widget showed 100% and disappeared while the agent's page was still unpublished",
+      "description": "US-487 (slice of US-283), committed as US-496. The dashboard's ProfileCompletionWidget now counts three more steps: the publish state (only is_published === true counts), the brokerage logo, and service areas (cities or ZIP codes). Before this, an agent whose page was hidden from every visitor could see the checklist at 100% and then lose it. \"Publish your page\" is a high-priority step. It is listed last, so the widget only suggests it once the photo, bio and contact details are in, but before any medium or low step. It links to /dashboard/settings#publish, which PublishProfileCard already scrolls to. Checklist links can now open a specific profile tab with ?tab= (service, professional, contact).",
+      "acceptanceCriteria": [
+        "The widget's percentage reflects is_published, brokerage_logo and service_cities/service_zip_codes",
+        "An unpublished but otherwise complete profile shows 90% and 'Next: Publish your page' linking to /dashboard/settings#publish",
+        "Tests cover each new item (lib unit tests + widget render tests)",
+        "/dashboard/profile?tab=service opens the Service Areas tab; unknown tab values fall back to Basic Info"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What the widget did before: src/components/dashboard/ProfileCompletionWidget.tsx:33-90 listed 7 steps (photo, bio, contact, listings, testimonials, links, theme). It had no publish, logo or service-area step, and line 97 hid the widget once those 7 were done.\n\nWhat changed:\n- New src/lib/profileCompletion.ts holds buildCompletionSteps(profile, counts), nextCompletionStep(steps) and profileTabFromSearch(search), with PROFILE_TABS. There are now 10 steps, adding service-areas (medium), brokerage-logo (low) and publish (high, last). Text checks ignore blank strings.\n- The widget now calls the helper. Its markup and styling are unchanged.\n- src/pages/dashboard/Profile.tsx (the tab useState near line 203) now takes its starting tab from ?tab= in window.location.search, falling back to 'basic' for anything unrecognised.\n\nTests added: src/lib/profileCompletion.test.ts (8 tests), src/components/dashboard/ProfileCompletionWidget.test.tsx (3 render tests checking the percentage, the next step and the link hrefs), and 2 tab deep-link tests in src/pages/dashboard/Profile.test.tsx. The pre-commit hook ran prettier on the staged files, which only reformatted trailing commas.\n\nLeft alone on purpose: US-486 (theme colours) and US-488 (custom_css, needs an owner decision).\n\nVERIFIED: npx tsc --noEmit: clean, no output.\nnpx vitest run src/lib/profileCompletion.test.ts src/components/dashboard/ProfileCompletionWidget.test.tsx src/pages/dashboard/Profile.test.tsx src/pages/dashboard/Overview.test.tsx: 4 files, 33 tests passed (run before the 2 Profile tab tests were added).\nnpx vitest run src/pages/dashboard/Profile.test.tsx after adding those 2 tests: 20 passed.\nFull npx vitest run: 274 files passed; 2595 tests passed, 1 skipped.\nnpx eslint on the 6 changed files: 0 errors and 4 warnings. All 4 are react/no-unescaped-entities at Profile.tsx:1273-1288, existing lines this change did not touch, so no new warnings.\nNo migration, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-497",
+      "lane": "uiux",
+      "round": 11,
+      "title": "Leads page: show who holds a lead, and let the owner reassign it (closes US-489)",
+      "description": "The lead's owner can now see who holds each lead and hand it to an accepted teammate, or clear the assignment. Before this, leads that US-475 unassigned when a teammate left could not be given to anyone from the dashboard. The database now refuses an assignee who is not an accepted teammate. That matters because whoever assigned_to names can read the lead and decrypt its email and phone.",
+      "acceptanceCriteria": [
+        "The lead detail dialog shows an 'Assigned to' select (label wired with htmlFor) to the lead's owner when they own a team. The choices are Unassigned, Me and each accepted teammate (by email). Pending invitees are left out",
+        "Changing it updates leads.assigned_to scoped to id and user_id, with select('id').single(). On success a toast names the person and onLeadUpdated refetches the list. Nothing changes on screen until the save works: a refusal leaves the select on the real assignee and shows a destructive toast. The guard_lead_assignee refusal gets its own message and re-reads the roster",
+        "If the lead is assigned to someone off the team, that person shows as a disabled 'Someone not on your team' choice",
+        "A solo agent sees no control. A team with nobody accepted yet shows a note saying so. A failed roster load shows role=alert with a Try again button",
+        "A teammate viewing a lead assigned to them sees 'Assigned to you' as plain text, with no control",
+        "Each lead row shows an 'Assigned to <name>' badge when the lead has an assignee",
+        "Migration 20261108000497 adds a BEFORE INSERT OR UPDATE OF assigned_to trigger. It refuses an anon or authenticated write naming anyone except NULL, the owner, or an accepted member of a team the owner owns, with check_violation and DETAIL lead_assignee_not_teammate. Service role and SECURITY DEFINER callers (auto_assign_lead, the US-475 departure trigger) are not affected",
+        "verify-schema has a new check: the owner can assign to a teammate, to nobody and to themselves, and is refused for a stranger and for a pending invitee, with the lead left unchanged"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-489, the open uiux slice. I did not do US-420: it needs the owner to decide between one team per user and a team switcher.\n\nEvidence:\n- Before this, Leads.tsx had only an 'assigned to me' filter (~lines 119, 154-165) and nothing that showed or changed the assignee.\n- The leads UPDATE policy in 20261028000004 checks `USING/WITH CHECK auth.uid() = user_id OR auth.uid() = assigned_to`, so the owner could set assigned_to to any uuid.\n- Whoever assigned_to names can then decrypt the lead's email and phone through pii-crypto (supabase/functions/pii-crypto/index.ts:194, decrypt_leads filters user_id OR assigned_to) and gets a notification from notify_lead_assignee (20260930000006). That is why I added a server guard alongside the UI.\n\nFiles:\n- New: src/lib/leadAssignee.ts (describeAssignee, assigneeLabel, isNotTeammateError).\n- New: src/hooks/useLeadAssignees.ts. It reads the team the viewer owns, then its accepted members with a user_id, under the existing teams and team_members SELECT policies (is_team_admin covers the owner).\n- New: src/components/leads/LeadAssigneeControl.tsx. It uses a native select, the same pattern as TeamPage's role selects, and theme tokens only.\n- Changed: LeadDetailModal.tsx renders the control under the status selector.\n- Changed: Leads.tsx shows a secondary badge with a UserCheck icon when a lead has an assignee. It leaves out 'Unassigned' on rows to avoid noise; the dialog shows it.\n- New migration: supabase/migrations/20261108000497_lead_assignee_must_be_teammate.sql. guard_lead_assignee is SECURITY INVOKER (it checks current_user, like guard_frozen_columns), pins search_path, and has EXECUTE revoked from PUBLIC, anon and authenticated.\n- Changed: scripts/verify-schema.mjs gains the check 'a lead can be assigned only to an accepted teammate'.\n\nI stayed out of lead stats (the leads lane's area this round) and touched only the list row and the detail dialog.\n\nVERIFIED: - `npx tsc --noEmit`: clean, before and after the pre-commit prettier pass.\n- `npx vitest run src/lib/leadAssignee.test.ts src/components/leads/LeadAssigneeControl.test.tsx`: 2 files, 17 tests passed.\n- `npx vitest run src/hooks/useLeadAssignees.test.tsx`: 3 passed.\n- `npx vitest run src/pages/dashboard/Leads.test.tsx src/components/leads src/test/a11y`: 6 files, 58 passed.\n- After the commit, `npx vitest run src/lib/leadAssignee.test.ts src/components/leads src/hooks/useLeadAssignees.test.tsx src/pages/dashboard/Leads.test.tsx`: 7 files, 61 passed.\n- Full `npx vitest run`: 275 files, 2602 passed, 1 skipped.\n- `npm run verify:migrations`: OK, 80 migration files structurally valid.\n- `npx eslint` on the changed src files: 0 errors and 1 warning, the no-useless-assignment at Leads.tsx:414. That warning is already recorded in progress.txt as present on HEAD. `npm run lint` covers src/ only.\n- `node --check scripts/verify-schema.mjs`: OK.\n- NOT run: `npm run verify:schema`. Starting a local Postgres needs initdb and pg_ctl to run as the postgres user, and the sandbox refused su and runuser in this isolated worktree. So the new SQL and the new check have not been run against a real Postgres yet; CI verify-backend will run them.\n\nREVIEW: fix_required; fix-up: I confirmed the reviewer's finding. The fixture for the US-236 check ('an assignee works a lead but cannot take it or hand it away') has the owner reassign the lead to `third`, who is on no team. guard_lead_assignee refuses that on purpose, and the guard itself is correct. The only change is in that check in /home/user/plain-page-link/.claude/worktrees/wf_56090af3-693-4/scripts/verify-schema.mjs. It now creates a team owned by `owner` (id ...236b05) with `mate` and `third` as accepted members, and its cleanup deletes the team_members and teams rows. Committed as 0176b9b \"US-497: address review\". loop/r11-uiux was force-moved to HEAD. Nothing was pushed, and prd.json and progress.txt were not touched.\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261108000497_lead_assignee_must_be_teammate.sql (adds the guard_lead_assignee trigger on leads; no data change) | Deploy Cloudflare Pages for the frontend change; no edge function changes | verify:schema was not run locally (no Postgres could be started in the sandbox). Watch CI verify-backend for the new check 'a lead can be assigned only to an accepted teammate'"
+    },
+    {
+      "id": "US-504",
+      "lane": "uiux",
+      "round": 11,
+      "title": "Leads page: filter by assignee for team owners",
+      "description": "Owners can now see and change assignees, but the list can only filter 'assigned to me'. Add an assignee filter (Unassigned / each teammate) to the Leads toolbar, carried through useLeads and the CSV export, and kept in the URL like status and type.",
+      "acceptanceCriteria": [
+        "A team owner can filter the list to Unassigned or to one teammate, and the choice is kept in the URL",
+        "The CSV export respects the filter",
+        "Solo agents do not see the filter"
+      ],
+      "priority": 2,
       "passes": false,
-      "notes": " (follow-up from US-481)"
+      "notes": " (follow-up from US-497)"
+    },
+    {
+      "id": "US-505",
+      "lane": "uiux",
+      "round": 11,
+      "title": "Bulk reassign selected leads",
+      "description": "Leads.tsx already supports bulk status changes and bulk delete. Add 'Assign to…' to the bulk action bar for owners, going through the same guard_lead_assignee rules, and report partial failures.",
+      "acceptanceCriteria": [
+        "The owner can assign or unassign the selected leads in one action",
+        "A refused row is reported, and the other rows still update"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-497)"
+    },
+    {
+      "id": "US-498",
+      "lane": "performance",
+      "round": 11,
+      "title": "The Settings page downloaded react-hook-form and zod (23.4 KB gzip) to check a username",
+      "description": "US-443 slice. On /dashboard/settings, the only module that imported zod was src/lib/usernameValidation.ts (imported by Settings.tsx:13 and useUsernameCheck.ts:3). Because of that one import, the route pulled in the whole form-vendor chunk (react-hook-form + @hookform/resolvers + zod, 23.4 KB gzip). validateUsername now uses plain checks. They run in the same order and return the same messages, and the first failure wins, as with zod's errors[0]. The weight the Settings route downloads beyond the entry chunk and DashboardLayout fell from 54.6 KB to 31.2 KB gzip.",
+      "acceptanceCriteria": [
+        "Settings closure beyond entry + DashboardLayout measured from the vite build manifest: 54.6 KB -> 31.2 KB gzip; form-vendor is no longer in it",
+        "validateUsername returns the same result as the old zod schema for every case in usernameValidation.test.ts (length, pattern, profanity, reserved, unicode, ordering of errors)",
+        "Source guard: usernameValidation.ts does not import zod, react-hook-form or @hookform/*",
+        "Settings.test.tsx, useUsernameCheck.test.ts and Register.test.tsx still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "How it was measured: I ran `npx vite build --manifest` before and after the change, then ran the closure script from the earlier rounds (/tmp/claude-0/-home-user-plain-page-link/3a5c39fd-7090-5660-8a7d-dbafb71cb691/scratchpad/closure.mjs dist src/pages/dashboard/Settings.tsx). It takes the static closure of the route chunk, subtracts the entry closure and the DashboardLayout closure, and gzips what remains.\n\nBefore (54.6 KB): form-vendor 23.4, Settings 17.3, useNotificationPreferences 1.4, select 1.1, useNativeMFA 1.1, dropdown-menu 1.0, useUsernameCheck 0.9, alert-dialog 0.7, and so on.\nAfter (31.2 KB): Settings 17.3, useNotificationPreferences 1.4, select 1.1, useNativeMFA 1.1, dropdown-menu 1.0, and so on. The form-vendor chunk is gone.\n\nThe before dist is kept at /tmp/claude-0/-home-user-plain-page-link/3a5c39fd-7090-5660-8a7d-dbafb71cb691/scratchpad/r11perf-dist-before.\n\nWhy this module: a grep for react-hook-form, zod and @hookform across every component and hook on the Settings route found only src/lib/usernameValidation.ts. Nothing outside that file used its usernameSchema export (grep across src, supabase, functions and scripts). Register has its own zod usernameSchema in src/utils/validation.ts:37, which it uses with react-hook-form. That schema is unchanged.\n\nChanges:\n- src/lib/usernameValidation.ts: removed `import { z } from 'zod'` and the unused usernameSchema export. Added usernameError(username), which returns the first rule broken or null. It checks min length 3, then max length 30, then the pattern, then profanity, then reserved names, in that order and with the same messages. Also added USERNAME_MIN_LENGTH and USERNAME_MAX_LENGTH. validateUsername keeps its signature, and a non-string input still returns 'Invalid username'.\n- src/lib/usernameValidation.test.ts (new): 28 parametrised cases, each compared against the old zod schema, which is rebuilt inside the test. Tests may import zod because test code is not bundled. Also covers error ordering, a non-string input, and a source guard against importing zod or react-hook-form.\n\nThere is no behaviour change. The migration comment in 20260808000001 that mentions RESERVED_USERNAMES in this file is still accurate.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run src/lib/usernameValidation.test.ts src/pages/dashboard/Settings.test.tsx src/lib/username.test.ts`: 3 files, 47 tests passed.\n- Full `npx vitest run`: 273 files passed; 2614 tests passed, 1 skipped.\n- `npx eslint src/lib/usernameValidation.ts src/lib/usernameValidation.test.ts`: no output (0 warnings).\n- `npx vite build --manifest`: built in both the before and after runs.\n- Closure script: 54.6 KB before, 31.2 KB after.\n- `npm run route-weight` was not run to completion: it needs Playwright browsers, which are not installed in this sandbox. It only covers public routes, and none of them import usernameValidation.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-506",
+      "lane": "performance",
+      "round": 11,
+      "title": "Settings route: load the below-the-fold security sections on demand (31.2 KB beyond layout)",
+      "description": "The Settings chunk itself is 17.3 KB. It inlines SessionManagement, AuditLogViewer, GDPRSettings (370 lines), NativeMFASettings, LeadNotificationPreferences and TimeZoneSetting. All of them render below the Security & Privacy header (Settings.tsx ~670-690), far below the fold. Put them behind React.lazy, mounted when scrolled near (IntersectionObserver) or after first paint, with a skeleton. Settings.test.tsx already mocks these children.",
+      "acceptanceCriteria": [
+        "Settings closure beyond entry + DashboardLayout measured before and after",
+        "Each lazy section renders once it is scrolled into view; a #hash link to a section still works",
+        "Settings.test.tsx passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "dropdown-menu, select and useNativeMFA in the closure come from these sections, so they would also leave the first load. (follow-up from US-498)"
+    },
+    {
+      "id": "US-499",
+      "lane": "security",
+      "round": 11,
+      "title": "Revoked API keys still read is_active = true (US-384)",
+      "description": "Keys revoked before US-377 had revoked_at set and is_active = true, because US-044's revoke (commit 98284df) wrote only revoked_at. The two columns disagreed. As a result, the partial indexes idx_api_keys_key_hash / idx_api_keys_expires_at (WHERE is_active = true) still indexed revoked keys, the GDPR export (_shared/gdpr-export.ts:99) reported revoked keys as active, and any reader that checked only one column would have accepted a revoked key. A new migration fixes the existing rows and adds a CHECK constraint so the columns cannot drift apart again.",
+      "acceptanceCriteria": [
+        "No api_keys row has revoked_at IS NOT NULL AND is_active = true (backfill UPDATE runs before the constraint is added)",
+        "CHECK api_keys_revoked_is_inactive (revoked_at IS NULL OR is_active = false) refuses a revoked-but-active row, even from service_role",
+        "verify:schema check 'a revoked api key is never is_active' asserts zero disagreeing rows, refusal of revoke-without-deactivate and revoked-on-insert, and that the api-keys function's two-column revoke still works",
+        "Vitest asserts the migration's backfill-then-constraint order and that supabase/functions/api-keys/index.ts revoke sets both columns"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-384, the open security-lane story that the last three rounds of progress.txt (lines 5476, 5714, 5789) flagged as the next small slice.\n\nChanges:\n- supabase/migrations/20261108000499_api_keys_revoked_is_inactive.sql: `UPDATE public.api_keys SET is_active = false WHERE revoked_at IS NOT NULL AND is_active IS TRUE;` then `ADD CONSTRAINT api_keys_revoked_is_inactive CHECK (revoked_at IS NULL OR is_active = false)`, with a constraint comment. revoked_at stays the record of when a key was revoked. is_active=false with no revoked_at is still allowed.\n- The only writer is the api-keys revoke at supabase/functions/api-keys/index.ts:125. It already sets `{ revoked_at, is_active: false }`, so it passes the CHECK. Browser roles have had no write grant since US-377.\n- scripts/verify-schema.mjs: new check after the US-377 one: 'a revoked api key is never is_active'.\n- supabase/functions/_shared/api-auth.ts:73-79: corrected a misleading doc comment. It said pre-US-377 revoked rows carried only is_active=false; git history shows they carried only revoked_at. isApiKeyUsable still checks both columns.\n- supabase/functions/_shared/api-auth.test.ts: 3 new tests covering the migration's backfill, the constraint, their order, and the revoke writing both columns.\n\nNot verified: the migration and the new verify:schema check have not run against a real Postgres. The local cluster refuses the postgres user without a password, and starting a private cluster (initdb/runuser) was refused by the sandbox. CI's verify-backend job runs both.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no errors.\n- `npx vitest run supabase/functions/_shared/api-auth.test.ts`: 23 passed (3 new).\n- `npm run verify:migrations`: \"[migrations] OK — 80 migration files structurally valid.\"\n- `node --check scripts/verify-schema.mjs`: syntax OK.\n- `npx eslint <changed files>`: the two .ts files are on the ignore list. verify-schema.mjs reports 14 errors, all already there before this change (no-undef for process/console at lines 29-34, 136-140 and 3940-3947, and no-control-regex at 481). None are in the new block. No new warnings.\n- Full `npx vitest run`: 272 files passed, 2585 tests passed, 1 skipped.\n- Pre-commit lint-staged (eslint --fix, prettier) passed.\n- `npm run verify:schema` was not run: no Postgres access in this sandbox. CI runs it.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261108000499_api_keys_revoked_is_inactive.sql to production. It fixes the existing revoked rows, then adds the CHECK. No edge function needs redeploying: api-auth.ts changed only a comment."
+    },
+    {
+      "id": "US-500",
+      "lane": "enterprise",
+      "round": 11,
+      "title": "Downloading your data directly no longer marks a queued export \"Completed\" with no link",
+      "description": "Fixes US-424. Before this change, when a subject who had queued an export then used Download now, the gdpr-export GET handler set their newest pending export request to 'completed' with no file and sent no email. Settings then showed \"Completed\" with no link, and because the request was no longer pending, the queue never built or emailed the export they had asked for. The GET now leaves queued requests alone, so the queue builds and emails them as usual. Older rows that the GET closed this way (status completed, file_expires_at null) now read \"Closed\" with the line \"Closed when you used Download now. No link was emailed for this request.\" Before, they showed a bare \"Completed\".",
+      "acceptanceCriteria": [
+        "A queued request is not marked completed by a GET without a file",
+        "The settings list shows an accurate status after a direct download (the queued request stays Queued, then Ready once emailed; legacy GET-closed rows say no link was emailed)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- supabase/functions/gdpr-export/index.ts: removed the block in the GET branch (it was at about lines 141-166) that read the newest pending gdpr_data_requests export row and updated it to status 'completed'. A comment now records why the GET leaves queued requests alone. The header doc says the same. The audit log entry for the GET is unchanged.\n- src/lib/dataExportRequests.ts describeExportRequest: a completed row with no file_expires_at can only have come from the old GET path. The queue always sets file_expires_at (gdpr-export-queue.ts:440-443) and the purge keeps it, clearing only file_url (:488). Such rows now show label 'Closed', tone neutral, and a detail saying no link was emailed. Before, they showed 'Completed' with tone done and no detail.\n- src/hooks/useGDPR.ts: removed the exportRequests invalidation after a direct download. Its comment (\"The GET closes a pending queued request\") is no longer true.\n- Tests: new supabase/functions/gdpr-export/index.test.ts checks the source, because index.ts runs under Deno and cannot be imported in vitest. It asserts the GET branch never mentions gdpr_data_requests and still writes the gdpr_data_export audit event. The dataExportRequests.test.ts case for the legacy row is updated.\n- Choice made: I left the queued request alone rather than cancelling it. The subject explicitly asked for the emailed copy, the status vocabulary already allows it, and cancelling would silently drop their request.\n\nVERIFIED: - `npx tsc --noEmit`: passed, no errors.\n- `npx vitest run supabase/functions/gdpr-export src/lib/dataExportRequests.test.ts src/hooks/useGDPR.test.ts src/components/settings/GDPRSettings.test.tsx supabase/functions/_shared/gdpr-export`: 6 files, 72 tests, all passed.\n- `npx eslint` on the changed files: 0 errors. The only warnings are 'File ignored' for the two files under supabase/functions, which the eslint config ignores, so no new warnings are added. lint-staged (eslint --fix and prettier) also ran clean at commit.\n- Full `npx vitest run`: 273 files passed, 2584 tests passed, 1 skipped. It also reported 1 unhandled error: \"Failed to fetch dynamically imported module\" from src/components/profile/LazyModal.test.tsx:35. That test simulates a failed lazy import. Run alone, LazyModal.test.tsx passes 2 of 2. It is unrelated to this change (profile lane) and looks like a leak that only shows up under full-suite load.\n- No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the gdpr-export edge function (functions.agentbio.net Coolify app, which serves supabase/functions/ via edge-functions-server.ts) so the GET stops closing queued exports."
+    },
+    {
+      "id": "US-501",
+      "lane": "marketing",
+      "round": 11,
+      "title": "Comparison pages quoted unsourced competitor prices and made AgentBio claims the product does not back",
+      "description": "This finishes US-319 and the part of US-156 that was never done. In US-156, src/config/competitors.ts set the rule: no competitor prices, show the vendor's tiers with a dated link to its site, and build AgentBio's own figures from PRICING_PLANS. /vs/linktree and /vs/later followed that rule. /vs/beacons never did, and the price row on /for-real-estate-agents still broke it. All four comparison pages now follow it. False AgentBio claims on those pages are removed, and a new test keeps them out.",
+      "acceptanceCriteria": [
+        "Each competitor price is removed, or shown with a source and a date (US-319): /for-real-estate-agents and /vs/beacons no longer quote Linktree or Beacons prices, and each page links to the vendor's site with COMPETITORS_VERIFIED_LABEL",
+        "AgentBio's prices, free-plan allowance and link allowance on /vs/beacons, /vs/later and /for-real-estate-agents are built from PRICING_PLANS, and no dollar figure is typed into the page as a literal",
+        "No comparison page claims Google Calendar, verified reviews, video testimonials, lead magnets, unlimited links, unsourced lead counts or ROI, 'Trusted by 3,000+' or 'top agents', the agentbio.io domain or yourname.agentbio.net",
+        "src/comparison-claims.test.ts pins all four pages; tsc and the full vitest suite pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What it fixes, with file:line on the base commit 50a0411:\n- src/pages/landing/ForRealEstateAgents.tsx:302-303: the table showed Linktree '$24' and Beacons '$10' with no source and no date (US-319). Both cells now say 'See their site'. Under the table there is now a line saying the vendors' plans were checked on linktr.ee and beacons.ai on COMPETITORS_VERIFIED_LABEL.\n- src/pages/landing/VsBeacons.tsx had never been converted under US-156:\n  - :280-291 compared '$49/month' with Beacons '$10/month' and rated ROI 'High' against 'Low'.\n  - :521 (FAQ) said 'Real estate agents report 15-25 qualified leads per month' and 'pays for itself with a single extra lead'.\n  - :238 ticked 'Unlimited Links' for AgentBio, but Free allows 5 links and Starter 15.\n  - :174 and :481 named a Google Calendar integration that does not exist.\n  - :180 claimed 'verified badges and success stories'.\n  - :461 gave the profile address as yourname.agentbio.net.\n  Now: the pricing rows are a Free Plan row and a Paid Plans row built from PRICING_PLANS, with Beacons shown by tier name from COMPETITORS.beacons. The FAQ answer is generated from the plans. There is a dated, linked note on where the Beacons facts were checked. The calendar copy says Calendly.\n- src/pages/landing/VsLater.tsx:\n  - :146 'Trusted by 3,000+ Real Estate Agents' (an unmeasured count) is now 'Built for real estate agents'.\n  - :316 'Unlimited Links' now shows the real per-plan allowance.\n  - :348 'Video Testimonials' was false (testimonials have no video column). It is now a 'Client Reviews' row.\n  - :350 the 'Lead Magnets/Downloads' row is removed; that feature does not exist.\n  - :465 'Many top agents run this combination' is removed.\n  - :521 the sign-up step said agentbio.io (the wrong domain); it now says agentbio.net.\n  - The title no longer says '2025'.\n  - Added the dated 'checked against later.com' note.\n- src/pages/landing/VsLinktree.tsx:180: 'Integrated Calendly/Google Calendar' is now Calendly only.\n- New src/config/pricing-plans.ts linkAllowanceSummary(), next to listingAllowanceSummary(). For the current plans it gives '5 on Free, 15 on Starter, unlimited from Professional'. Tests were added in src/config/pricing-plans.test.ts.\n- New src/comparison-claims.test.ts. It strips comments first, as features-claims.test.ts does, and then checks all four pages for:\n  - any dollar figure typed into the page as a literal;\n  - a list of the removed false phrases, each with the reason it is false;\n  - the use of COMPETITORS_VERIFIED_LABEL.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no errors.\n- `npx vitest run src/comparison-claims.test.ts src/landing-claims.test.ts src/features-claims.test.ts src/config/pricing-plans.test.ts`: 4 files, 44 tests passed. This was re-run after the pre-commit prettier pass.\n- `npx eslint` on the six changed files that existed before: 36 warnings, 0 errors, the same count with my changes stashed. All 36 are existing react/no-unescaped-entities warnings, so I added none. The new test file has no warnings.\n- Full `npx vitest run` before committing: 273 files passed; 2595 tests passed, 1 skipped.\n- No migration, so verify:migrations does not apply.\n\nREVIEW: fix_required; fix-up: The reviewer was right. src/config/pricing-plans.ts has four paid plans: Starter $29, Professional $49, Team $99 and Enterprise $299. PRICE_FAQ_ANSWER in VsBeacons.tsx used only the first two, so the FAQ said \"paid plans from Starter at $29 to Professional at $49 a month\", which wrongly makes $49 the top price.\n\nFixed in /home/user/plain-page-link/.claude/worktrees/wf_56090af3-693-8/src/pages/landing/VsBeacons.tsx:\n- The FAQ answer now names every paid plan: \"AgentBio has a free plan (...) and paid plans at $29 (Starter), $49 (Professional), $99 (Team) and $299 (Enterprise) a month.\"\n- Edge cases: with no paid plans, the paid part is left out, so the \"paid plans from  a month\" fragment can't appear. With only one paid plan it says \"plan\" instead of \"plans\". With no free plan and no paid plans, the \"AgentBio has ...\" sentence is dropped.\n- The \"Paid Plans\" table cell (AGENTBIO_PLANS_CELL) now lists all paid plans too, and says \"No paid plans\" if there are none.\n\nCommitted as 15d88a0 (\"US-501: address review\", with the attribution lines). loop/r11-marketing now points at HEAD. Not pushed, and prd.json and progress.txt were not touched."
+    },
+    {
+      "id": "US-507",
+      "lane": "marketing",
+      "round": 11,
+      "title": "Comparison-table competitor feature cells are unverified",
+      "description": "The competitor columns still make specific claims about other products that nothing records checking. Examples: Linktree 'Basic' lead capture forms and 'Limited' calendar booking (ForRealEstateAgents.tsx); Beacons 'Generic Contact Form' and no testimonials (VsBeacons.tsx); Later 'Limited' custom branding and 'Basic' analytics (VsLater.tsx). competitors.ts records tiers and builtFor only. Either move these feature facts into COMPETITORS so they carry the VERIFIED_ON date, or reduce the cells to what has been verified.",
+      "acceptanceCriteria": [
+        "Every competitor cell in the four comparison tables reads from COMPETITORS, or is removed",
+        "comparison-claims.test.ts asserts that no competitor cell is a string literal"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-501)"
+    },
+    {
+      "id": "US-508",
+      "lane": "marketing",
+      "round": 11,
+      "title": "VsLater and VsBeacons AgentBio rows: 'Advanced' analytics, 'Real Estate Templates', setup-time claims",
+      "description": "VsLater 'Analytics & Tracking: Advanced vs Basic' and VsBeacons 'Join agents who switched' and '5-minute setup' have no measurement behind them. VsLater still uses a hand-written Helmet block, where the other comparison pages use SEOHead.",
+      "acceptanceCriteria": [
+        "Each remaining comparative adjective names the feature it refers to, or is removed",
+        "VsLater uses SEOHead like the other comparison pages"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-501)"
+    },
+    {
+      "id": "US-502",
+      "lane": "seo",
+      "round": 11,
+      "title": "AgentBio's own price offers say they expire on 2026-12-31, and /blog describes a second, unlinked AgentBio in its structured data",
+      "description": "Two problems in AgentBio's own structured data, fixed as one change.\n\n1. Offer expiry. Three live schemas had priceValidUntil hard-coded to '2026-12-31', which will be in the past from 2027-01-01 (53 days away). They are the homepage ProfessionalService offer (src/lib/seo.ts generateEnhancedLocalBusinessSchema; the prerendered homepage fixture shows it shipping), all city pages (LocationTemplate.tsx through SEO_CONFIG.pricing.priceValidUntil), and the /pricing Product (generatePricingSchema). A new helper, offerPriceValidUntil() in src/config/seo.config.ts, returns the date one year from the build. All three schemas and Pricing.tsx's own offers now use it.\n\n2. One AgentBio Organization (US-491, US-370, plus /blog). BlogListSEO declared:\n   - a second Organization node with no @id, the 1536x1024 Cover.png banner as its logo, and an empty sameAs;\n   - a Blog publisher with no @id, also using the banner as its logo;\n   - a WebSite whose @id was the bare origin instead of `${origin}/#website`.\n   These now use generateEnhancedOrganizationSchema(), publisherOrganization() and websiteId(). The Blog also gains isPartOf and the WebSite gains a publisher reference.\n   These inline anonymous Organizations now point to the site Organization by @id (through publisherOrganization):\n   - Pricing.tsx offers[].seller (US-491)\n   - VsLater.tsx WebPage publisher (US-491)\n   - seo.ts ProfessionalService provider\n   - ArticleSEO.tsx author fallback when no author is named\n   Deleted dead code:\n   - src/components/seo/PageSEO.tsx and SchemaMarkup.tsx (US-370), which nothing imported.\n   - generateSoftwareApplicationSchema, generateComparisonSchema and generateHowToSchema in seo.ts, and generateSpeakableSchema in faq-schema.ts. Only the deleted components called them, or nothing did. One of them carried another '2026-12-31'.",
+      "acceptanceCriteria": [
+        "No file in src hard-codes a priceValidUntil date (guard test in src/config/offer-price-valid-until.test.ts)",
+        "The homepage LocalBusiness offer and the /pricing Product offers state an expiry one year after the build date, including when the build runs after 2026 (fake-timer test)",
+        "/blog JSON-LD declares the same Organization node as the other pages (organizationId, generateEnhancedOrganizationSchema) and the WebSite under websiteId; the Blog publisher equals publisherOrganization(); every reference on the page resolves to a node declared there; no logo is Cover.png",
+        "Every AgentBio Organization on /vs/later has the site @id; a source guard forbids an anonymous { '@type': 'Organization', name: 'AgentBio' | siteName } anywhere in src",
+        "PageSEO.tsx and SchemaMarkup.tsx are deleted, along with the generators only they used; social-profiles and site-entities tests updated"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence before the change:\n- The literal '2026-12-31' was at src/config/seo.config.ts:63, src/lib/seo.ts:259 and src/lib/seo.ts:467. The prerendered homepage fixture (functions/_tests/fixtures/prerendered-index.html) shows \"priceValidUntil\":\"2026-12-31\" and an anonymous \"provider\":{\"@type\":\"Organization\",\"name\":\"AgentBio\"}.\n- src/components/blog/BlogListSEO.tsx (old lines 30-50 and 58) had the anonymous publisher and Organization with Cover.png and sameAs: [], and the WebSite '@id': siteUrl.\n- The inline Organizations were at Pricing.tsx:99-102, VsLater.tsx:43-46 and ArticleSEO.tsx:84.\n- grep showed nothing importing PageSEO or SchemaMarkup except site-entities.test.tsx and the source read in social-profiles.test.ts.\n\nImplementation:\n- The new helper is in src/config/seo.config.ts (offerPriceValidUntil). SEO_CONFIG.pricing.priceValidUntil is removed.\n- Tests: the new file src/config/offer-price-valid-until.test.ts. In src/config/site-entities.test.tsx, the PageSEO describe was replaced by a /blog describe, a /vs/later render test and an anonymous-Organization source guard. The PageSEO entry was removed from src/social-profiles.test.ts.\n- The new guard found the seo.ts provider, which is fixed in this commit.\n- The commit hook (lint-staged eslint --fix plus prettier) ran cleanly.\n\nVERIFIED: - npx tsc --noEmit: passed, no output.\n- npx vitest run on src/config/, src/social-profiles.test.ts, src/lib/, src/pages/landing and src/components/blog: 88 files, 908 tests. The first run had 1 failure: my own comment spelled out the slash-#website id, which the US-380 guard rejects. I reworded the comment and the suite passed.\n- Full npx vitest run: 273 files passed, 2590 tests passed, 1 skipped.\n- npx eslint, comparing every changed file against its HEAD version: no new warnings. Net 9 fewer: seo.ts went from 18 to 13, and the two deleted files had 1 and 3. The new and edited test files have 0.\n- No migration, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-509",
+      "lane": "seo",
+      "round": 11,
+      "title": "Delete the unused HOMEPAGE_FAQS, PRICING_FAQS and COMPARISON_FAQS FAQ sets in src/lib/faq-schema.ts",
+      "description": "grep finds no importer for HOMEPAGE_FAQS, PRICING_FAQS, COMPARISON_FAQS or FeatureFAQKey; only FEATURE_FAQS is used. The unused sets repeat marketing claims (for example 'Traditional real estate websites cost $3,000-$15,000') that the marketing-lane guards do not reach because nothing renders them. Delete them, plus any helper constants that become unused.",
+      "acceptanceCriteria": [
+        "Only exports with importers remain in faq-schema.ts",
+        "tsc and the full vitest suite pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Left out of US-502 to keep the change about the structured-data entity and offer expiry. (follow-up from US-502)"
+    },
+    {
+      "id": "US-510",
+      "lane": "seo",
+      "round": 11,
+      "title": "Give the /blog WebSite one name across pages",
+      "description": "Landing.tsx names the WebSite (websiteId) 'AgentBio - Real Estate Agent Bio Page Builder', and BlogListSEO now declares the same @id with the name 'AgentBio'. A consumer merging by @id gets two names for one node. Choose one name, or drop the WebSite node from /blog and keep only the reference, then move the SearchAction decision there.",
+      "acceptanceCriteria": [
+        "Every page that declares the websiteId node gives it the same name",
+        "Test asserts it"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs a small content decision on the site name. (follow-up from US-502)"
+    },
+    {
+      "id": "US-503",
+      "lane": "mobile",
+      "round": 11,
+      "title": "Onboarding avatar upload also stores the home-screen icons (US-493)",
+      "description": "A photo chosen during onboarding, which is the first photo most agents set, got no home-screen icons. Their installed page (agentbio.net/:username added to a phone's home screen) kept the AgentBio logo until they uploaded the photo again from the dashboard. The onboarding wizard now stores the 192 and 512 PNG icons next to the photo, using the same code as the dashboard upload.",
+      "acceptanceCriteria": [
+        "An avatar uploaded in onboarding has -app-icon-192.png and -app-icon-512.png siblings, stored before avatar_url points at it",
+        "An onboarding upload still succeeds when icons cannot be rendered",
+        "An onboarding upload still succeeds when an icon upload fails",
+        "The dashboard avatar upload behaves as before (same shared code)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Closes US-493. Before this change, src/pages/onboarding/OnboardingWizardPage.tsx (old lines 59-85) uploaded the avatar with its own storage call and never called renderAppIcons. Changes:\n- New src/lib/storeAvatarAppIcons.ts: the render-and-store step, moved without changes from the private uploadAppIcons in src/hooks/useProfileImageUpload.ts. It is best effort, never throws, and returns the object names it stored.\n- src/hooks/useProfileImageUpload.ts now imports it. Its behaviour, including leaving the icon names out of the stale-object cleanup, is unchanged.\n- OnboardingWizardPage.tsx now names the object `avatar-<ts>.<ext>` (it was `<ts>.<ext>`), matching the dashboard's filePrefix. It calls storeAvatarAppIcons('avatars', user.id, objectName, photo) after the photo uploads and before updateProfile, so the per-profile manifest never sees the new avatar_url without its icons. avatarAppIconUrls derives the icon URLs from any object name, so the manifest needs no change.\n- Tests: OnboardingWizardPage.test.tsx gains 3 cases: icons stored in order with the right names and PNG content type, before updateProfile; render fails and the photo is still saved; an icon upload fails and the photo is still saved. Existing tests keep a mock where renderAppIcons rejects (jsdom cannot draw).\nNot done: US-471 (crawler manifest link) and US-492 (backfill) are still open.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx vitest run src/pages/onboarding/OnboardingWizardPage.test.tsx src/hooks/useProfileImageUpload.test.ts: 2 files, 18 tests passed.\nnpx eslint on the 4 changed files: no output (0 warnings, 0 errors).\nFull npx vitest run: 272 files passed; 2585 tests passed, 1 skipped (2586).\nThe lint-staged pre-commit hook (eslint --fix, prettier) passed. No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-511",
+      "lane": "mobile",
+      "round": 11,
+      "title": "Dead offline-storage stack: useOfflineStorage/offline-storage (and the idb dependency) have no importers",
+      "description": "After US-494 removed sync-manager, useOfflineStorage.ts and offline-storage.ts are unreferenced. Delete them and the idb dependency unless offline editing is planned; update docs/architecture/TECH_SPEC_PWA_MOBILE.md.",
+      "acceptanceCriteria": [
+        "No importers remain; tsc, tests and build pass",
+        "idb removed from package.json if unused"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Finding from round 11."
     }
   ]
 }

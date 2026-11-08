@@ -161,7 +161,6 @@ plain-page-link/
 │   │   ├── image-seo.ts            # Image SEO optimization
 │   │   ├── pageBuilder.ts          # Page builder utilities
 │   │   ├── themes.ts               # Theme definitions
-│   │   ├── sync-manager.ts         # Offline sync management
 │   │   ├── instagram-bio-analyzer/ # Instagram bio tool
 │   │   └── listing-description-generator/ # Listing generator tool
 │   │
@@ -1080,7 +1079,6 @@ logger.authEvent('login_success', user.id);
 **PWA Features:**
 - `usePullToRefresh` hook for mobile refresh patterns
 - Offline storage with IndexedDB (`src/lib/offline-storage.ts`)
-- Sync manager for offline data synchronization
 - 44px minimum touch targets for iOS compliance
 
 **Mobile Components (`src/components/mobile/`):**
@@ -1150,7 +1148,6 @@ try {
 
 - `src/hooks/usePullToRefresh.ts` - Pull-to-refresh functionality
 - `src/lib/offline-storage.ts` - IndexedDB offline storage
-- `src/lib/sync-manager.ts` - Offline sync management
 - `src/components/mobile/MobileNav.tsx` - Mobile navigation
 
 ---
