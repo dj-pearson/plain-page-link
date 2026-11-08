@@ -17,8 +17,15 @@
  * span: Safari prefers it over everything else as the icon's label, and the
  * label on a buyer's home screen should be the agent, which the manifest's
  * name supplies.
+ *
+ * iOS ignores the manifest's icons and uses the apple-touch-icon link, which
+ * index.html points at the AgentBio logo. On iOS Safari, once a HEAD request
+ * finds the square render of the agent's photo (US-481, avatarAppIcon.ts),
+ * the link names it instead. Only there: no other browser reads the link for
+ * Add to Home Screen, so no other visitor pays for the request.
  */
 import { useEffect } from 'react';
+import { avatarAppIconUrls } from '@/lib/avatarAppIcon';
 
 const DASHBOARD_MANIFEST = '/manifest.json';
 
@@ -27,7 +34,39 @@ export function profileManifestHref(username: string): string {
   return `/${encodeURIComponent(username)}/manifest.json`;
 }
 
-export function useProfileManifest(username: string): void {
+/** iOS Safari, in a tab: the only browser whose Add to Home Screen reads apple-touch-icon. */
+function isIosSafariTab(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as Navigator & { standalone?: boolean };
+  return 'standalone' in nav && nav.standalone !== true;
+}
+
+export function useProfileManifest(username: string, avatarUrl: string | null = null): void {
+  useEffect(() => {
+    if (!username || typeof document === 'undefined' || !isIosSafariTab()) return;
+    const icon = avatarAppIconUrls(avatarUrl)?.[192];
+    const link = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    if (!icon || !link) return;
+
+    const previousHref = link.getAttribute('href');
+    let cancelled = false;
+    let swapped = false;
+    fetch(icon, { method: 'HEAD' })
+      .then((response) => {
+        if (cancelled || !response.ok) return;
+        link.setAttribute('href', icon);
+        swapped = true;
+      })
+      .catch(() => {
+        // No icon, or no network: the logo stays, which is still an icon.
+      });
+
+    return () => {
+      cancelled = true;
+      if (swapped && previousHref !== null) link.setAttribute('href', previousHref);
+    };
+  }, [username, avatarUrl]);
+
   useEffect(() => {
     if (!username || typeof document === 'undefined') return;
 

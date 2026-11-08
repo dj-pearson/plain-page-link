@@ -5,6 +5,8 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { validateUpload } from '@/lib/fileValidation';
+import { APP_ICON_SIZES, appIconObjectName } from '@/lib/avatarAppIcon';
+import { renderAppIcons } from '@/lib/renderAppIcons';
 
 /** The profile columns that hold a single uploaded image. */
 export type ProfileImageColumn = 'avatar_url' | 'brokerage_logo';
@@ -22,6 +24,46 @@ export interface ProfileImageUploadConfig {
   maxBytes: number;
   /** Lower-case noun for messages, e.g. "profile picture". */
   label: string;
+  /**
+   * Also store the image as square home-screen icons named after it
+   * (US-481), which the agent's page manifest lists. The avatar only.
+   */
+  appIcons?: boolean;
+}
+
+/**
+ * Render and store the home-screen icons for a just-uploaded avatar, returning
+ * the object names stored. Best effort: the photo is what the agent asked
+ * for, so a browser that cannot draw it, or an icon upload that fails, costs
+ * only the icon (the manifest then keeps the platform icon) and never the
+ * upload.
+ */
+async function uploadAppIcons(
+  bucket: ProfileImageUploadConfig['bucket'],
+  userId: string,
+  objectName: string,
+  file: File
+): Promise<string[]> {
+  try {
+    const icons = await renderAppIcons(file);
+    const stored: string[] = [];
+    for (const size of APP_ICON_SIZES) {
+      const icon = icons.get(size);
+      if (!icon) continue;
+      const name = appIconObjectName(objectName, size);
+      const { error } = await supabase.storage.from(bucket).upload(`${userId}/${name}`, icon, {
+        cacheControl: '3600',
+        contentType: 'image/png',
+        upsert: true,
+      });
+      if (error) throw error;
+      stored.push(name);
+    }
+    return stored;
+  } catch (error) {
+    logger.warn('Could not make the home-screen icon from this photo', { error });
+    return [];
+  }
 }
 
 /**
@@ -35,7 +77,7 @@ export interface ProfileImageUploadConfig {
  * page until the agent noticed.
  */
 export function useProfileImageUpload(config: ProfileImageUploadConfig) {
-  const { bucket, column, filePrefix, accept, maxBytes, label } = config;
+  const { bucket, column, filePrefix, accept, maxBytes, label, appIcons = false } = config;
   const user = useAuthStore((s) => s.user);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -69,6 +111,10 @@ export function useProfileImageUpload(config: ProfileImageUploadConfig) {
       });
       if (uploadError) throw uploadError;
 
+      // Before the profile points at the photo, so the manifest never sees
+      // the new avatar_url without its icons when the icons could be made.
+      const iconNames = appIcons ? await uploadAppIcons(bucket, user.id, objectName, file) : [];
+
       const {
         data: { publicUrl },
       } = supabase.storage.from(bucket).getPublicUrl(path);
@@ -85,7 +131,7 @@ export function useProfileImageUpload(config: ProfileImageUploadConfig) {
       try {
         const { data: existing } = await supabase.storage.from(bucket).list(user.id);
         const stale = (existing ?? [])
-          .filter((f) => f.name !== objectName)
+          .filter((f) => f.name !== objectName && !iconNames.includes(f.name))
           .map((f) => `${user.id}/${f.name}`);
         if (stale.length > 0) await supabase.storage.from(bucket).remove(stale);
       } catch (cleanupError) {

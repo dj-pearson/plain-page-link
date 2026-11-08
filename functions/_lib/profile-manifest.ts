@@ -21,10 +21,17 @@
  * 404, which leaves the browser with no manifest: the home-screen icon is then
  * a plain bookmark of the page the visitor was on, which is still right.
  *
+ * The icons are the agent's photo when the avatar upload stored square
+ * renders of it (US-481, src/lib/avatarAppIcon.ts), listed ahead of the
+ * platform icons, which stay as the fallback. They are listed only after a
+ * HEAD request finds both: a declared icon that does not load costs Chrome's
+ * installability check, which a logo never does.
+ *
  * Pure — no Workers globals — so it is tested directly.
  */
 import { isReservedSegment } from './social-meta';
 import { needsCanonicalRedirect } from '../../src/lib/username';
+import { APP_ICON_SIZES, avatarAppIconUrls, type AppIconSize } from '../../src/lib/avatarAppIcon';
 
 export interface ProfileManifestEnv {
   VITE_SUPABASE_URL?: string;
@@ -36,7 +43,11 @@ export interface ProfileManifestEnv {
 export interface ManifestProfile {
   username: string;
   full_name: string | null;
+  avatar_url?: string | null;
 }
+
+/** Icon URLs by size, as avatarAppIconUrls returns them. */
+export type AvatarIcons = Record<AppIconSize, string>;
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -47,6 +58,9 @@ const ICON_SIZES = [192, 384, 512] as const;
 const SHORT_NAME_MAX = 12;
 
 const UPSTREAM_TIMEOUT_MS = 4000;
+
+/** The icon check is optional; a slow one should not hold the manifest. */
+const ICON_CHECK_TIMEOUT_MS = 2000;
 
 /** The path of the manifest for `username`, as ProfileRoute links it. */
 export function profileManifestPath(username: string): string {
@@ -59,7 +73,10 @@ function shortName(name: string): string {
   return first.length <= SHORT_NAME_MAX ? first : `${first.slice(0, SHORT_NAME_MAX - 1)}…`;
 }
 
-export function buildProfileManifest(profile: ManifestProfile): Record<string, unknown> {
+export function buildProfileManifest(
+  profile: ManifestProfile,
+  avatarIcons: AvatarIcons | null = null
+): Record<string, unknown> {
   const page = `/${encodeURIComponent(profile.username)}`;
   const name = profile.full_name?.trim() || profile.username;
   return {
@@ -73,13 +90,61 @@ export function buildProfileManifest(profile: ManifestProfile): Record<string, u
     display: 'standalone',
     background_color: '#ffffff',
     theme_color: '#2563eb',
-    icons: ICON_SIZES.map((size) => ({
-      src: `/icons/icon-${size}.png`,
-      sizes: `${size}x${size}`,
-      type: 'image/png',
-      purpose: 'any',
-    })),
+    // The agent's photo first. Chrome takes the icon nearest the size it
+    // wants and, at equal sizes, the first one listed — so the photo wins at
+    // every size it comes in, and the logo is dropped at sizes it does not
+    // (a 384 logo would otherwise beat a 512 photo on a screen that wants
+    // 256-384).
+    icons: [
+      ...(avatarIcons
+        ? APP_ICON_SIZES.map((size) => ({
+            src: avatarIcons[size],
+            sizes: `${size}x${size}`,
+            type: 'image/png',
+            purpose: 'any',
+          }))
+        : []),
+      ...ICON_SIZES.filter(
+        (size) => !avatarIcons || (APP_ICON_SIZES as readonly number[]).includes(size)
+      ).map((size) => ({
+        src: `/icons/icon-${size}.png`,
+        sizes: `${size}x${size}`,
+        type: 'image/png',
+        purpose: 'any',
+      })),
+    ],
   };
+}
+
+/**
+ * The agent's photo icons when every size is stored, else null. Any failure,
+ * including a timeout, is "not stored": the platform icon is always safe.
+ */
+export async function findAvatarIcons(
+  avatarUrl: string | null | undefined,
+  storageBase: string,
+  fetchImpl: FetchLike
+): Promise<AvatarIcons | null> {
+  const icons = avatarAppIconUrls(avatarUrl, storageBase);
+  if (!icons) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ICON_CHECK_TIMEOUT_MS);
+  try {
+    const found = await Promise.all(
+      APP_ICON_SIZES.map(async (size) => {
+        const response = await fetchImpl(icons[size], {
+          method: 'HEAD',
+          signal: controller.signal,
+        });
+        return response.ok;
+      })
+    );
+    return found.every(Boolean) ? icons : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -121,7 +186,7 @@ export async function profileManifestResponse(
   let rows: ManifestProfile[];
   try {
     const response = await fetchImpl(
-      `${base}/rest/v1/profiles?select=username,full_name&username=eq.${encodeURIComponent(segment)}&is_published=is.true&limit=1`,
+      `${base}/rest/v1/profiles?select=username,full_name,avatar_url&username=eq.${encodeURIComponent(segment)}&is_published=is.true&limit=1`,
       {
         headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
         signal: controller.signal,
@@ -138,7 +203,9 @@ export async function profileManifestResponse(
   const profile = Array.isArray(rows) ? rows[0] : undefined;
   if (!profile) return notFound();
 
-  return new Response(JSON.stringify(buildProfileManifest(profile)), {
+  const avatarIcons = await findAvatarIcons(profile.avatar_url, base, fetchImpl);
+
+  return new Response(JSON.stringify(buildProfileManifest(profile, avatarIcons)), {
     status: 200,
     headers: {
       'content-type': 'application/manifest+json; charset=utf-8',
