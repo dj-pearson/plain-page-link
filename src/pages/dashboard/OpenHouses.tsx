@@ -8,7 +8,6 @@
  */
 import { lazy, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { format, isSameYear } from 'date-fns';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import {
@@ -54,6 +53,8 @@ import { LazyModal } from '@/components/profile/LazyModal';
 import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { formatOpenHouseAddress, useOpenHouses, type OpenHouse } from '@/hooks/useOpenHouses';
+import { useAgentTimeZone } from '@/hooks/useAgentTimeZone';
+import { formatOpenHouseWhen } from '@/lib/openHouseSchedule';
 import { useListings } from '@/hooks/useListings';
 import { fallBackToOriginal, sizedImage, type SizedImage } from '@/lib/images';
 import { toStringList } from '@/types/profile';
@@ -88,18 +89,6 @@ function kioskUrl(id: string): string {
   return `${window.location.origin}/open-house/${id}`;
 }
 
-/** "Sat, Oct 4 · 1:00–3:00 PM" — with the year when it is not this year. */
-function formatWhen(startsAt: string, endsAt: string): string {
-  const s = new Date(startsAt);
-  const e = new Date(endsAt);
-  const day = format(s, isSameYear(s, new Date()) ? 'EEE, MMM d' : 'EEE, MMM d, yyyy');
-  const time =
-    format(s, 'a') === format(e, 'a')
-      ? `${format(s, 'h:mm')}–${format(e, 'h:mm a')}`
-      : `${format(s, 'h:mm a')}–${format(e, 'h:mm a')}`;
-  return `${day} · ${time}`;
-}
-
 /** A 96x72 thumbnail: the 200px variant, not the original upload (US-260). */
 function photoOf(oh: OpenHouse): SizedImage {
   const l = oh.listings;
@@ -113,6 +102,8 @@ function addressOf(oh: OpenHouse): string {
 interface RowProps {
   openHouse: OpenHouse;
   variant: 'upcoming' | 'past' | 'cancelled';
+  /** The agent's zone, the one the schedule form saved the times in (US-628). */
+  timeZone: string;
   onShowQr(): void;
   onVisitors(): void;
   onEdit(): void;
@@ -124,6 +115,7 @@ interface RowProps {
 function OpenHouseRow({
   openHouse: oh,
   variant,
+  timeZone,
   onShowQr,
   onVisitors,
   onEdit,
@@ -149,7 +141,9 @@ function OpenHouseRow({
         />
         <div className="min-w-0">
           <p className="font-semibold text-foreground">
-            <time dateTime={oh.starts_at}>{formatWhen(oh.starts_at, oh.ends_at)}</time>
+            <time dateTime={oh.starts_at}>
+              {formatOpenHouseWhen(oh.starts_at, oh.ends_at, timeZone)}
+            </time>
           </p>
           <p className="truncate text-sm text-foreground">{addressOf(oh)}</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
@@ -256,6 +250,8 @@ export default function OpenHouses() {
   const [showCancelled, setShowCancelled] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { status, planName } = usePlanUsage();
+  const { timeZone: savedZone, detected } = useAgentTimeZone();
+  const timeZone = savedZone ?? detected ?? 'UTC';
   const form = useMountOnFirstOpen(formOpen);
   const upgradeModal = useMountOnFirstOpen(upgradeOpen);
   const visitorsDialog = useMountOnFirstOpen(visitorsFor !== null);
@@ -341,6 +337,7 @@ export default function OpenHouses() {
   };
 
   const rowHandlers = (oh: OpenHouse) => ({
+    timeZone,
     onShowQr: () => setQrFor(oh),
     onVisitors: () => setVisitorsFor(oh),
     onEdit: () => openEdit(oh),

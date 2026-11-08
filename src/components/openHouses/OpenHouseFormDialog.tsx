@@ -1,19 +1,28 @@
 /**
  * Schedule or edit an open house.
  *
- * The form works in the agent's local date and times — that is how an open
- * house is thought about ("Saturday, 1 to 3") — and converts to ISO instants
- * for starts_at / ends_at only on submit. Editing converts back the same way,
- * so a round trip does not drift by a timezone offset.
+ * The form works in wall-clock date and times — that is how an open house is
+ * thought about ("Saturday, 1 to 3") — in the agent's saved time zone
+ * (profiles.timezone), falling back to this device's zone only when none is
+ * saved (US-628). It converts to ISO instants for starts_at / ends_at only on
+ * submit, and editing converts back in the same zone, so a round trip does
+ * not drift and a travelling agent does not save the wrong instant.
  */
 import { useEffect, useMemo } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, isSaturday, nextSaturday } from 'date-fns';
 import { toast } from 'sonner';
 import { toastSaveError } from '@/lib/planLimitToast';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
+import { useAgentTimeZone } from '@/hooks/useAgentTimeZone';
+import { timeZoneLabel } from '@/lib/timeZone';
+import {
+  defaultOpenHouseDate,
+  isoToWallTime,
+  pastStartError,
+  wallTimeToIso,
+} from '@/lib/openHouseSchedule';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -48,7 +57,7 @@ interface OpenHouseFormDialogProps {
 /** A listing can host an open house while it is still on the market. */
 const SCHEDULABLE_STATUSES = new Set(['active', 'pending', 'under_contract']);
 
-const formSchema = z
+const baseSchema = z
   .object({
     listing_id: z.string().min(1, 'Choose a listing'),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date'),
@@ -64,27 +73,38 @@ const formSchema = z
     path: ['end_time'],
   });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof baseSchema>;
 
-/** Local date + time → ISO instant. `new Date('YYYY-MM-DDTHH:mm')` is local time. */
-function toIso(date: string, time: string): string {
-  return new Date(`${date}T${time}`).toISOString();
+/**
+ * The form schema for one zone. A start already in the past is refused (it
+ * would count against open_houses_per_month and open the kiosk for a house
+ * nobody is at), except when editing an open house whose start has not moved.
+ */
+export function buildOpenHouseSchema(timeZone: string, originalStartsAt?: string | null) {
+  return baseSchema.superRefine((v, ctx) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date) || !/^\d{2}:\d{2}$/.test(v.start_time)) return;
+    const message = pastStartError(
+      wallTimeToIso(v.date, v.start_time, timeZone),
+      new Date(),
+      originalStartsAt
+    );
+    if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['start_time'] });
+  });
 }
 
-function defaultDate(): string {
-  const today = new Date();
-  return format(isSaturday(today) ? today : nextSaturday(today), 'yyyy-MM-dd');
-}
-
-function valuesFor(openHouse: OpenHouse | null | undefined, defaultListingId?: string): FormValues {
+function valuesFor(
+  openHouse: OpenHouse | null | undefined,
+  timeZone: string,
+  defaultListingId?: string
+): FormValues {
   if (openHouse) {
-    const start = new Date(openHouse.starts_at);
-    const end = new Date(openHouse.ends_at);
+    const start = isoToWallTime(openHouse.starts_at, timeZone);
+    const end = isoToWallTime(openHouse.ends_at, timeZone);
     return {
       listing_id: openHouse.listing_id,
-      date: format(start, 'yyyy-MM-dd'),
-      start_time: format(start, 'HH:mm'),
-      end_time: format(end, 'HH:mm'),
+      date: start.date,
+      start_time: start.time,
+      end_time: end.time,
       is_public: openHouse.is_public,
       public_notes: openHouse.public_notes ?? '',
       private_notes: openHouse.private_notes ?? '',
@@ -92,7 +112,7 @@ function valuesFor(openHouse: OpenHouse | null | undefined, defaultListingId?: s
   }
   return {
     listing_id: defaultListingId ?? '',
-    date: defaultDate(),
+    date: defaultOpenHouseDate(timeZone),
     start_time: '13:00',
     end_time: '15:00',
     is_public: true,
@@ -111,6 +131,12 @@ export function OpenHouseFormDialog({
   const { listings, isLoading: listingsLoading } = useListings();
   const { createOpenHouse, updateOpenHouse } = useOpenHouses();
   const { planName } = usePlanUsage();
+  const { timeZone: savedZone, detected } = useAgentTimeZone();
+  const timeZone = savedZone ?? detected ?? 'UTC';
+  const schema = useMemo(
+    () => buildOpenHouseSchema(timeZone, openHouse?.starts_at),
+    [timeZone, openHouse?.starts_at]
+  );
 
   const {
     control,
@@ -119,15 +145,15 @@ export function OpenHouseFormDialog({
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: valuesFor(openHouse, defaultListingId),
+    resolver: zodResolver(schema),
+    defaultValues: valuesFor(openHouse, timeZone, defaultListingId),
   });
 
   // Fresh values each time the dialog opens, so editing one open house and
   // then scheduling another does not carry the first one's fields over.
   useEffect(() => {
-    if (open) reset(valuesFor(openHouse, defaultListingId));
-  }, [open, openHouse, defaultListingId, reset]);
+    if (open) reset(valuesFor(openHouse, timeZone, defaultListingId));
+  }, [open, openHouse, timeZone, defaultListingId, reset]);
 
   const listingOptions = useMemo(
     () =>
@@ -146,8 +172,8 @@ export function OpenHouseFormDialog({
   const onSubmit = async (values: FormValues) => {
     const input = {
       listing_id: values.listing_id,
-      starts_at: toIso(values.date, values.start_time),
-      ends_at: toIso(values.date, values.end_time),
+      starts_at: wallTimeToIso(values.date, values.start_time, timeZone),
+      ends_at: wallTimeToIso(values.date, values.end_time, timeZone),
       is_public: values.is_public,
       public_notes: values.public_notes.trim() || null,
       private_notes: values.private_notes.trim() || null,
@@ -233,7 +259,13 @@ export function OpenHouseFormDialog({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="oh-date">Date</Label>
-              <Input id="oh-date" type="date" className="min-h-[44px]" {...register('date')} />
+              <Input
+                id="oh-date"
+                type="date"
+                className="min-h-[44px]"
+                aria-describedby="oh-zone"
+                {...register('date')}
+              />
               {errors.date && <p className="text-sm text-red-600">{errors.date.message}</p>}
             </div>
             <div className="space-y-1.5">
@@ -243,6 +275,8 @@ export function OpenHouseFormDialog({
                 type="time"
                 step={900}
                 className="min-h-[44px]"
+                aria-invalid={!!errors.start_time}
+                aria-describedby="oh-zone"
                 {...register('start_time')}
               />
               {errors.start_time && (
@@ -262,6 +296,11 @@ export function OpenHouseFormDialog({
               {errors.end_time && <p className="text-sm text-red-600">{errors.end_time.message}</p>}
             </div>
           </div>
+          <p id="oh-zone" className="-mt-2 text-sm text-gray-600">
+            {savedZone
+              ? `Times are in ${timeZoneLabel(timeZone)}.`
+              : `Times are in this device's time zone, ${timeZoneLabel(timeZone)}. Set yours in Settings.`}
+          </p>
 
           <Controller
             control={control}
