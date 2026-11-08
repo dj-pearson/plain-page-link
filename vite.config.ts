@@ -43,6 +43,11 @@ const ANALYZE = process.env.ANALYZE === 'true';
 // dist without that flag set.
 const BUILD_SOURCEMAPS = process.env.BUILD_SOURCEMAPS === 'true';
 
+// US-535: scripts/check-dashboard-weight.mjs reads .vite/manifest.json to weigh
+// each dashboard route. Written only when asked for (CI's bundle-size job), so
+// the deployed site does not publish its chunk map at /.vite/manifest.json.
+const BUILD_MANIFEST = process.env.BUILD_MANIFEST === 'true';
+
 export default defineConfig(({ mode }) => {
   // '' as the prefix so .env files are read whole; only VITE_GA_MEASUREMENT_ID
   // is used below, and Vite still applies its own VITE_ prefix rule to what the
@@ -173,6 +178,7 @@ export default defineConfig(({ mode }) => {
       // it does NOT stop anyone requesting the .map directly, which is why the
       // default is false and the deploy guard exists.
       sourcemap: BUILD_SOURCEMAPS ? 'hidden' : false,
+      manifest: BUILD_MANIFEST,
       rollupOptions: {
         output: {
           format: 'es',
