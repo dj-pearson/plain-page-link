@@ -157,9 +157,9 @@ function App() {
   //
   // This also called offlineStorage.init(), opening an IndexedDB database on
   // every visit - and its static import put the idb library in the entry chunk
-  // every visitor downloads. Nothing reads that database: useOfflineStorage,
-  // its only consumer, has no importers (US-260). sync-manager, the other one,
-  // was deleted in US-494.
+  // every visitor downloads. Nothing read that database (US-260); sync-manager
+  // was deleted in US-494, and offline-storage, useOfflineStorage and the idb
+  // dependency in US-618.
   useEffect(() => {
     // Clean up any interfering service workers first
     cleanupServiceWorkers();

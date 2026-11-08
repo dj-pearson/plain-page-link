@@ -5,6 +5,14 @@
 **Date:** October 31, 2025  
 **Status:** 📋 Ready for Development
 
+> **Current state (2026-11, US-618):** this is the original October 2025 plan,
+> not a description of what shipped. The backend is Supabase, not Laravel; web
+> push was removed (US-059, owner decision 2026-11-07); and there is no
+> IndexedDB offline data layer. `offline-storage.ts`, `useOfflineStorage.ts`,
+> `sync-manager.ts` and the `idb` dependency had no callers and were deleted
+> (US-494, US-618). Offline support is the service worker's cache only.
+> Sections 4 and 5 are kept for history.
+
 ---
 
 ## 1. Overview
@@ -232,6 +240,8 @@ self.addEventListener("activate", (event) => {
 ---
 
 ## 4. Offline Data Storage
+
+> Not implemented. See the current-state note at the top.
 
 ### 4.1 IndexedDB Schema
 

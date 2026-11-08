@@ -272,8 +272,9 @@ console.log(
 
 // US-260: the idb library is not a vendor chunk, so the list above cannot name
 // it. App.tsx statically imported offline-storage to open an IndexedDB database
-// nothing read, which inlined idb into the entry chunk itself. Recognise it by
-// the event name only an IndexedDB open uses.
+// nothing read, which inlined idb into the entry chunk itself. Both are gone
+// (US-618); the check stays so IndexedDB never returns to first paint.
+// Recognise it by the event name only an IndexedDB open uses.
 const entryWithIdb = [...eager].filter((f) => (sources.get(f) ?? "").includes('"upgradeneeded"'));
 if (entryWithIdb.length) {
   console.error(
