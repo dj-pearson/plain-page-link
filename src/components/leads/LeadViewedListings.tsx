@@ -1,4 +1,4 @@
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowWithSuffix } from '@/lib/relativeTime';
 import { useLeadViewedListings } from '@/hooks/useLeadViewedListings';
 import { viewedListingsHeadline } from '@/lib/leadViewedListings';
 
@@ -42,7 +42,7 @@ export function LeadViewedListings({ lead }: LeadViewedListingsProps) {
               dateTime={item.lastViewedAt}
               className="flex-shrink-0 text-xs text-muted-foreground"
             >
-              {formatDistanceToNow(new Date(item.lastViewedAt), { addSuffix: true })}
+              {formatDistanceToNowWithSuffix(new Date(item.lastViewedAt))}
             </time>
           </li>
         ))}

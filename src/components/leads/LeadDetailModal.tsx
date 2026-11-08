@@ -57,7 +57,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/dateFormat';
+import { formatDistanceToNowWithSuffix } from '@/lib/relativeTime';
 import type { Lead } from '@/types/lead';
 import { useLeadScore } from '@/hooks/useMLLeadScoring';
 import { useLeadContactAction, type ContactChannel } from '@/hooks/useLeadContactAction';
@@ -141,7 +142,7 @@ function activityHeadline(a: LeadActivity): string {
   if (a.activity_type === 'meeting' && a.meeting_scheduled_at) {
     const when = new Date(a.meeting_scheduled_at);
     const base = a.title || 'Meeting';
-    return Number.isNaN(when.getTime()) ? base : `${base} · ${format(when, 'MMM d, h:mm a')}`;
+    return Number.isNaN(when.getTime()) ? base : `${base} · ${formatDate(when, 'MMM d, h:mm a')}`;
   }
   if (a.activity_type === 'task' && a.task_priority === 'high') {
     return `${a.title || 'Follow-up'} (high priority)`;
@@ -412,9 +413,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
 
   if (!lead) return null;
 
-  const timeAgo = lead.created_at
-    ? formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })
-    : '';
+  const timeAgo = lead.created_at ? formatDistanceToNowWithSuffix(new Date(lead.created_at)) : '';
 
   const origin = describeLeadOrigin(lead);
   // Shown for a locked lead too: the allowance withholds contact details
@@ -980,15 +979,14 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                         )}
                         <p className="text-xs text-muted-foreground mt-1">
                           {a.activity_type === 'task' && a.task_due_date
-                            ? `${a.task_completed_at ? 'Completed' : 'Due'} ${formatDistanceToNow(
+                            ? `${a.task_completed_at ? 'Completed' : 'Due'} ${formatDistanceToNowWithSuffix(
                                 (a.task_completed_at
                                   ? new Date(a.task_completed_at)
-                                  : taskDueAt(a.task_due_date)) ?? new Date(a.task_due_date),
-                                { addSuffix: true }
+                                  : taskDueAt(a.task_due_date)) ?? new Date(a.task_due_date)
                               )}`
-                            : formatDistanceToNow(new Date(a.activity_at ?? a.created_at), {
-                                addSuffix: true,
-                              })}
+                            : formatDistanceToNowWithSuffix(
+                                new Date(a.activity_at ?? a.created_at)
+                              )}
                         </p>
                         {a.activity_type === 'task' && !a.task_completed_at && (
                           <Button

@@ -153,6 +153,19 @@ describe('date-fns and closed panels stay off first paint (US-558)', () => {
     expect(source('src/lib/format.ts')).not.toMatch(importsDateFns);
     expect(source('src/lib/analytics.ts')).not.toMatch(importsDateFns);
     expect(source('src/lib/relativeTime.ts')).not.toMatch(importsDateFns);
+    expect(source('src/lib/dateFormat.ts')).not.toMatch(importsDateFns);
+  });
+
+  it('keeps date-fns off the dashboard Overview and the lead detail dialog (US-574)', () => {
+    for (const path of [
+      'src/components/dashboard/ComingUp.tsx',
+      'src/components/dashboard/DueFollowUps.tsx',
+      'src/components/dashboard/PlanUsageCard.tsx',
+      'src/components/leads/LeadDetailModal.tsx',
+      'src/components/leads/LeadViewedListings.tsx',
+    ]) {
+      expect(source(path), path).not.toMatch(importsDateFns);
+    }
   });
 
   it('loads the Analytics report builder and upgrade dialog on open', () => {
@@ -188,5 +201,14 @@ describe('dashboard-weight budgets cover the real routes (US-535)', () => {
   it('keeps form-vendor and charts-vendor off every dashboard route', () => {
     expect(ROUTE_MUST_NOT_INCLUDE['form-vendor'].allow).toEqual([]);
     expect(ROUTE_MUST_NOT_INCLUDE['charts-vendor'].allow).toEqual([]);
+  });
+
+  it('allows date-vendor only on the routes that still import date-fns (US-574)', () => {
+    // The allow list may only shrink. Adding a route here puts 6.2 KB gzip
+    // back on it; use src/lib/dateFormat.ts or relativeTime.ts instead.
+    expect(ROUTE_MUST_NOT_INCLUDE['date-vendor'].allow).toEqual([
+      'src/pages/dashboard/Clients.tsx',
+      'src/pages/dashboard/OpenHouses.tsx',
+    ]);
   });
 });

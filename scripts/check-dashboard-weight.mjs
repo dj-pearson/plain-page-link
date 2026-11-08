@@ -60,11 +60,15 @@ const LAYOUT_SRC = 'src/components/layout/DashboardLayout.tsx';
  * US-558 (2026-11-08): Analytics 47.4 -> 36.7 (Reports tab, UpgradeModal and
  *   date-fns off first paint), Listings 38.2 -> 32.3 (format.ts no longer
  *   imports date-fns). Budgets for both lowered to match.
+ * US-574 (2026-11-08): Overview 38.3 -> 33.3 and LeadDetailModal 27.5 -> 21.9
+ *   (date-fns' format/formatDistanceToNow replaced by src/lib/dateFormat.ts
+ *   and relativeTime.ts). Budgets lowered; date-vendor is now banned outside
+ *   the routes still listed under its `allow`.
  */
 export const DASHBOARD_ROUTES = [
   // What every dashboard route pays first; measured beyond the entry only.
   { src: LAYOUT_SRC, isLayout: true, maxKb: 54 },
-  { src: 'src/pages/dashboard/Overview.tsx', maxKb: 42 },
+  { src: 'src/pages/dashboard/Overview.tsx', maxKb: 38 },
   { src: 'src/pages/dashboard/Listings.tsx', maxKb: 37 },
   { src: 'src/pages/dashboard/Leads.tsx', maxKb: 35 },
   { src: 'src/pages/dashboard/Clients.tsx', maxKb: 24 },
@@ -87,7 +91,7 @@ export const DASHBOARD_ROUTES = [
   {
     src: 'src/components/leads/LeadDetailModal.tsx',
     beyond: ['src/pages/dashboard/Leads.tsx'],
-    maxKb: 30,
+    maxKb: 25,
   },
 ];
 
@@ -108,6 +112,14 @@ export const ROUTE_MUST_NOT_INCLUDE = {
   'form-vendor': {
     why: 'react-hook-form + zod (23 KB gzip). Forms load when their dialog opens.',
     allow: [],
+  },
+  // US-574: the Overview (the first screen after sign-in), Leads, Listings,
+  // Analytics and the lead detail dialog format dates without date-fns
+  // (src/lib/dateFormat.ts, relativeTime.ts, timeAgo.ts). The two allowed
+  // routes still import it directly; take each off this list as it moves.
+  'date-vendor': {
+    why: 'date-fns (6.2 KB gzip). Use src/lib/dateFormat.ts or relativeTime.ts.',
+    allow: ['src/pages/dashboard/Clients.tsx', 'src/pages/dashboard/OpenHouses.tsx'],
   },
 };
 

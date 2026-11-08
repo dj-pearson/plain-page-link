@@ -11,7 +11,8 @@
  */
 import { Link } from 'react-router-dom';
 import { CheckSquare, CalendarClock } from 'lucide-react';
-import { formatDistanceToNow, isPast } from 'date-fns';
+import { isPast } from '@/lib/dateFormat';
+import { formatDistanceToNowWithSuffix } from '@/lib/relativeTime';
 import { useDueLeadTasks, useLeadActivities } from '@/hooks/useLeadActivities';
 import { taskDueAt } from '@/lib/localDate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,7 +66,7 @@ export function DueFollowUps() {
                     <span className={late ? 'text-red-600' : undefined}>
                       {' · '}
                       {late ? 'overdue ' : 'due '}
-                      {formatDistanceToNow(due, { addSuffix: true })}
+                      {formatDistanceToNowWithSuffix(due)}
                     </span>
                   )}
                 </p>
