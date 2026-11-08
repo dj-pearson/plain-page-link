@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { readReferral } from '@/lib/signupIntent';
+import { oauthAuthorizeUrl, readReferral } from '@/lib/signupIntent';
 import { getAttribution } from '@/lib/attribution';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
@@ -538,7 +538,14 @@ export const useAuthStore = create<AuthState>()(
 
           if (functionsUrl) {
             // Self-hosted: use oauth-proxy edge function
-            const oauthUrl = `${functionsUrl}/oauth-proxy?action=authorize&provider=google&redirect_to=${encodeURIComponent(lastRoute)}`;
+            // US-594: with the referral, so a social signup is attributed.
+            const oauthUrl = oauthAuthorizeUrl(
+              functionsUrl,
+              'google',
+              lastRoute,
+              readReferral(),
+              getAttribution()?.utm_source
+            );
             window.location.href = oauthUrl;
           } else {
             // Fallback: use standard Supabase OAuth (for hosted Supabase)
@@ -576,7 +583,14 @@ export const useAuthStore = create<AuthState>()(
 
           if (functionsUrl) {
             // Self-hosted: use oauth-proxy edge function
-            const oauthUrl = `${functionsUrl}/oauth-proxy?action=authorize&provider=apple&redirect_to=${encodeURIComponent(lastRoute)}`;
+            // US-594: with the referral, so a social signup is attributed.
+            const oauthUrl = oauthAuthorizeUrl(
+              functionsUrl,
+              'apple',
+              lastRoute,
+              readReferral(),
+              getAttribution()?.utm_source
+            );
             window.location.href = oauthUrl;
           } else {
             // Fallback: use standard Supabase OAuth (for hosted Supabase)

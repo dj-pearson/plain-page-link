@@ -98,7 +98,61 @@ export function safeRedirectPath(input: string | null | undefined, fallback = '/
   return input;
 }
 
-export interface StatePayload {
+/**
+ * US-594: who sent a visitor who signs up with Google or Apple.
+ *
+ * An email signup passes ?ref= (the "Powered by AgentBio" badge on an agent's
+ * page) and the first-touch utm_source to supabase.auth.signUp as user
+ * metadata, and handle_new_user writes them to profiles.referred_by /
+ * signup_source. A social signup went through this proxy, which created the
+ * user with provider metadata only, so every Google/Apple signup was recorded
+ * as unattributed. The frontend now sends both on the authorize leg; they
+ * ride in the signed state and are put on the new user's metadata.
+ *
+ * Same shapes as the client keeps (src/lib/signupIntent.ts REF_RE) and the
+ * 100-character cap of the profiles_signup_source_length check. A value that
+ * does not fit is dropped, never truncated into something else; handle_new_user
+ * still ignores a ref that names no real profile.
+ */
+const REF_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+
+export interface SignupAttribution {
+  ref?: string;
+  source?: string;
+}
+
+export function sanitizeSignupAttribution(ref: unknown, source: unknown): SignupAttribution {
+  const out: SignupAttribution = {};
+  if (typeof ref === 'string') {
+    const r = ref.trim().toLowerCase();
+    if (REF_RE.test(r)) out.ref = r;
+  }
+  if (typeof source === 'string') {
+    const s = source.trim();
+    if (s && s.length <= 100 && !/[\u0000-\u001f\u007f]/.test(s)) out.source = s;
+  }
+  return out;
+}
+
+/**
+ * user_metadata for an account this proxy creates. ref / signup_source are the
+ * keys handle_new_user reads (migration 20260930000010).
+ */
+export function newSocialUserMetadata(
+  identity: SocialIdentity,
+  provider: OAuthProvider,
+  attribution: SignupAttribution,
+): Record<string, string | undefined> {
+  return {
+    full_name: identity.name,
+    avatar_url: identity.picture,
+    provider,
+    ...(attribution.ref ? { ref: attribution.ref } : {}),
+    ...(attribution.source ? { signup_source: attribution.source } : {}),
+  };
+}
+
+export interface StatePayload extends SignupAttribution {
   provider: OAuthProvider;
   redirectTo: string;
   nonce: string;
@@ -107,8 +161,18 @@ export interface StatePayload {
 }
 
 export async function signState(secret: string, payload: StatePayload): Promise<string> {
+  const attribution = sanitizeSignupAttribution(payload.ref, payload.source);
   const body = base64UrlEncode(
-    enc.encode(JSON.stringify({ p: payload.provider, r: payload.redirectTo, n: payload.nonce, exp: payload.exp })),
+    enc.encode(
+      JSON.stringify({
+        p: payload.provider,
+        r: payload.redirectTo,
+        n: payload.nonce,
+        exp: payload.exp,
+        ...(attribution.ref ? { f: attribution.ref } : {}),
+        ...(attribution.source ? { s: attribution.source } : {}),
+      }),
+    ),
   );
   const sig = base64UrlEncode(await hmac(secret, body));
   return `${body}.${sig}`;
@@ -136,12 +200,15 @@ export async function verifyState(
     return refuse('Invalid state');
   }
   if (!parsed || typeof parsed !== 'object') return refuse('Invalid state');
-  const { p, r, n, exp } = parsed as Record<string, unknown>;
+  const { p, r, n, exp, f, s } = parsed as Record<string, unknown>;
   if (!isOAuthProvider(p) || typeof r !== 'string' || typeof n !== 'string' || !n || typeof exp !== 'number') {
     return refuse('Invalid state');
   }
   if (exp <= nowSeconds) return refuse('Sign-in link expired, please try again');
-  return { ok: true, value: { provider: p, redirectTo: safeRedirectPath(r), nonce: n, exp } };
+  return {
+    ok: true,
+    value: { provider: p, redirectTo: safeRedirectPath(r), nonce: n, exp, ...sanitizeSignupAttribution(f, s) },
+  };
 }
 
 const ISSUERS: Record<OAuthProvider, readonly string[]> = {

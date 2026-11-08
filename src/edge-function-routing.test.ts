@@ -40,7 +40,7 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
  * Every edge-function name the app asks for, by reading the call sites.
  *
  * Covers callEdgeFunction('x'), functions.invoke('x') and the two places
- * useAuthStore builds a URL as `${functionsUrl}/oauth-proxy`.
+ * signupIntent.oauthAuthorizeUrl (US-594) builds a URL as `${functionsBase}/oauth-proxy`.
  */
 const CALL_SITE =
   /(?:callEdgeFunction|functions\.invoke|invoke)\s*(?:<[^>]*>)?\s*\(\s*['"]([a-z0-9][a-z0-9-]*)['"]/g;
