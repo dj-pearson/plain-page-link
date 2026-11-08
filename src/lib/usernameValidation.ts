@@ -1,4 +1,15 @@
-import { z } from 'zod';
+/**
+ * Username rules for the Settings page and the live availability check.
+ *
+ * Plain checks, not a zod schema (US-498). This module was the only reason the
+ * Settings route downloaded form-vendor (react-hook-form + zod, 23.4 KB gzip):
+ * nothing else on that page builds a form schema. Register keeps its own zod
+ * schema in src/utils/validation.ts because it already uses react-hook-form.
+ *
+ * The checks run in the order the zod schema reported them, and the first
+ * failure wins, so every message is unchanged. usernameValidation.test.ts
+ * holds the two together against the old schema.
+ */
 
 // Common profanity list (add more as needed)
 const PROFANITY_LIST = [
@@ -71,22 +82,24 @@ export const isReservedUsername = (username: string): boolean => {
   return RESERVED_USERNAMES.includes(username.toLowerCase());
 };
 
-export const usernameSchema = z
-  .string()
-  .min(3, 'Username must be at least 3 characters')
-  .max(30, 'Username must be less than 30 characters')
-  .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, hyphens, and underscores')
-  .refine((username) => !containsProfanity(username), 'Username contains inappropriate language')
-  .refine((username) => !isReservedUsername(username), 'This username is reserved');
+export const USERNAME_MIN_LENGTH = 3;
+export const USERNAME_MAX_LENGTH = 30;
+const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/** The first rule `username` breaks, or null when it breaks none. */
+export const usernameError = (username: string): string | null => {
+  if (username.length < USERNAME_MIN_LENGTH) return 'Username must be at least 3 characters';
+  if (username.length > USERNAME_MAX_LENGTH) return 'Username must be less than 30 characters';
+  if (!USERNAME_PATTERN.test(username)) {
+    return 'Username can only contain letters, numbers, hyphens, and underscores';
+  }
+  if (containsProfanity(username)) return 'Username contains inappropriate language';
+  if (isReservedUsername(username)) return 'This username is reserved';
+  return null;
+};
 
 export const validateUsername = (username: string): { valid: boolean; error?: string } => {
-  try {
-    usernameSchema.parse(username);
-    return { valid: true };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return { valid: false, error: error.errors[0].message };
-    }
-    return { valid: false, error: 'Invalid username' };
-  }
+  if (typeof username !== 'string') return { valid: false, error: 'Invalid username' };
+  const error = usernameError(username);
+  return error === null ? { valid: true } : { valid: false, error };
 };
