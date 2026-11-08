@@ -5,6 +5,7 @@ import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
 import { trackContactTap } from '@/lib/analyticsEvents';
 import { AvatarImage } from './AvatarImage';
+import { CONTACT_BUTTON_BOTTOM, QUICK_ACTIONS_PANEL_BOTTOM } from './stickyActionBarLayout';
 
 interface StickyActionBarProps {
   profile: PublicProfile;
@@ -120,8 +121,11 @@ export function StickyActionBar({
               transition={
                 reduceMotion ? { duration: 0.15 } : { type: 'spring', damping: 25, stiffness: 300 }
               }
-              className="fixed bottom-20 left-0 right-0 z-50 px-4"
-              style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+              // Placed from the button's own geometry, so it clears the button
+              // whatever the home-indicator inset (US-660).
+              className="fixed left-0 right-0 z-50 px-4"
+              style={{ bottom: QUICK_ACTIONS_PANEL_BOTTOM }}
+              data-testid="quick-actions-panel"
             >
               <div className="bg-white rounded-2xl shadow-2xl p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -165,11 +169,11 @@ export function StickyActionBar({
         <motion.button
           onClick={() => setIsExpanded(!isExpanded)}
           className={cn(
-            'fixed bottom-6 right-4 z-50 rounded-full px-6 py-4 shadow-2xl transition-all flex items-center gap-2 min-h-[56px]',
+            'fixed right-4 z-50 rounded-full px-6 py-4 shadow-2xl transition-all flex items-center gap-2 min-h-[56px]',
             isExpanded ? 'bg-gray-900 text-white' : 'bg-primary text-primary-foreground'
           )}
           whileTap={reduceMotion ? undefined : { scale: 0.95 }}
-          style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+          style={{ bottom: CONTACT_BUTTON_BOTTOM }}
           aria-label={isExpanded ? 'Close quick actions' : 'Open quick actions'}
         >
           {isExpanded ? (
