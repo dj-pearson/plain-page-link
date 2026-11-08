@@ -10,6 +10,7 @@ import { getErrorMessage } from '../_shared/errorHelpers.ts'
 import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts';
 import {
   isSuppressed,
+  unsubscribeFooterHtml,
   unsubscribeFooterText,
   unsubscribeHeaders,
   unsubscribeLinks,
@@ -250,31 +251,37 @@ function getEmail1HTML(data: BioAnalyzerEmailData, unsubscribe: UnsubscribeLinks
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-    .header { background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); color: white; padding: 40px 30px; text-align: center; }
-    .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
-    .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.95; }
-    .content { padding: 40px 30px; }
-    .score-badge { background: linear-gradient(135deg, #eef2ff 0%, #fce7f3 100%); border-left: 4px solid #9333ea; padding: 20px; margin: 25px 0; border-radius: 8px; text-align: center; }
-    .score-number { font-size: 48px; font-weight: bold; color: #9333ea; margin: 0; }
-    .bio-box { background: #f9fafb; border: 2px solid #e5e7eb; padding: 20px; margin: 20px 0; border-radius: 8px; }
-    .bio-label { font-weight: 600; color: #6b7280; font-size: 12px; text-transform: uppercase; margin-bottom: 10px; }
-    .bio-text { font-family: monospace; font-size: 14px; line-height: 1.8; color: #1f2937; white-space: pre-wrap; }
-    .checklist { margin: 25px 0; }
-    .checklist-item { padding: 12px; background: #f0fdf4; border-left: 3px solid #10b981; margin-bottom: 10px; border-radius: 4px; }
-    .cta-box { background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); color: white; padding: 30px; text-align: center; border-radius: 12px; margin: 30px 0; }
+    .header { padding: 32px 30px 20px; border-bottom: 1px solid #e5e7eb; }
+    .header .brand { margin: 0 0 6px 0; font-size: 14px; font-weight: 600; color: #6d28d9; }
+    .header h1 { margin: 0; font-size: 28px; font-weight: 600; color: #1f2937; line-height: 1.25; }
+    .header p { margin: 10px 0 0 0; font-size: 16px; color: #52606d; }
+    .content { padding: 32px 30px; }
+    .score-badge { background: #f5f3ff; border: 1px solid #ddd6fe; padding: 20px; margin: 25px 0; border-radius: 12px; text-align: center; }
+    .score-label { margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #4c1d95; }
+    .score-number { font-size: 48px; font-weight: bold; color: #4c1d95; margin: 0; }
+    .bio-box { background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; margin: 20px 0; border-radius: 12px; }
+    .bio-label { font-weight: 600; color: #52606d; font-size: 14px; margin-bottom: 10px; }
+    .bio-text { font-size: 15px; line-height: 1.7; color: #1f2937; white-space: pre-wrap; }
+    .checklist { margin: 25px 0; padding: 4px 20px; background: #f0fdf4; border-radius: 12px; }
+    .checklist-item { padding: 10px 0; color: #14532d; border-bottom: 1px solid #dcfce7; }
+    .checklist-item:last-child { border-bottom: 0; }
+    .quick-win { background: #fef3c7; border: 1px solid #fde68a; padding: 20px; margin: 25px 0; border-radius: 12px; }
+    .cta-box { background: #f5f3ff; color: #1f2937; padding: 30px; text-align: center; border-radius: 12px; margin: 30px 0; }
     .cta-box h3 { margin: 0 0 15px 0; font-size: 22px; }
+    .cta-box p, .cta-box li { color: #4c1d95; }
     .cta-box ul { text-align: left; max-width: 400px; margin: 20px auto; }
     .cta-box li { margin-bottom: 8px; }
-    .button { display: inline-block; background: white; color: #9333ea !important; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 15px 0; font-weight: 600; }
-    .button:hover { background: #f3f4f6; }
-    .footer { background: #f9fafb; padding: 30px; text-align: center; font-size: 14px; color: #6b7280; }
+    .button { display: inline-block; background: #6d28d9; color: #ffffff !important; padding: 14px 32px; text-decoration: none; border-radius: 12px; margin: 15px 0; font-weight: 600; }
+    .footer { padding: 24px 30px 30px; font-size: 14px; color: #52606d; border-top: 1px solid #e5e7eb; }
+    .footer a { color: #6d28d9; text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>✨ Your Optimized Instagram Bios Are Ready!</h1>
-      <p>3 professionally rewritten versions + action plan</p>
+      <p class="brand">AgentBio</p>
+      <h1>Your optimized Instagram bios are ready</h1>
+      <p>3 rewritten versions and an action plan</p>
     </div>
 
     <div class="content">
@@ -283,13 +290,13 @@ function getEmail1HTML(data: BioAnalyzerEmailData, unsubscribe: UnsubscribeLinks
       <p>Thanks for using the Instagram Bio Analyzer!</p>
 
       <div class="score-badge">
-        <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280; font-weight: 600;">YOUR EFFECTIVENESS SCORE</p>
+        <p class="score-label">Your effectiveness score</p>
         <div class="score-number">${data.score}/100</div>
       </div>
 
       <p>I've got your <strong>3 professionally optimized bio versions</strong> ready. Each is tailored to your market (${data.market}) and optimized for maximum lead conversion.</p>
 
-      <h2 style="color: #9333ea; margin-top: 30px;">Your Optimized Bios:</h2>
+      <h2 style="color: #1f2937; margin-top: 30px;">Your optimized bios</h2>
 
       <div class="bio-box">
         <div class="bio-label">Option 1 - Professional Authority</div>
@@ -316,7 +323,7 @@ function getEmail1HTML(data: BioAnalyzerEmailData, unsubscribe: UnsubscribeLinks
         <div class="checklist-item">✓ Track your results for 1-2 weeks</div>
       </div>
 
-      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 8px;">
+      <div class="quick-win">
         <p style="margin: 0; font-weight: 600; color: #92400e;">⚡ Your Quick Win:</p>
         <p style="margin: 8px 0 0 0; color: #78350f;">Update your bio today, then compare your profile visits and link taps a week or two later against what you see now.</p>
       </div>
@@ -345,14 +352,11 @@ function getEmail1HTML(data: BioAnalyzerEmailData, unsubscribe: UnsubscribeLinks
     <div class="footer">
       <p><strong>AgentBio</strong> - Link-in-Bio for Real Estate Agents</p>
       <p style="margin: 10px 0 0 0;">
-        <a href="${siteUrl}" style="color: #9333ea; text-decoration: none;">Visit AgentBio</a> •
-        <a href="${siteUrl}/tools/instagram-bio-analyzer" style="color: #9333ea; text-decoration: none;">Bio Analyzer</a> •
-        <a href="${siteUrl}/blog" style="color: #9333ea; text-decoration: none;">Blog</a>
+        <a href="${siteUrl}">Visit AgentBio</a> •
+        <a href="${siteUrl}/tools/instagram-bio-analyzer">Bio Analyzer</a> •
+        <a href="${siteUrl}/blog">Blog</a>
       </p>
-      <p style="margin: 15px 0 0 0; font-size: 12px;">
-        ${UNSUBSCRIBE_REASON}
-        <a href="${unsubscribe.pageUrl.replace(/&/g, '&amp;')}" style="color: #6b7280;">Unsubscribe</a>
-      </p>
+      ${unsubscribeFooterHtml(unsubscribe, UNSUBSCRIBE_REASON)}
     </div>
   </div>
 </body>

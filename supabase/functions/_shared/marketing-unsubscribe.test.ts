@@ -13,8 +13,10 @@ import { join } from 'node:path';
 import {
   isSuppressed,
   parseUnsubscribeRequest,
+  postalAddress,
   signUnsubscribe,
   unsubscribeFooterHtml,
+  unsubscribeFooterText,
   unsubscribeHeaders,
   unsubscribeLinks,
   unsubscribeSecret,
@@ -84,6 +86,73 @@ describe('unsubscribeLinks / headers / footer', () => {
     const html = unsubscribeFooterHtml(links, 'Because.');
     expect(html).toContain(links.pageUrl.replace(/&/g, '&amp;'));
     expect(html).toContain('>Unsubscribe</a>');
+  });
+});
+
+describe('postal address in the drip footer (US-447, CAN-SPAM)', () => {
+  function stubEnv(env: Record<string, string>) {
+    (globalThis as Record<string, unknown>).Deno = { env: { get: (k: string) => env[k] } };
+  }
+
+  it('is read from COMPANY_POSTAL_ADDRESS, lines joined with commas', () => {
+    stubEnv({ COMPANY_POSTAL_ADDRESS: ' 123 Main St, Suite 4\n Salt Lake City, UT 84101 \n' });
+    expect(postalAddress()).toBe('123 Main St, Suite 4, Salt Lake City, UT 84101');
+  });
+
+  it('is undefined when unset, blank, or outside Deno', () => {
+    expect(postalAddress()).toBeUndefined();
+    stubEnv({});
+    expect(postalAddress()).toBeUndefined();
+    stubEnv({ COMPANY_POSTAL_ADDRESS: '  \n ' });
+    expect(postalAddress()).toBeUndefined();
+  });
+
+  it('prints the configured address in both the HTML and the text footer', async () => {
+    stubEnv({ COMPANY_POSTAL_ADDRESS: '123 Main St\nSalt Lake City, UT 84101' });
+    const links = await unsubscribeLinks('listing', CAPTURE, SECRET, ORIGINS);
+    expect(unsubscribeFooterHtml(links, 'Because.')).toContain('AgentBio, 123 Main St, Salt Lake City, UT 84101');
+    expect(unsubscribeFooterText(links, 'Because.')).toBe(
+      `Because. Unsubscribe: ${links.pageUrl}\nAgentBio, 123 Main St, Salt Lake City, UT 84101`
+    );
+  });
+
+  it('escapes the address for HTML', async () => {
+    const links = await unsubscribeLinks('bio', CAPTURE, SECRET, ORIGINS);
+    const html = unsubscribeFooterHtml(links, 'Because.', 'PO Box 1 <b>&</b>');
+    expect(html).toContain('PO Box 1 &lt;b&gt;&amp;&lt;/b&gt;');
+    expect(html).not.toContain('<b>');
+  });
+
+  it('omits the line rather than printing a placeholder when no address is set', async () => {
+    const links = await unsubscribeLinks('bio', CAPTURE, SECRET, ORIGINS);
+    expect(unsubscribeFooterHtml(links, 'Because.')).not.toContain('AgentBio,');
+    expect(unsubscribeFooterText(links, 'Because.')).toBe(`Because. Unsubscribe: ${links.pageUrl}`);
+  });
+});
+
+describe('free-tool drip senders (US-447)', () => {
+  const SENDERS = [
+    'send-listing-generator-email/index.ts',
+    'send-scheduled-listing-emails/index.ts',
+    'send-bio-analyzer-email/index.ts',
+    'send-scheduled-bio-emails/index.ts',
+  ];
+  const read = (rel: string) => readFileSync(join(process.cwd(), 'supabase/functions', rel), 'utf-8');
+
+  it.each(SENDERS)('%s ends every email with the shared footer (unsubscribe + postal address)', (rel) => {
+    const src = read(rel);
+    expect(src).toMatch(/unsubscribeFooterHtml\(/);
+    // No hand-rolled unsubscribe link that would skip the address.
+    expect(src).not.toMatch(/unsubscribe\.pageUrl\.replace/);
+  });
+
+  it.each([...SENDERS, '_shared/bio-drip-emails.ts'])('%s has no gradient or thick side-stripe callouts', (rel) => {
+    const src = read(rel);
+    expect(src).not.toMatch(/linear-gradient|radial-gradient/);
+    const stripes = src.match(/border-(left|right)\s*:\s*(\d+)px/g) ?? [];
+    for (const stripe of stripes) {
+      expect(Number(/(\d+)px/.exec(stripe)![1]), stripe).toBeLessThanOrEqual(1);
+    }
   });
 });
 

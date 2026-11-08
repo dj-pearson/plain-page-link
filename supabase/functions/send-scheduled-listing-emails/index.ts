@@ -18,7 +18,7 @@ import {
 } from '../_shared/marketing-unsubscribe.ts';
 import { safeHtmlText } from '../_shared/public-email.ts';
 import { maskEmail } from '../_shared/log-redaction.ts';
-import { LISTING_DRIP, LISTING_DRIP_DAY } from '../_shared/listing-drip.ts';
+import { LISTING_DRIP, LISTING_DRIP_DAY, LISTING_UNSUBSCRIBE_REASON } from '../_shared/listing-drip.ts';
 import { isFinalDripEmail, isPastDripWindow, nextDueDripEmail } from '../_shared/drip-schedule.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
@@ -234,7 +234,7 @@ async function sendSequenceEmail(data: {
       getSequenceEmailHTML(data.sequenceNumber, data.firstName) +
       `<div style="max-width: 600px; margin: 0 auto; padding: 0 20px 20px;">${unsubscribeFooterHtml(
         data.unsubscribe,
-        "You're receiving this because you used AgentBio's listing description generator."
+        LISTING_UNSUBSCRIBE_REASON
       )}</div>`;
 
     const response = await fetch('https://api.resend.com/emails', {
@@ -276,7 +276,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p><strong>The most common listing description mistake:</strong></p>
 
-      <p style="background: #fef3f9; border-left: 4px solid #ec4899; padding: 20px; margin: 20px 0;">
+      <p style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px; color: #4c1d95; padding: 20px; margin: 20px 0;">
         They list <em>features</em> instead of painting <em>experiences</em>.
       </p>
 
@@ -342,8 +342,8 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p><strong>Here's my simple decision tree:</strong></p>
 
-      <div style="background: #faf5ff; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #9333ea;">
-        <h3 style="margin-top: 0; color: #9333ea;">Use LUXURY style when:</h3>
+      <div style="background: #faf5ff; padding: 20px; margin: 20px 0; border-radius: 12px; border: 1px solid #e9d5ff;">
+        <h3 style="margin-top: 0; color: #6b21a8;">Use LUXURY style when:</h3>
         <ul>
           <li>Price is above neighborhood average by 20%+</li>
           <li>High-end finishes (marble, custom cabinets, smart home)</li>
@@ -352,8 +352,8 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
         </ul>
       </div>
 
-      <div style="background: #fef3f9; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #ec4899;">
-        <h3 style="margin-top: 0; color: #ec4899;">Use FAMILY-FRIENDLY style when:</h3>
+      <div style="background: #fdf2f8; padding: 20px; margin: 20px 0; border-radius: 12px; border: 1px solid #fbcfe8;">
+        <h3 style="margin-top: 0; color: #9d174d;">Use FAMILY-FRIENDLY style when:</h3>
         <ul>
           <li>3+ bedrooms, yard, family-oriented neighborhood</li>
           <li>Near good schools, parks, family amenities</li>
@@ -362,7 +362,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
         </ul>
       </div>
 
-      <div style="background: #f0fdf4; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #10b981;">
+      <div style="background: #f0fdf4; padding: 20px; margin: 20px 0; border-radius: 12px; border: 1px solid #bbf7d0;">
         <h3 style="margin-top: 0; color: #059669;">Use INVESTMENT style when:</h3>
         <ul>
           <li>Multi-family, duplex, triplex, or rental property</li>
