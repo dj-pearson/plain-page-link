@@ -21,6 +21,8 @@ export function useAgentTimeZone() {
     data: stored = null,
     isLoading,
     isSuccess,
+    isError,
+    refetch,
   } = useQuery({
     queryKey: agentTimeZoneKey(user?.id),
     enabled: !!user?.id,
@@ -57,6 +59,12 @@ export function useAgentTimeZone() {
     isLoading,
     /** True once the stored value has been read: null then really means unset. */
     isKnown: isSuccess,
+    /**
+     * True when the read failed (US-631). timeZone is null then too, but that
+     * null means "unknown", not "unset": never offer to save over it.
+     */
+    isError,
+    refetch,
     update,
   };
 }
