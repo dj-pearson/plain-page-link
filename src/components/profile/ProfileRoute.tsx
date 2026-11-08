@@ -24,6 +24,7 @@ import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import { publicProfileQueryOptions } from '@/hooks/usePublicProfile';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { normalizeUsername } from '@/lib/username';
+import { useProfileManifest } from '@/hooks/useProfileManifest';
 
 interface ProfileRouteProps {
   /** The lazily loaded page, e.g. `lazy(() => import('./FullProfilePage'))`. */
@@ -47,6 +48,10 @@ export function ProfileRoute({ page: Page }: ProfileRouteProps) {
     // failure is cached as the query's error and handled by the page.
     void queryClient.prefetchQuery(publicProfileQueryOptions(username, viewerId));
   }, [queryClient, username, viewerId]);
+
+  // Add to Home Screen here installs the agent's page, not the dashboard
+  // (US-460).
+  useProfileManifest(username);
 
   return (
     <Suspense fallback={<ProfileSkeleton />}>
