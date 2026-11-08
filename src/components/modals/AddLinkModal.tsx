@@ -48,7 +48,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { logger } from '@/lib/logger';
-import { sanitizeUrl } from '@/utils/sanitize';
+import { sanitizeUrl } from '@/utils/sanitizeUrl';
 
 const linkSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),

@@ -9,7 +9,7 @@
  * built from them are already saved as jsonb, so the renderer also refuses to
  * publish a link that has no real destination.
  */
-import { sanitizeUrl } from '@/utils/sanitize';
+import { sanitizeUrl } from '@/utils/sanitizeUrl';
 
 /** RFC 2606 reserves these for documentation; they are never a real target. */
 const RESERVED_HOST = /(^|\.)example\.(com|org|net)$/i;

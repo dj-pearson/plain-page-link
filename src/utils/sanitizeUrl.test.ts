@@ -7,7 +7,9 @@
  * public profile.
  */
 import { describe, it, expect } from 'vitest';
-import { sanitizeUrl, sanitizeExternalUrl } from './sanitize';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { sanitizeUrl, sanitizeExternalUrl } from './sanitizeUrl';
 
 describe('sanitizeUrl', () => {
   it.each([
@@ -81,5 +83,40 @@ describe('sanitizeExternalUrl', () => {
     expect(sanitizeExternalUrl('mailto:jane@example.com')).toBe('');
     expect(sanitizeExternalUrl('/dashboard')).toBe('');
     expect(sanitizeExternalUrl('java\tscript:alert(1)')).toBe('');
+  });
+});
+
+/**
+ * US-455: sanitizeUrl used to live beside the DOMPurify helpers, so every
+ * link check loaded purify.es (~10.8 KB gzip) — on the public profile, the
+ * listing page, Links and the Page Builder. These keep it off those routes.
+ */
+describe('sanitizeUrl stays free of DOMPurify', () => {
+  const SRC = join(process.cwd(), 'src');
+
+  it('sanitizeUrl.ts does not import dompurify or sanitize.ts', () => {
+    const source = readFileSync(join(SRC, 'utils/sanitizeUrl.ts'), 'utf8');
+    expect(source).not.toMatch(/from\s+['"]dompurify['"]/);
+    expect(source).not.toMatch(/import\(\s*['"]dompurify['"]\s*\)/);
+    expect(source).not.toMatch(/from\s+['"](?:\.\/sanitize|@\/utils\/sanitize)['"]/);
+  });
+
+  it('no module imports the URL helpers through the DOMPurify module', () => {
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (/\.(ts|tsx)$/.test(name)) files.push(path);
+      }
+    };
+    walk(SRC);
+
+    const offenders = files.filter((file) =>
+      /import\s*\{[^}]*\bsanitize(?:External)?Url\b[^}]*\}\s*from\s*['"](?:@\/utils\/sanitize|\.\.?\/(?:utils\/)?sanitize)['"]/.test(
+        readFileSync(file, 'utf8')
+      )
+    );
+    expect(offenders.map((f) => relative(SRC, f))).toEqual([]);
   });
 });

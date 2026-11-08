@@ -42,7 +42,7 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { byPosition, moveAndRenumber } from '@/lib/linkOrder';
-import { sanitizeUrl } from '@/utils/sanitize';
+import { sanitizeUrl } from '@/utils/sanitizeUrl';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';

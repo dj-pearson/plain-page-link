@@ -47,7 +47,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { Link } from '@/hooks/useLinks';
-import { sanitizeUrl } from '@/utils/sanitize';
+import { sanitizeUrl } from '@/utils/sanitizeUrl';
 
 const editLinkSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
