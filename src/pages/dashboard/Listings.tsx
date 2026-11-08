@@ -33,6 +33,11 @@ import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
 import { todayCalendarDate } from '@/lib/localDate';
 import { describeListingSaveError, normalizeVirtualTourUrl } from '@/lib/listingUrls';
 import { buildImportedListing } from '@/lib/listingImport';
+import {
+  importCsvListings,
+  type CsvImportListing,
+  type CsvImportResult,
+} from '@/lib/listingCsvImport';
 import { reorderWithinView, sortOrderChanges } from '@/lib/listingOrder';
 import type { EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
@@ -297,43 +302,31 @@ export default function Listings() {
     }
   };
 
-  const handleCSVImport = async (importedListings: Record<string, unknown>[]) => {
-    let successCount = 0;
-    let failCount = 0;
-    for (const listing of importedListings) {
-      try {
-        await addListing.mutateAsync({
-          address: listing.address as string,
-          city: listing.city as string,
-          state: listing.state as string,
-          zip_code: listing.zip_code as string,
-          price: String(listing.price),
-          bedrooms: listing.bedrooms as number,
-          bathrooms: listing.bathrooms as number,
-          square_feet: listing.square_feet as number,
-          status: listing.status as string,
-          description: listing.description as string,
-          mls_number: listing.mls_number as string,
-          property_type: listing.property_type as string,
-          lot_size_acres: listing.lot_size_acres as number,
-          is_featured: listing.is_featured as boolean,
-          virtual_tour_url: listing.virtual_tour_url as string,
-          // The template has advertised year_built all along (US-106).
-          year_built: (listing.year_built as number | null) ?? null,
-        });
-        successCount++;
-      } catch {
-        failCount++;
-      }
-    }
-    toast({
-      title: 'Import complete',
-      description:
-        failCount > 0
-          ? `Imported ${successCount} of ${importedListings.length} listings. ${failCount} failed.`
-          : `Successfully imported ${successCount} of ${importedListings.length} listings.`,
-      variant: failCount > 0 ? 'destructive' : 'default',
+  /**
+   * Save the valid rows of a CSV and report what landed. Each refused row
+   * keeps its reason (a plan limit, a refused tour URL) instead of becoming an
+   * anonymous "failed" count, and the dialog shows the real total (US-587).
+   */
+  const handleCSVImport = async (rows: CsvImportListing[]): Promise<CsvImportResult> => {
+    const result = await importCsvListings(rows, {
+      insert: (listing) => addListing.mutateAsync(listing),
+      describeError: (error) =>
+        describeListingSaveError(
+          error,
+          'The listing could not be saved. Check the row and try again.'
+        ),
+      today: todayCalendarDate(),
     });
+    const total = rows.length;
+    toast({
+      title: result.failures.length > 0 ? 'Import finished with problems' : 'Import complete',
+      description:
+        result.failures.length > 0
+          ? `Imported ${result.imported} of ${total} listings. ${result.failures.length} could not be saved.`
+          : `Imported ${result.imported} of ${total} listings.`,
+      variant: result.failures.length > 0 ? 'destructive' : 'default',
+    });
+    return result;
   };
 
   /**
