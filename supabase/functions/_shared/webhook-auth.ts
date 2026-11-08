@@ -1,116 +1,71 @@
 /**
  * Webhook & API Key Authentication
  * Supports external services like Make.com, Zapier, n8n, etc.
- * 
- * Security: Validates API keys for server-to-server communication
+ *
+ * Security: Validates API keys for server-to-server communication. The key
+ * rules themselves live in api-auth.ts; this module only decides how an API
+ * key and a JWT combine.
  */
 
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
-import { hashApiKey } from './api-auth.ts';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { authenticateApiKey, extractApiKey } from './api-auth.ts';
 import { unauthorized } from './http-error.ts';
 
 /**
- * Validate API key from request headers
- * Checks both x-api-key and apikey headers
+ * Validate the API key on a request (`Authorization: Bearer ab_…`,
+ * `x-api-key`, or a prefixed `apikey`).
+ *
+ * US-432: this delegates to authenticateApiKey in api-auth.ts, which owns
+ * every rule (prefix, hash lookup, revoked_at, is_active, expiry). It used to
+ * repeat the lookup with its own rules, which drifted: it was the copy that
+ * kept honouring revoked keys until US-377.
+ *
  * @param req - Request object
- * @param supabase - Supabase client
- * @returns User object associated with API key, or throws error
+ * @param supabase - A service-role client (the lookup bypasses RLS)
+ * @returns The key's owner, or null when no key was presented. Throws a 401
+ *   when a key was presented and is not usable.
  */
 export async function validateApiKey(
   req: Request,
   supabase: SupabaseClient
 ): Promise<{ user_id: string; key_name: string } | null> {
-  // Check for API key in headers (x-api-key or apikey)
-  const apiKey = req.headers.get('x-api-key') || req.headers.get('apikey');
-  
-  if (!apiKey) {
-    return null; // No API key provided
-  }
+  if (!extractApiKey(req)) return null;
 
-  try {
-    // Keys are stored as SHA-256 hashes, so hash the presented key before
-    // looking it up. Comparing the raw key against key_hash never matched,
-    // silently breaking all API-key auth through this path.
-    const keyHash = await hashApiKey(apiKey);
-
-    // Query api_keys table for valid key
-    const { data: keyData, error } = await supabase
-      .from('api_keys')
-      .select('user_id, name, is_active, expires_at, last_used_at, revoked_at')
-      .eq('key_hash', keyHash)
-      .single();
-
-    if (error || !keyData) {
-      throw new Error('Invalid API key');
-    }
-
-    // Check if key is active
-    // The api-keys edge function retires a key by setting revoked_at, so
-    // is_active alone let a revoked key keep authenticating here.
-    if (!keyData.is_active || keyData.revoked_at) {
-      throw new Error('API key is inactive');
-    }
-
-    // Check if key has expired
-    if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-      throw new Error('API key has expired');
-    }
-
-    // Update last_used_at timestamp
-    await supabase
-      .from('api_keys')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('key_hash', keyHash);
-
-    return {
-      user_id: keyData.user_id,
-      key_name: keyData.name,
-    };
-  } catch (error) {
-    console.error('API key validation failed:', error);
+  const auth = await authenticateApiKey(req, supabase);
+  if (!auth) {
     throw unauthorized('Unauthorized: Invalid API key', 'AUTH_SESSION_INVALID');
   }
+  return { user_id: auth.userId, key_name: auth.keyName };
 }
 
 /**
  * Flexible authentication - supports both JWT and API key
  * Use this for functions that can be called from web app or webhooks
  * @param req - Request object
- * @param supabase - Supabase client
- * @returns User ID or null if no auth provided
+ * @param supabase - Service-role client (used for the API-key lookup)
+ * @returns User ID or null if no valid auth was provided
  */
 export async function flexibleAuth(
   req: Request,
   supabase: SupabaseClient
 ): Promise<string | null> {
-  // Try API key first (for webhooks)
+  // A presented API key decides the outcome on its own: a revoked or unknown
+  // key does not fall through to the JWT path.
+  if (extractApiKey(req)) {
+    const auth = await authenticateApiKey(req, supabase);
+    return auth ? auth.userId : null;
+  }
+
+  // JWT (web app)
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
   try {
-    const apiKeyResult = await validateApiKey(req, supabase);
-    if (apiKeyResult) {
-      console.log(`[webhook-auth] Authenticated via API key: ${apiKeyResult.key_name}`);
-      return apiKeyResult.user_id;
-    }
-  } catch (error) {
-    // API key validation failed, will try JWT next
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (user && !error) return user.id;
+  } catch {
+    // JWT validation failed
   }
 
-  // Try JWT token (for web app)
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader) {
-    try {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      
-      if (user && !error) {
-        console.log('[webhook-auth] Authenticated via JWT');
-        return user.id;
-      }
-    } catch (error) {
-      // JWT validation failed
-    }
-  }
-
-  // No valid authentication found
   return null;
 }
 
@@ -126,7 +81,7 @@ export async function requireFlexibleAuth(
   supabase: SupabaseClient
 ): Promise<string> {
   const userId = await flexibleAuth(req, supabase);
-  
+
   if (!userId) {
     throw unauthorized('Unauthorized: Valid JWT token or API key required', 'AUTH_TOKEN_MISSING');
   }
