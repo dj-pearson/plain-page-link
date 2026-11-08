@@ -270,6 +270,78 @@ describe('Leads page', () => {
   // US-104: status was not a filter at all, and nothing about the view was
   // reflected in the URL, so a filtered list could not be linked to.
   describe('filters', () => {
+    // US-534: lead_stats counted every lead the owner has, so with an assignee
+    // filter the chips and the Needs-attention badge disagreed with the list.
+    const statsArgs = () =>
+      rpcMock.mock.calls.filter(([fn]) => fn === 'lead_stats').map(([, args]) => args);
+
+    it('counts the chips over the whole book when no assignee filter is set', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() => expect(statsArgs().length).toBeGreaterThan(0));
+      for (const args of statsArgs()) expect(args.p_assignee).toBeUndefined();
+    });
+
+    it('counts the chips over the teammate the list is filtered to', async () => {
+      const teammate = '22222222-2222-2222-2222-222222222222';
+      window.history.replaceState(null, '', `/?assignee=${teammate}`);
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      expect(eqCalls).toContainEqual(['assigned_to', teammate]);
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(expect.objectContaining({ p_assignee: teammate }))
+      );
+    });
+
+    it('counts the chips over unassigned leads when the list shows those', async () => {
+      window.history.replaceState(null, '', '/?assignee=unassigned');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(expect.objectContaining({ p_assignee: 'unassigned' }))
+      );
+    });
+
+    it('counts "Assigned to me" as the assignee filter on my own id', async () => {
+      window.history.replaceState(null, '', '/?assigned=me');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(
+          expect.objectContaining({ p_assignee: mockLeadRow.user_id })
+        )
+      );
+    });
+
+    it('shows the filtered Needs-attention count from lead_stats', async () => {
+      const teammate = '22222222-2222-2222-2222-222222222222';
+      window.history.replaceState(null, '', `/?assignee=${teammate}`);
+      rpcMock.mockImplementation(async (fn: string, args: { p_assignee?: string }) =>
+        fn === 'lead_stats'
+          ? {
+              data: {
+                total: args.p_assignee === teammate ? 3 : 40,
+                by_status: args.p_assignee === teammate ? { new: 3 } : { new: 40 },
+                needs_attention: args.p_assignee === teammate ? 2 : 25,
+              },
+              error: null,
+            }
+          : { data: 'activity-1', error: null }
+      );
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: /needs attention/i })).toHaveAccessibleName(
+          'Needs attention (2)'
+        )
+      );
+    });
+
     it('pushes the status filter into the query rather than filtering in JS', async () => {
       renderWithProviders(<Leads />);
       await screen.findByText(mockLead.name);

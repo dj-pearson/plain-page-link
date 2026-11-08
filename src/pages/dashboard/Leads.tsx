@@ -137,7 +137,12 @@ export default function Leads() {
 
   const { slaHours, update: updatePreferences } = useNotificationPreferences();
   const setSlaHours = (hours: number) => updatePreferences.mutate({ sla_hours: hours });
-  const { stats: serverStats } = useLeadStats({ slaHours });
+  // US-534: the chips and the Needs-attention badge count what the list shows
+  // under the assignee filters ("Assigned to me" is the same filter on my id).
+  const { stats: serverStats } = useLeadStats({
+    slaHours,
+    assignee: assignedToMe ? (user?.id ?? null) : assigneeFilter,
+  });
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
 
   // The one reader of `leads`. useLeads owns the query, the cache key and the
