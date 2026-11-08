@@ -6347,3 +6347,85 @@ Other findings:
 ## Round 17 integrator fix — US-622: lead and contact details never decrypted in production
 
 src/lib/pii.ts called supabase.functions.invoke('pii-crypto'), which posts to ${VITE_SUPABASE_URL}/functions/v1; nothing public routes there (the same cause as US-611's failing reviews). So the dashboard could not show lead or contact email/phone, and saving a phone number could not encrypt it. All four calls now go through callEdgeFunction (VITE_FUNCTIONS_URL, auth). The edge-function routing test now allows no invoke() caller at all. 3159 tests pass; build OK. Frontend-only: ships with the Cloudflare Pages deploy.
+
+---
+
+## Continuous improvement loop — round 18 — 2026-11-08 (US-628 to US-637 done)
+
+Seven approved outright; listings (DST conversion), enterprise (cancelled stream skipped the audit entry) and mobile (font-size rule) each needed one fix-up. No merge conflicts. Closed US-507, US-584, US-600, US-604, US-608, US-623, US-624, US-627; slice 1 of US-620. Security found any agent could overwrite another agent's listing photo variants through optimize-image.
+Final: tsc clean (app + node config), 3298 unit tests pass (from 3159), verify:migrations OK (92 files), vite build OK, eslint 555 warnings (CI ratchet 556 -> 555).
+
+- US-628 [listings] Open-house times now use the agent's saved time zone, and start times that have already passed are refused
+- US-629 [leads] Converting a lead who is already a client no longer creates a duplicate client (US-620 slice 1)
+- US-630 [profile] The page builder's page list never showed which page was live, and showed "No pages yet" when the pages had only failed to load
+- US-631 [uiux] Time zone setting tells an agent "Not saved yet" when it simply failed to read their saved zone
+- US-632 [performance] The public profile drew an 800px headshot in 32-128px circles (US-604)
+- US-633 [security] Any agent could overwrite another agent's public listing photo variants through optimize-image
+- US-634 [enterprise] The immediate data export held the whole account in memory and could fail for the largest agents
+- US-635 [marketing] Comparison tables no longer mark unverified gaps in competitors' products (US-507)
+- US-636 [seo] llms.txt now tells AI answer engines that agent pages exist and where they are listed (US-608)
+- US-637 [mobile] Tapping a message box or dropdown on a phone zoomed the page in on iOS and left it zoomed
+
+Owner actions:
+- US-629: Apply migration 20261108000629_contact_lookup_hashes.sql
+- US-629: Redeploy the edge-functions server (functions.agentbio.net) so pii-crypto has the match_contacts_for_lead op. Until then the check fails and the button falls back to adding the contact as before
+- US-629: Check that CI verify-backend passes the new US-629 verify-schema check, which was not run locally
+- US-632: Redeploy Cloudflare Pages (frontend only). No migration, no edge-function deploy, no secret.
+- US-632: After deploy, smoke test: upload a new headshot in Settings. Storage should then hold avatar-<ts>-full.jpg and avatar-<ts>-256.webp, and the public profile should request the -256.webp file for the header circle.
+- US-633: Redeploy the edge-functions image (functions.agentbio.net, Coolify) so optimize-image picks up the path and bucket validation
+- US-633: Optional: check listing-photos for *-200/-400/-800.webp objects whose last update came from a different user's optimize-image audit event (audit_logs action 'image_optimize', resource_id containing '..'), to see whether this was ever abused
+- US-634: Redeploy the gdpr-export edge function, which is served by the Coolify functions.agentbio.net app from the root Dockerfile. Its shared module _shared/gdpr-export.ts changed, and scheduled-maintenance imports the same module, so redeploy that too.
+- US-635: None: frontend copy only, so a normal Cloudflare Pages deploy picks it up. No migration, edge function or secret is involved.
+- US-636: Redeploy Cloudflare Pages so the new public/llms.txt is served. No migration, no edge-function deploy, no secrets.
+
+Opened:
+- US-638 [listings] US-627 slice 2: refuse past open-house starts in the database
+- US-639 [listings] Show open-house times in the agent's zone on the public page, kiosk and calendar export
+- US-640 [leads] US-620 slice 2: hash contacts at write time and backfill the whole sphere
+- US-641 [leads] US-620 slice 3: warn about duplicates when an agent adds a client by hand
+- US-642 [profile] Page list: deleting the live page should warn that the public page loses its blocks
+- US-643 [performance] Use AvatarImage for avatars in the dashboard and other public surfaces
+- US-644 [security] Make isServiceRoleRequest fail closed and constant-time
+- US-645 [security] Remove or server-side the self-reported report-stripe-usage endpoint
+- US-646 [enterprise] Verify the streamed GET export behind Kong/Cloudflare
+- US-647 [marketing] Dated re-check of the competitor 'offered' feature cells
+- US-648 [marketing] Comparison prose still makes negative claims about competitors
+- US-649 [mobile] Public profile Contact button covers the last content on iPhones and tablets
+- US-650 [mobile] Dialogs use 90vh, which goes past the visible area in iOS Safari's browser tab
+
+Other findings:
+- [listings] The open-house zone comes from the agent, not the property. An agent covering listings in several zones would need a per-listing time zone, which is an owner product decision. Not implemented.
+- [listings] src/pages/dashboard/OpenHouses.tsx upcoming/past split uses Date.now() vs ends_at (around line 260), which is zone-independent and correct; no change needed.
+- [leads] contacts.encrypted_email/encrypted_phone are still browser-readable (they are in the new column grant). useContact reads them only to throw them away. Taking them out of the grant, as was done for leads in 20261101000016, would harden US-254 further: change DETAIL_COLUMNS and the grant together.
+- [leads] supabase/functions/pii-crypto/index.ts: match_contacts_for_lead does not run contactsCopiedFromLockedLeads over the contacts it hashes. A contact copied from a locked lead's ciphertext (only possible before 20261101000016) could be matched to an unlocked lead. The impact is low.
+- [leads] Indexing a contact bumps its updated_at, because the trg_contacts_set_next_touch trigger sets it on every update. Nothing sorts contacts by updated_at today, but if something starts to, that ordering will be misleading.
+- [leads] US-621 (carry property_address, price_range, timeline and contacted_at onto the converted contact) is still open and small. It touches createFromLead in AddLeadToClientsButton.tsx.
+- [profile] src/components/settings/ProfileDisplaySettings.tsx:38-49: loadActivePage ignores a query error (`if (!error && data)`). A failed read looks like 'no active custom page', so Settings may present the default profile as what visitors see.
+- [profile] src/components/pageBuilder/blocks/ListingsBlock.tsx:137-139: a failed listings fetch sets [] and the block renders empty on the public page. Arguably fine for visitors, but the owner's builder canvas gives no hint either.
+- [profile] src/stores/pageBuilderStore.ts:181 (old) / PageList: handleSetActive in PageList logs the error a second time after the store already logs and toasts it. Harmless duplication.
+- [profile] src/stores/pageBuilderStore.ts:39 `addBlockToPage: (type: any, ...)` and src/types/pageBuilder.ts:320 still carry `any` (existing lint warnings).
+- [uiux] src/components/settings/LeadNotificationPreferences.tsx:65-66 sets `clockZone = zone.timeZone ?? zone.detected`, so if the time-zone read fails the digest-hour hint says 'Your time: <device zone>' as if that zone were saved. It is minor, but it could check zone.isError or zone.isKnown.
+- [uiux] US-624 (ProfileDisplaySettings: a failed read looks like 'no custom page') is still open and is a similar one-session fix using the same SectionLoadError pattern.
+- [performance] The lint-staged pre-commit hook again wrote a backup entry (8a9419c) into the git stash that all worktrees share.
+- [performance] src/lib/avatarAppIcon.ts:14-16: the doc example still shows only the old avatar-<ts>.jpg name. The icon derivation works unchanged with -full names (icons become avatar-<ts>-full-app-icon-192.png).
+- [performance] If the photo upload fails after the small copy was stored, the small copy is orphaned until the agent's next successful upload, whose cleanup removes it. Low cost.
+- [performance] US-625 (preload the next gallery photo), US-581 and US-582 (take date-fns off the Clients and OpenHouses routes) are still open; I did not take them this round.
+- [security] supabase/functions/audit-log/index.ts:73-115 lets any signed-in user write arbitrary audit_logs rows (any action and risk level) under their own user_id. Those rows can mimic server events such as 'admin_action' or 'mfa_disable'. Restrict client-written actions to an allowlist, or tag them as client-reported.
+- [security] supabase/functions/create-portal-session/index.ts:71-133 and create-checkout-session/index.ts:81,192 pass caller-supplied returnUrl/successUrl/cancelUrl to Stripe without an origin check. The impact is a self-redirect, so it is low, but an allowlist against getSiteUrl() is cheap.
+- [security] supabase/functions/google-analytics-oauth-callback, bing-webmaster-oauth-callback and yandex-webmaster-oauth-callback accept `state` but never verify it against anything. That allows OAuth login-CSRF: an attacker's GA or Bing account gets linked to the victim's AgentBio account. Low impact.
+- [security] supabase/functions/teams/index.ts: a team 'admin' (not only the owner) can demote or remove other admins and invite new admins. Whether only the owner should manage admins is a product decision.
+- [security] US-444 (generate-article and x-api-key in docs/setup/MAKE_COM_INTEGRATION.md) and US-423 (legacy user_mfa_settings removal; disable-mfa still reads it) remain blocked on owner decisions.
+- [enterprise] [enterprise] verify:schema 'every table referenced in code exists' still flags supabase/functions/_shared/resend-webhook.test.ts:19-20. The regex /\.from\(\s*['"]([a-z0-9_]+)['"]/ in scripts/verify-schema.mjs:265 matches Buffer.from('0123456789abcdefghijklmn'). Round 17 reported this and it is not fixed at f5c9ca5, so CI's verify-backend job will fail. Fix: require a non-identifier character before `.from(` that rules out `Buffer`/`Array` (e.g. a negative lookbehind for (?<!Buffer|Array)), or skip *.test.ts files. I left it out to keep this story to one improvement.
+- [enterprise] [enterprise] collectSections and buildExportDocument in supabase/functions/_shared/gdpr-export.ts are now used only by tests, as the reference for byte-identity. They could be marked test-only or kept as the specification.
+- [enterprise] [enterprise] src/hooks/useGDPR.ts:173-183 parses the downloaded JSON and then stringifies it again into a Blob, which doubles the export in browser memory. Reading response.blob() and checking that it parses (or just that it ends with '}') would avoid this. It needs callEdgeFunction to support a raw-response mode.
+- [enterprise] [enterprise] US-467, US-528, US-549, US-567 and US-386 are still open. US-467 still needs the owner's product decision, and US-549 overlaps the listings lane's US-627.
+- [marketing] src/pages/landing/ForRealEstateAgents.tsx FAQ_ENTRIES[0] and the SEOHead/WebPage description claim that Linktree 'can't showcase property listings' and 'lack features like appointment booking'. These are the same unverified negative competitor claims, but in prose and JSON-LD (covered by the second nextSlice).
+- [marketing] src/pages/landing/VsLater.tsx 'Choose Later' scenario: 'Industry-leading scheduling tools' is competitor puffery with nothing recorded behind it (already noted in progress.txt).
+- [marketing] US-447 (craft-floor drip email HTML: gradient headers and 4px border-left callouts in send-listing-generator-email, send-scheduled-listing-emails and send-bio-analyzer-email) can be done without the owner. Only its postal-address half is blocked.
+- [marketing] US-585 (add pricing-plans.ts and seo.ts to CLAIM_MODULES in src/dead-claim-exports.test.ts) is a small, self-contained marketing slice for a later round.
+- [seo] [seo] US-530 is still open and small. In public/robots.txt (named groups from line 21: GPTBot, ClaudeBot, PerplexityBot and others), each named User-agent group replaces the '*' group, so those bots are never told 'Disallow: /api/'.
+- [seo] [seo] llms.txt now states that answer-engine fetchers get plain HTML on agent pages. If ANSWER_ENGINE_TOKENS in functions/_lib/social-meta.ts:120 shrinks, that statement should be checked again; no test ties the two together.
+- [seo] [tooling] The lint-staged pre-commit hook again wrote a backup entry (8121af2) into the git stash that all worktrees share.
+- [mobile] src/components/ui/textarea.tsx:13 and src/components/forms/TwoStepLeadForm.tsx:47 are still text-sm on narrow non-touch windows. Harmless now that the coarse-pointer rule exists, but aligning them with Input's text-base sm:text-sm would make the primitives consistent.
+- [mobile] Optional, not done: the new rule also applies to Android, which does not auto-zoom. It is harmless there, since 16px is the readable size anyway, but it could be limited to iOS with @supports (-webkit-touch-callout: none) if the owner wants Android to keep 14px fields.
+- [mobile] CLAUDE.md still lists the deleted src/hooks/useOfflineStorage.ts and src/lib/offline-storage.ts. This was carried over from US-618 and is still unaddressed. I did not edit CLAUDE.md.

@@ -62,7 +62,10 @@ app and the frontend depend on each other in both directions:
 7. **Stripe setting.** Check "after all retries fail" in the Stripe dashboard.
    If it cancels the subscription, access ends then; if it leaves it unpaid,
    the past-due grace (now counted from the last paid period) ends access.
-8. **Search consoles.** Submit `/sitemap-profiles.xml` to Google Search
+8. **Headshot check.** Upload a new headshot in Settings. Storage should then
+   hold `avatar-<ts>-full.jpg` and `avatar-<ts>-256.webp`, and the public
+   profile should request the 256px one.
+9. **Search consoles.** Submit `/sitemap-profiles.xml` to Google Search
    Console and Bing if you have not already.
 
 ## Migrations not yet in production (filename order)
@@ -104,6 +107,7 @@ app and the frontend depend on each other in both directions:
 20261108000592_storage_media_not_listable.sql
 20261108000610_contact_touch_follows_deleted_interactions.sql
 20261108000615_past_due_grace_from_paid_period.sql
+20261108000629_contact_lookup_hashes.sql
 ```
 
 ## What changes for users the moment it ships

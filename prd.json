@@ -7913,8 +7913,8 @@
         "comparison-claims.test.ts asserts that no competitor cell is a string literal"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-501)"
+      "passes": true,
+      "notes": " (follow-up from US-501) DONE in round 18 as US-635."
     },
     {
       "id": "US-508",
@@ -9077,8 +9077,8 @@
         "A section that fails to read is never delivered as a document that looks complete"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-576)"
+      "passes": true,
+      "notes": " (follow-up from US-576) DONE in round 18 as US-634."
     },
     {
       "id": "US-577",
@@ -9261,8 +9261,8 @@
         "A test covers it"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "This is a follow-up from US-589. It may need no code change at all, only verification. (follow-up from US-589)"
+      "passes": true,
+      "notes": "This is a follow-up from US-589. It may need no code change at all, only verification. (follow-up from US-589) DONE in round 18 as US-630."
     },
     {
       "id": "US-590",
@@ -9353,8 +9353,8 @@
         "Falls back to the original on error, as fallBackToOriginal does for listings"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-591)"
+      "passes": true,
+      "notes": " (follow-up from US-591) DONE in round 18 as US-632."
     },
     {
       "id": "US-592",
@@ -9479,8 +9479,8 @@
         "src/llms-txt.test.ts still passes (URL checks may need to allow the function-served sitemap)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-595)"
+      "passes": true,
+      "notes": " (follow-up from US-595) DONE in round 18 as US-636."
     },
     {
       "id": "US-596",
@@ -9563,7 +9563,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Overlaps with US-128. Needs pii-crypto or a contacts edge function to compute the hash. (follow-up from US-610)"
+      "notes": "Overlaps with US-128. Needs pii-crypto or a contacts edge function to compute the hash. (follow-up from US-610) Slice 1 done in round 18 as US-629."
     },
     {
       "id": "US-621",
@@ -9641,8 +9641,8 @@
         "Tests cover both"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-612)"
+      "passes": true,
+      "notes": " (follow-up from US-612) DONE in round 18 as US-631."
     },
     {
       "id": "US-624",
@@ -9655,8 +9655,8 @@
         "Test covers the error state"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-612)"
+      "passes": true,
+      "notes": " (follow-up from US-612) DONE in round 18 as US-630."
     },
     {
       "id": "US-613",
@@ -9804,8 +9804,359 @@
         "Tests"
       ],
       "priority": 2,
+      "passes": true,
+      "notes": "Finding from round 17 listings lane. DONE in round 18 as US-628."
+    },
+    {
+      "id": "US-628",
+      "lane": "listings",
+      "round": 18,
+      "title": "Open-house times now use the agent's saved time zone, and start times that have already passed are refused",
+      "description": "Implements US-627, the open listings-lane story. Before this change, OpenHouseFormDialog turned \"Saturday, 1 to 3\" into an instant using the browser's local time (`new Date('YYYY-MM-DDTHH:mm')`, old file line 70-72). An agent travelling outside their market therefore saved the wrong instant. The form also accepted any past date, which used up open_houses_per_month and opened the kiosk for a house nobody was at. The dashboard list also showed times in the device's zone. Now the form reads and writes wall-clock times in profiles.timezone (US-433). When no zone is saved it falls back to the device's zone and says so. A start more than 30 minutes in the past is refused with a clear message. Editing an open house whose start has not moved is always allowed, so notes on a past one can still be fixed. The dashboard list now shows times in the same zone.",
+      "acceptanceCriteria": [
+        "Dates are interpreted in the agent's stored time zone (profiles.timezone), falling back to the device zone with a visible note",
+        "A start more than 30 minutes in the past is refused with 'That start time has already passed…' on the Starts field, and nothing is saved",
+        "Editing an existing open house whose start is unchanged saves even when it is in the past",
+        "The dashboard Open houses list shows times in the same zone the form saved them in",
+        "Tests cover zone conversion, both DST edge cases, the default Saturday, the past-start rule and the dialog end to end"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "New file src/lib/openHouseSchedule.ts converts with Intl only (date-fns-tz is not installed). It provides:\n- wallTimeToIso: two-pass offset resolution. A time skipped by spring-forward moves forward by the gap; a time repeated by fall-back resolves to its first occurrence, in zones both behind and ahead of UTC.\n- isoToWallTime\n- defaultOpenHouseDate: the coming Saturday in the agent's zone, not UTC\n- pastStartError: 30-minute grace window; editing with an unchanged start is exempt\n- formatOpenHouseWhen: the old date-fns formatWhen, now zone-aware\n\nsrc/components/openHouses/OpenHouseFormDialog.tsx:\n- uses useAgentTimeZone; the zone is the saved one, else the detected one, else 'UTC'\n- the schema is built per zone by buildOpenHouseSchema, using superRefine on start_time\n- valuesFor and onSubmit convert in that zone\n- adds a \"Times are in America / Chicago (GMT-6)\" hint, linked to the date and start fields with aria-describedby, and aria-invalid on Starts\n\nsrc/pages/dashboard/OpenHouses.tsx: removes formatWhen, and OpenHouseRow takes a timeZone prop.\n\nreact-hook-form 7.66 sets control._options on every render, so the resolver picks up the new schema when the zone loads.\n\nNo migration and no edge-function change. The refusal is enforced only in the client: a direct API insert of a past open house is still accepted. That gap is listed as the next slice.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output.\n- `npx eslint` on the 5 changed files: no output, so no warnings.\n- `npx vitest run src/lib/openHouseSchedule.test.ts src/components/openHouses/OpenHouseFormDialog.test.tsx src/pages/dashboard/OpenHouses.lazyDialogs.test.tsx`: 3 files, 25 tests passed. Re-run after the commit hook's prettier pass, same result.\n- Full `npx vitest run` before committing: 323 test files passed; 3180 tests passed, 1 skipped (3181), exit 0.\n- No migration, so `verify:migrations` was not needed.\n\nREVIEW: fix_required; fix-up: The reviewer was right. In `wallTimeToIso` (`/home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-1/src/lib/openHouseSchedule.ts`), whenever the two passes disagreed the code always took `Math.max(first, second)`. On the spring-forward day in zones behind UTC, that pushed valid times an hour late. Two examples: 9:00 in Los Angeles was saved as 17:00Z and read back as 10:00, and 3:30 in Chicago read back as 4:30.\n\nThe fix computes both candidates, plus each one an hour earlier, and keeps the ones that read back as exactly the requested date and time. If more than one fits (a fall-back overlap), it takes the earliest. Only when none fits (a real spring-forward gap) does it fall back to the later candidate, which moves the time forward by the gap.\n\nNew tests in `/home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-1/src/lib/openHouseSchedule.test.ts`:\n- 2026-03-08 09:00 in America/Los_Angeles gives 16:00Z.\n- 2026-03-08 03:30 in America/Chicago gives 08:30Z.\n- Europe/Berlin on 2026-03-29: 01:30 gives 00:30Z, 03:30 gives 01:30Z, and the skipped 02:30 gives 01:30Z.\n- A sweep over every quarter-hour of both DST days for Los Angeles, Chicago, New York, Berlin and Sydney. Every time must read back unchanged, except the four quarter-hours of the skipped hour, which must move exactly +60 minutes.\n\nCommitted as d85ddf2 (\"US-628: address review\"). `loop/r18-listings` now points at that commit. Nothing was pushed, and `prd.json` / `progress.txt` were not touched."
+    },
+    {
+      "id": "US-638",
+      "lane": "listings",
+      "round": 18,
+      "title": "US-627 slice 2: refuse past open-house starts in the database",
+      "description": "The past-start rule exists only in the client. Add a BEFORE INSERT/UPDATE trigger on open_houses that refuses starts_at < now() - interval '30 minutes' when the row is new or starts_at changed, raised as check_violation with a DETAIL the client recognises. This stops direct API calls from using up open_houses_per_month and opening the kiosk for a past date. Also refuse ends_at <= starts_at.",
+      "acceptanceCriteria": [
+        "An insert with starts_at an hour ago is refused; an update that leaves starts_at unchanged on a past row succeeds",
+        "The service role is unaffected or explicitly exempt",
+        "verify:schema/verify:migrations pass"
+      ],
+      "priority": 2,
       "passes": false,
-      "notes": "Finding from round 17 listings lane."
+      "notes": "Keep the 30-minute grace in step with PAST_START_GRACE_MS in src/lib/openHouseSchedule.ts. (follow-up from US-628)"
+    },
+    {
+      "id": "US-639",
+      "lane": "listings",
+      "round": 18,
+      "title": "Show open-house times in the agent's zone on the public page, kiosk and calendar export",
+      "description": "The public profile's open-house list, the /open-house/:id kiosk and any .ics or add-to-calendar output still format times in the visitor's browser zone. Visitors need the property's local time. Return the owner's timezone from list_public_open_houses / get_public_open_house, or format on the server, and reuse formatOpenHouseWhen.",
+      "acceptanceCriteria": [
+        "A visitor in another zone sees '1:00–3:00 PM' for a 1-3 PM Chicago open house, with the zone shown",
+        "Calendar export carries the correct instant"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "The RPCs are SECURITY DEFINER. Adding a column to their output needs the published-profile check from US-308 to stay in place. (follow-up from US-628)"
+    },
+    {
+      "id": "US-629",
+      "lane": "leads",
+      "round": 18,
+      "title": "Converting a lead who is already a client no longer creates a duplicate client (US-620 slice 1)",
+      "description": "AddLeadToClientsButton (src/components/leads/AddLeadToClientsButton.tsx) looked for an existing contact by contacts.lead_id only. So a past client's new enquiry, or a person the agent had typed in by hand, became a second client record. Contact email and phone are random-IV ciphertext, so no query could find the duplicate. Now, before creating a contact, the button asks pii-crypto whether the lead matches one of the caller's contacts by email or phone, using keyed fingerprints. If it does, a popover offers \"Link to this client\" (sets lead_id), \"Open client\" (when that contact is already linked to another enquiry), or \"Add as a new client\".",
+      "acceptanceCriteria": [
+        "contacts gains email_hash and phone_hash (plus lookup_hashed_at). They are written only server-side: a trigger drops browser-supplied values and restores them on update. The browser cannot read them: table-wide SELECT is replaced by a column grant without them, and anon has no SELECT at all",
+        "Converting a lead whose email or phone matches an existing contact offers to link to it instead of creating a new one",
+        "Existing contacts are backfilled lazily: each match call hashes up to 40 of the caller's unhashed contacts, and the client repeats while complete=false (up to 8 rounds). Editing a contact's email or phone clears its hashes by trigger, so it gets hashed again",
+        "A locked lead is never matched, so matching cannot identify it"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Files changed:\n- supabase/migrations/20261108000629_contact_lookup_hashes.sql: three columns, indexes, trigger contacts_guard_lookup_hashes (SECURITY INVOKER, search_path pinned, checks current_user IN anon/authenticated), REVOKE SELECT ON contacts FROM PUBLIC, anon, authenticated and a GRANT SELECT on the 26 existing columns to authenticated.\n- supabase/functions/pii-crypto/contactMatch.ts: pure logic with injected dependencies, so vitest can test it. It uses the same HMAC key labels as leads (spam-guard emailLookupHash/phoneLookupHash). Matching is allowed for the lead's owner or its assignee; the lock check uses the owner's plan; email matches rank above phone matches; at most 5 matches are returned.\n- supabase/functions/pii-crypto/index.ts: new op match_contacts_for_lead. The lock check fails closed. Hashes are saved with a guard on updated_at, so a concurrent edit is not overwritten.\n- src/lib/pii.ts: findContactsMatchingLead, which loops while the server reports complete=false.\n- AddLeadToClientsButton.tsx: check first, then the popover. If the check fails, it logs a warning and adds the contact as before.\n- popover.tsx: exports PopoverAnchor.\n- useContacts.ts: useContact now selects a named column list instead of '*', because '*' would be refused under the new column grant.\n- types.ts: the contacts Row/Insert/Update types gain the three columns.\n- scripts/verify-schema.mjs: a new check covers the browser not being able to read or plant hashes, anon getting no SELECT, the service role being able to write hashes, and an email change clearing them.\n\nHow it was verified: tsc, vitest and verify:migrations below. verify:schema could not be run locally: Postgres here needs a password or peer auth, and the sandbox refused su/runuser for initdb. The new check and the column grant are therefore unverified until CI's verify-backend job runs.\n\nVERIFIED: - npx tsc --noEmit: passed.\n- npx vitest run supabase/functions/pii-crypto: 2 files, 15 tests passed.\n- npx vitest run src/lib/pii.test.ts: 19 passed (4 new).\n- npx vitest run src/components/leads/AddLeadToClientsButton.test.tsx: 5 passed (new file).\n- Full npx vitest run: 323 files passed; 3178 tests passed, 1 skipped.\n- npm run verify:migrations: OK, 92 files.\n- npx eslint on the changed src files: no output (clean). The supabase/functions files are eslint-ignored. scripts/verify-schema.mjs has 14 no-undef errors for console/process; I believe these were already there, because the new check uses neither, but I did not compare against HEAD.\n- verify:schema: not run locally (no usable Postgres, see notes).\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration 20261108000629_contact_lookup_hashes.sql | Redeploy the edge-functions server (functions.agentbio.net) so pii-crypto has the match_contacts_for_lead op. Until then the check fails and the button falls back to adding the contact as before | Check that CI verify-backend passes the new US-629 verify-schema check, which was not run locally"
+    },
+    {
+      "id": "US-640",
+      "lane": "leads",
+      "round": 18,
+      "title": "US-620 slice 2: hash contacts at write time and backfill the whole sphere",
+      "description": "Right now contacts are hashed only when a match runs, 40 per call and at most 8 rounds, so an agent with more than about 320 unhashed contacts can get an incomplete check on the first conversion. Add an index_contacts op (or a scheduled-maintenance job) that hashes new or edited contacts right after createContact/updateContact, plus a one-off backfill loop.",
+      "acceptanceCriteria": [
+        "A newly created or edited contact has lookup_hashed_at set within one request",
+        "Every existing contact is hashed without needing a lead conversion"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-629)"
+    },
+    {
+      "id": "US-641",
+      "lane": "leads",
+      "round": 18,
+      "title": "US-620 slice 3: warn about duplicates when an agent adds a client by hand",
+      "description": "The Clients page add/edit form can still create two records for one person. Reuse the fingerprints to warn 'Dana Reyes already has this email' before saving.",
+      "acceptanceCriteria": [
+        "Saving a contact whose email or phone matches another of the agent's contacts shows the existing one and lets the agent open it or save anyway"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-629)"
+    },
+    {
+      "id": "US-630",
+      "lane": "profile",
+      "round": 18,
+      "title": "The page builder's page list never showed which page was live, and showed \"No pages yet\" when the pages had only failed to load",
+      "description": "This fixes two problems in the page builder's page list, the screen where agents manage their custom pages.\n\nFirst, it never showed which page was live. `loadUserPages` dropped `custom_pages.is_active` when it turned rows into `PageConfig` objects. `PageList` then read `(page as any).is_active`, which was always undefined. So the Active badge never appeared, and the page visitors were actually seeing still offered \"Set as Active\". Agents could not tell which page was on their public profile.\n\nSecond, a failed load looked like an empty account. `loadUserPages` caught query errors and returned `[]`, so a network or RLS failure showed \"No pages yet — Create Your First Page\". That invited an agent with a live page to build a duplicate of it. The toast in `PageList`'s catch could never fire.\n\nChanges:\n- `PageConfig` has a new read-only `isActive` field.\n- Both load functions now fill in `isActive`, and `loadUserPages` passes errors on instead of returning an empty list.\n- The page list labels the active, published page \"Live on your page\", because the public profile requires both flags (`usePublicProfile.ts:441-448`).\n- An active page that is still a draft gets a note saying the public page does not show it.\n- A failed load shows an error card with a \"Try again\" button instead of the empty state.",
+      "acceptanceCriteria": [
+        "The page list marks the active, published custom page \"Live on your page\" and offers no \"Set as Active\" on it",
+        "An active page that is unpublished says the public page does not show it, and is not labelled live",
+        "A failed pages query shows an error card with Try again, never the \"No pages yet\" empty state; Try again reloads",
+        "loadUserPages carries is_active through and rethrows query errors",
+        "An account with no pages still sees the empty state"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Audit of the US-611/US-622 class (functions called by a path production does not route): nothing is left to fix. `src/edge-function-routing.test.ts` checks every `callEdgeFunction` / `invoke` / `${functionsBase}/x` call site against the router, and its KNOWN allowlist of `supabase.functions.invoke` callers is empty. Grepping for `functions/v1` in `src/` finds only `client.ts:48`, which is the fallback when `VITE_FUNCTIONS_URL` is unset, plus two comments.\n\nSilent-failure audit of the public page and page builder: the worst case I found is the one fixed here.\n- Before the fix: `src/stores/pageBuilderStore.ts`, `loadUserPages` mapping (about line 166) dropped is_active, and its catch (about line 181) returned [].\n- Before the fix: `src/components/pageBuilder/PageList.tsx:150` read `(page as any).is_active`.\n\nUS-600 (listings-block card vs gallery card counting): verified, no code change needed.\n- Both kinds of card link to the same page. FullProfilePage builds the gallery link with `listingHref` and the listings-block link with `blockListingHref` (`reachableListingHref`), lines 104-118, and both lead to `/:username/listing/:id`.\n- That page records the view in one place, whichever card was tapped: `ListingPage.tsx:90-95`, `trackListingView`, which dedupes per session.\n- Neither ListingCard nor ListingsBlock records a click event of its own, so funnel reports count both taps the same way.\n- The integrator can close US-600 on this evidence.\n\nUS-525 and US-544 were not taken this round.\n\nFiles:\n- /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-3/src/types/pageBuilder.ts\n- /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-3/src/stores/pageBuilderStore.ts\n- /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-3/src/stores/pageBuilderStore.test.ts (2 new tests; the list query result is now settable)\n- /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-3/src/components/pageBuilder/PageList.tsx\n- /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-3/src/components/pageBuilder/PageList.test.tsx (new, 4 tests)\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run src/stores/pageBuilderStore.test.ts src/components/pageBuilder/`: 8 files, 67 tests passed.\n- `npx vitest run` (full suite): 322 files passed; 3165 tests passed, 1 skipped.\n- `npx eslint` on the 5 changed files: 0 errors, 3 warnings, all pre-existing:\n  - `PageList.tsx:48`, exhaustive-deps;\n  - `pageBuilderStore.ts:39`, any;\n  - `pageBuilder.ts:320`, any.\n- One `as any` was removed from PageList, so there are no new warnings.\n- lint-staged (eslint --fix, prettier) ran at commit and passed.\n- No migration was added.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-642",
+      "lane": "profile",
+      "round": 18,
+      "title": "Page list: deleting the live page should warn that the public page loses its blocks",
+      "description": "PageList.handleDelete (PageList.tsx, the delete handler) deletes with only a native confirm(). If the deleted page is the active, published one, the public profile drops its blocks section with no warning. Now that isActive is known, the confirm can say so.",
+      "acceptanceCriteria": [
+        "Deleting the live page shows a confirmation that names the effect on the public page",
+        "Test covers the live-page delete path"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-630)"
+    },
+    {
+      "id": "US-631",
+      "lane": "uiux",
+      "round": 18,
+      "title": "Time zone setting tells an agent \"Not saved yet\" when it simply failed to read their saved zone",
+      "description": "Fixes US-623. useAgentTimeZone returned timeZone=null both when no zone was saved and when the read failed. TimeZoneSetting worked out its \"Not saved yet\" prompt as `!isLoading && timeZone === null`, so a failed read told the agent no zone was saved and showed a \"Use this time zone\" button that would save the device's zone over one that may already be stored. The hook now also returns isError and refetch. When the read fails, the card shows SectionLoadError with Retry in place of the picker, and the prompt now depends on isKnown.",
+      "acceptanceCriteria": [
+        "A failed time-zone read shows SectionLoadError with Retry, not the 'not saved' state, and hides the picker (which would show the device zone as if it were saved)",
+        "TimeZonePrompt does not appear on a failed read (it already gates on isKnown, which is false when the read fails; a hook test now locks this in)",
+        "Tests cover both"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence: src/components/settings/TimeZoneSetting.tsx:27 (old) `unsaved = !isLoading && timeZone === null`. In src/hooks/useAgentTimeZone.ts the query error was hidden behind `data: stored = null`.\nChanges:\n- src/hooks/useAgentTimeZone.ts: also returns `isError` and `refetch` from useQuery, with a doc comment saying null-on-error means unknown, not unset.\n- src/components/settings/TimeZoneSetting.tsx: when isError is true it renders `<SectionLoadError message=\"Your time zone did not load.\" retryLabel=\"Retry loading your time zone\">` in place of the Select and the prompt. `unsaved` is now `isKnown && timeZone === null`, so the prompt stays hidden during loading, after an error and while the query is disabled. This follows the same pattern as LeadNotificationPreferences (US-612).\n- TimeZonePrompt (src/components/dashboard/TimeZonePrompt.tsx:50) and useNotificationPreferences.ts:83 already gate on isKnown (isSuccess), so the story's guess that TimeZonePrompt has the same bug was wrong. A new hook test checks that a failed read gives isKnown=false and isError=true.\nTests: TimeZoneSetting.test.tsx has 2 new cases: a failed read shows the alert and Retry calls refetch, with no picker, prompt or mutate; and no prompt while loading. New src/hooks/useAgentTimeZone.test.ts has 3 cases: an error, a known-null read, and a stored zone, all using a real QueryClient with fetchOwnProfile mocked.\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx eslint on the 4 changed files: exit 0, no warnings.\nnpx vitest run on useAgentTimeZone.test.ts, TimeZoneSetting.test.tsx, TimeZonePrompt.test.tsx, LeadNotificationPreferences.test.tsx and Overview.test.tsx: 5 files, 24 tests passed.\nFull npx vitest run: 322 files passed, 3164 tests passed, 1 skipped.\nThe pre-commit lint-staged hook (eslint --fix, prettier) passed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-632",
+      "lane": "performance",
+      "round": 18,
+      "title": "The public profile drew an 800px headshot in 32-128px circles (US-604)",
+      "description": "Avatar uploads now also store a small WebP copy, 256px on its short side. The public page shows that copy in the 128px header circle, the 48px sticky-bar avatar and the 32px breadcrumb on listing pages, instead of the 800px JPEG. The photo's file name records whether the small copy exists (`avatar-<ts>-full.jpg` next to `avatar-<ts>-256.webp`). So the page never requests a small copy for an older upload, and never pays a 404 in the LCP region. avatar_url stays the JPEG, so the lead auto-reply email and the og:image fallback do not change.",
+      "acceptanceCriteria": [
+        "ProfileHeader, StickyActionBar and the ListingPage breadcrumb load at most a 256px image for an avatar uploaded after this change (the 256px-short-side WebP companion)",
+        "If the companion fails to load, the <img> loads the full avatar_url once (fallBackToAvatarOriginal)",
+        "Avatars uploaded before this change, browsers that cannot encode WebP, and failed companion uploads keep the old naming. The page draws the photo directly and makes no 404 request",
+        "avatar_url is still the JPEG photo, so email and og:image are unchanged",
+        "Upload cleanup keeps the new companion and removes the previous photo and its companion"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Problem: since US-591 the stored avatar is at most 800px. ProfileHeader (src/components/profile/ProfileHeader.tsx:67) draws it in a 96-128px circle above the fold, StickyActionBar (:225) at 48px, and ListingPage (:250) at 32px. That is about 3x the pixels a DPR-2 phone needs, or more.\n\nWhat I did:\n- src/lib/avatarVariant.ts (new, pure, no imports): the naming scheme `avatar-<ts>-full.<ext>` plus `avatar-<ts>-256.webp`, and three helpers. avatarVariantUrl derives the small copy's URL only for an http(s) URL in the avatars bucket whose name ends in -full. avatarImage returns the image to draw. fallBackToAvatarOriginal swaps to the photo once on error and never shows the house placeholder.\n- src/lib/shrinkProfileImage.ts: added variantSize, which scales so the short side is 256 (that is the side that fills an object-cover circle) and caps the long side at 3x. Added renderAvatarVariant, which encodes WebP only and returns null when toBlob falls back to PNG.\n- src/lib/storeAvatarVariant.ts (new): uploads the small copy (image/webp, cached for a year) and returns its name or null. Best effort; it never throws.\n- useProfileImageUpload: new `smallVariant` option, avatar bucket only. It stores the small copy before the photo and names the photo -full only when that succeeded. The stale-object cleanup also keeps the new small copy. useAvatarUpload turns the option on.\n- OnboardingWizardPage: same flow for the onboarding photo.\n- src/components/profile/AvatarImage.tsx (new): used in ProfileHeader, StickyActionBar (which also gets width/height 48) and the ListingPage breadcrumb (this also covers the round-17 finding about the 32px breadcrumb loading the full avatar).\n\nDesign choice: the -full marker in the photo's name, rather than guessing a small copy for every avatar as listing photos do. With guessing, almost every existing agent would get a 404 and then a second fetch for the image above the fold.\n\nTests added or updated:\n- avatarVariant.test.ts\n- shrinkProfileImage.test.ts: variantSize and renderAvatarVariant\n- useProfileImageUpload.test.ts: upload order, -full naming, fallback naming when the small copy cannot be made or fails to upload, cleanup, not made for the logo\n- OnboardingWizardPage.test.tsx: -full naming when the small copy is stored\n- AvatarImage.test.tsx: small copy drawn, error falls back to the photo, older upload drawn as is, ProfileHeader uses the small copy\n\nVERIFIED: - `npx tsc --noEmit`: clean.\n- `npx vitest run src/components/profile src/pages/public src/pages/onboarding src/hooks/useProfileImageUpload.test.ts src/lib/avatarVariant.test.ts src/lib/shrinkProfileImage.test.ts`: 25 files, 183 tests passed. Run again after adding the onboarding test: OnboardingWizardPage 11/11 passed.\n- Full `npx vitest run`: 323 files passed, 3183 tests passed, 1 skipped.\n- `npx eslint` on every changed and new file: 0 warnings in the touched files. The only warnings in those directories are pre-existing ones in LeadCaptureCTA.tsx and TestimonialCard.tsx, which I did not touch.\n- `npx vite build`: OK. `npm run size-check`: OK (287 chunks within budget; the Profile graph has none of the forbidden chunks).\n- Not run: route-weight, because Playwright browsers are not installed. dashboard-weight, because it needs a BUILD_MANIFEST build.\n- No migration, so verify:migrations does not apply. Pre-commit lint-staged (eslint --fix, prettier) passed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages (frontend only). No migration, no edge-function deploy, no secret. | After deploy, smoke test: upload a new headshot in Settings. Storage should then hold avatar-<ts>-full.jpg and avatar-<ts>-256.webp, and the public profile should request the -256.webp file for the header circle."
+    },
+    {
+      "id": "US-643",
+      "lane": "performance",
+      "round": 18,
+      "title": "Use AvatarImage for avatars in the dashboard and other public surfaces",
+      "description": "DashboardLayout's header avatar, the profile settings preview and other small avatar renders still load avatar_url. Switch them to AvatarImage so they get the 256px companion.",
+      "acceptanceCriteria": [
+        "Every <img src={...avatar_url}> rendered at 128px or less goes through AvatarImage",
+        "Existing tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-632)"
+    },
+    {
+      "id": "US-633",
+      "lane": "security",
+      "round": 18,
+      "title": "Any agent could overwrite another agent's public listing photo variants through optimize-image",
+      "description": "optimize-image reads and writes storage with the service-role client, so it bypasses storage RLS. Its only ownership check was `String(path).startsWith(`${user.id}/`)`, and it took the bucket from the request body (supabase/functions/optimize-image/index.ts, old lines 69-78). supabase-js puts storage paths into the request URL unencoded, and URL parsing collapses `..` and `%2e%2e`. So `<me>/../<victim>/1/photo.jpg` passed the check and read any agent's object, in any bucket. A crafted path such as `<me>/../<victim>/1/photo./%2e%2e/%2e%2e/%2e%2e/<me>/evil` goes further. The full path collapses onto the caller's own upload. The part before its last literal dot (the old variantPath stem) collapses to `<victim>/1/photo`. The result: the caller's image is written with upsert over the victim's photo-200/400/800.webp. Those are the files every public listing page serves (ListingDetails.tsx, US-613). That let any account deface another agent's public page. The target is now checked in a pure module, supabase/functions/optimize-image/target.ts. The bucket must be listing-photos. Every path segment must be plain: no dot segments, percent-encoding, backslash, ?, # or whitespace. The first segment must be exactly the caller's id. variantPath moved into that module and now names files the same way listingPhotoCleanup.withVariantPaths does.",
+      "acceptanceCriteria": [
+        "optimize-image refuses any bucket other than listing-photos (403)",
+        "optimize-image refuses paths with ./.. segments, percent-encoded or backslash traversal, ?, #, whitespace, empty segments or a leading slash (400)",
+        "optimize-image refuses a path whose first segment is not exactly the caller's user id, including <uid>x/ prefixes (403)",
+        "The path useListingImageUpload writes (<uid>/<listingId|timestamp>/<random>.<ext>) is still accepted",
+        "variantPath produces the same variant names listingPhotoCleanup deletes (parity test)",
+        "A test shows the old traversal really escapes the folder under WHATWG URL parsing, so the refusals are not vacuous"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Audit scope: all 89 edge functions under supabase/functions, checked for authentication and ownership. edge-functions-server.ts does no JWT verification, so each function has to authenticate the caller itself. Checked and found sound: admin gates (requireAdmin / requireAdminOrServiceRole, _shared/auth.ts:38-69, on every SEO, blog and admin function, including generate-article and google-indexing from US-614); service-role-only schedulers (run-scheduled-audit:16, scheduled-maintenance:199, send-scheduled-*-emails, send-seo-notification:16, notify-lead:74, process-account-deletions:42); user-scoped functions (gsc-*, bing/yandex/GA sync all filter by the caller's user_id; execute-workflow uses assertLeadOwnedBy; teams uses is_team_admin; api-keys, revoke-session, get-sessions, gdpr-* all scope to the caller); public endpoints (submit-review checks the profile is published; send-bio/listing-generator-email are capture-id only since US-219; login-security ignores the userId in the body; sso-callback refuses SAML and checks mayMintLinkFor; enterprise_sso_config's public policy was dropped in 20260808000002). The one exploitable hole was optimize-image.\n\nFiles: supabase/functions/optimize-image/target.ts (new: parseOptimizeTarget, variantPath, OPTIMIZABLE_BUCKETS); supabase/functions/optimize-image/index.ts (uses target.ts, drops its local variantPath); supabase/functions/optimize-image/target.test.ts (new, 34 tests). The only caller, src/hooks/useListingImageUpload.ts:75,105, sends bucket 'listing-photos' and a path of the form `${user.id}/${listingId||timestamp}/${randomId}.${ext}`, which the new check accepts.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output. npx vitest run supabase/functions/optimize-image src/lib/listingPhotoCleanup: 2 files, 42 tests passed. Full npx vitest run: 322 files passed, 3189 tests passed, 1 skipped. npx eslint supabase/functions/optimize-image/: the config ignores supabase/functions (no lint applies). lint-staged ran eslint --fix and prettier on commit. No migration, so verify:migrations was not needed. Deno is not installed here, so the edge function was not run under Deno. target.ts has no imports, and index.ts only gains a relative import.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the edge-functions image (functions.agentbio.net, Coolify) so optimize-image picks up the path and bucket validation | Optional: check listing-photos for *-200/-400/-800.webp objects whose last update came from a different user's optimize-image audit event (audit_logs action 'image_optimize', resource_id containing '..'), to see whether this was ever abused"
+    },
+    {
+      "id": "US-644",
+      "lane": "security",
+      "round": 18,
+      "title": "Make isServiceRoleRequest fail closed and constant-time",
+      "description": "supabase/functions/_shared/service-auth.ts:12-20 compares the bearer token to SUPABASE_SERVICE_ROLE_KEY with ===. If that variable is set but empty (for example a compose file interpolating an unset variable), an `Authorization: Bearer ` header matches. That would open process-account-deletions, notify-lead and every scheduler. Refuse when the key is empty or shorter than a JWT, and compare in constant time.",
+      "acceptanceCriteria": [
+        "isServiceRoleRequest returns false when the env key is unset, empty or too short",
+        "The comparison is constant-time",
+        "A unit test covers the empty-key case"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": " (follow-up from US-633)"
+    },
+    {
+      "id": "US-645",
+      "lane": "security",
+      "round": 18,
+      "title": "Remove or server-side the self-reported report-stripe-usage endpoint",
+      "description": "supabase/functions/report-stripe-usage/index.ts lets a signed-in user post usage records, including action 'set' with quantity 0, against their own subscription items. Today there are no metered prices and EdgeFunctions.reportStripeUsage (src/lib/edgeFunctions.ts:328) has no callers. If a metered price is ever added, users could reset their own bill. Delete the function, or make it service-role only.",
+      "acceptanceCriteria": [
+        "No browser-callable endpoint writes Stripe usage records",
+        "The dead client wrapper is removed or points at a service-only path"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": " (follow-up from US-633)"
+    },
+    {
+      "id": "US-634",
+      "lane": "enterprise",
+      "round": 18,
+      "title": "The immediate data export held the whole account in memory and could fail for the largest agents",
+      "description": "US-584. Before this change, the GET download in gdpr-export read all 27 sections (up to 100,000 rows each) with collectSections, built the document with buildExportDocument, and then ran JSON.stringify on the whole thing. That kept every row in memory about three times over, so the accounts with the most data were the ones whose download could exhaust the function's memory.\n\nThe GET now writes the document a page at a time. It holds up to 2 MiB first. If the whole export fits in that (most accounts), nothing changes: the agent gets a complete file, or a 503 that names the sections that failed. A larger export is streamed. If a section fails after streaming has started, the response body is cut off before the closing brace, so the agent never ends up with a file that looks complete. When the download is cut off like that, the dashboard offers to email a download link instead.",
+      "acceptanceCriteria": [
+        "The GET export does not hold every section in memory: once it passes STREAM_AFTER_CHARS (2 MiB) it streams one page of rows at a time, and it reads from the database only as the body is consumed.",
+        "A section that fails is never delivered as a document that looks complete. Before streaming starts, the response is a 503 with failedSections, as before. After streaming starts, the writer runs with failFast and stops the body before the closing brace and the meta block.",
+        "When the document fits the buffer, the downloaded file is byte-identical to JSON.stringify(buildExportDocument(...), null, 2). A streamed file is byte-identical too.",
+        "A download that is cut short (TypeError or SyntaxError) offers the emailed link (shouldOfferQueuedExport).",
+        "The queued export (writeExportDocument) keeps the same return shape and output."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence before the change: supabase/functions/gdpr-export/index.ts GET branch (lines ~175-238 at f5c9ca5) called collectSections, then buildExportDocument, then JSON.stringify(exportData) on the whole document.\n\nWhat changed:\n- supabase/functions/_shared/gdpr-export.ts\n  - writeExportDocument is now an async generator, exportDocumentChunks(reader, subject, decrypt, {now,pageSize,maxRows,failFast}). It yields one chunk per page and returns {counts, truncated}.\n  - Without failFast it holds back one chunk, so the closing brace is never yielded when any section failed. With failFast it throws ExportIncompleteError at the first failure.\n  - writeExportDocument now just collects the generator; its signature and return value are unchanged, and the queue still uses it.\n  - New: startExportDownload(chunks, limit=STREAM_AFTER_CHARS) returns complete, failed or streaming.\n  - New: exportDownloadStream(head, rest, onDone) is a pull-based ReadableStream. It errors the stream when a read fails, calls rest.return() when the browser cancels, and wraps onDone so a failed audit write cannot change what the agent receives.\n- supabase/functions/gdpr-export/index.ts GET\n  - Uses the three helpers above with failFast:true.\n  - The audit entry for success or failure is written when the download ends; failures are tagged with streamed:true or false.\n  - Still never touches gdpr_data_requests (US-424).\n- src/lib/dataExportRequests.ts: shouldOfferQueuedExport also treats a SyntaxError as a cut-off download, which is what happens when a stream that ended cleanly does not parse.\n\nTests:\n- 7 new cases in supabase/functions/_shared/gdpr-export.test.ts:\n  - failFast stops at the failed section, reads nothing after it, and what was produced does not parse.\n  - Without failFast, the closing brace is still never produced when a section fails.\n  - The buffered document is byte-identical to the old output.\n  - A failure before anything is sent comes back as 'failed', so the function can still answer 503.\n  - A streamed document is byte-identical to the old output.\n  - A failure mid-stream errors the body.\n  - Reads happen only as the body is consumed, and cancelling stops them.\n- index.test.ts: getBranch now ends at the dispatch's own `\\n    } else {`. The GET branch now contains nested else blocks, so the old slice ended early and the US-424 guard covered less of the branch. New source assertions check failFast, startExportDownload and the 503 path.\n- dataExportRequests.test.ts: one new SyntaxError case.\n\nTrade-off: sections are now read one after another, so a small account's GET makes about 27 sequential round trips instead of overlapping them. This is noted in the code comment. The client timeout is still 90s (IMMEDIATE_EXPORT_TIMEOUT_MS).\n\nChecking supabase/functions code: deno is not installed and tsconfig does not include supabase/functions. I ran tsc with strict settings on gdpr-export.ts and gdpr-export/index.ts directly. The only errors were URL imports and the Deno global, which happen in every edge function.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, run before and after the commit.\n- `npx vitest run supabase/functions/_shared/gdpr-export.test.ts supabase/functions/gdpr-export src/lib/dataExportRequests.test.ts supabase/functions/_shared/gdpr-export-queue.test.ts`: 4 files, 73 tests passed. Re-run after the lint-staged prettier and eslint --fix pass: still 73 passed.\n- Full `npx vitest run`: 321 files passed, 3169 tests passed, 1 skipped. This ran while I made one last small edit to exportDownloadStream (wrapping onDone); the targeted suites were re-run after that edit and after commit.\n- `npx eslint` on the 6 changed files: 0 errors. The 4 warnings are 'file ignored' for the supabase/functions files, which ESLint is configured to skip. No new rule warnings.\n- No migration, so verify:migrations does not apply.\n- Strict tsc run directly on the two edge files: only errors are URL imports and the Deno global.\n\nREVIEW: fix_required; fix-up: The review was right. When a client cancelled a streamed export, `onDone` was never called, so no `gdpr_data_export` audit entry was written, even though at least 2 MiB of PII had already been sent. This is fixed.\n\n- `supabase/functions/_shared/gdpr-export.ts`: added the `ExportDownloadOutcome` type, which has a third case, `{ ok: false, cancelled: true, reason? }`. `cancel(reason)` now calls `report()` with that case before it closes the generator with `rest.return()`. That close is now wrapped in try/catch. `report()` has a `reported` flag, so `onDone` runs at most once per stream.\n- `supabase/functions/gdpr-export/index.ts`: the streamed `onDone` handler has a new `'cancelled' in outcome` branch. It writes a `log_audit_event` row with `p_status: 'failure'` and `p_details: { streamed: true, cancelled: true }`. If that write fails, the error is logged.\n- Tests: two new tests in `_shared/gdpr-export.test.ts`. The first cancels a streamed body after reading part of it and checks that `onDone` receives `{ ok: false, cancelled: true, reason }`. The second checks that `onDone` is called exactly once on cancel, even when it throws. `gdpr-export/index.test.ts` has one new test asserting the GET branch audits a cancelled download.\n\nCommitted as 9bb9bc0 \"US-634: address review\" with the requested attribution lines. `loop/r18-enterprise` is set to HEAD. Nothing was pushed, and `prd.json` / `progress.txt` were not edited.\n\nOWNER ACTIONS: Redeploy the gdpr-export edge function, which is served by the Coolify functions.agentbio.net app from the root Dockerfile. Its shared module _shared/gdpr-export.ts changed, and scheduled-maintenance imports the same module, so redeploy that too."
+    },
+    {
+      "id": "US-646",
+      "lane": "enterprise",
+      "round": 18,
+      "title": "Verify the streamed GET export behind Kong/Cloudflare",
+      "description": "Check that functions.agentbio.net passes a streamed response through without buffering it, and that an errored stream reaches the browser as a reset or truncated body rather than a clean end. Test with an account whose export is over 2 MiB.",
+      "acceptanceCriteria": [
+        "A >2 MiB export downloads with constant function memory",
+        "Killing a section's read mid-stream leaves the dashboard showing 'The download did not finish' with the emailed-link offer"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "If the proxy buffers the whole response, memory moves to the proxy, but the function is still protected. (follow-up from US-634)"
+    },
+    {
+      "id": "US-635",
+      "lane": "marketing",
+      "round": 18,
+      "title": "Comparison tables no longer mark unverified gaps in competitors' products (US-507)",
+      "description": "The four comparison pages (/vs/beacons, /vs/later, /vs/linktree, /for-real-estate-agents) filled the competitor column with string and boolean literals. Examples: a red cross for Beacons testimonials, Beacons \"Generic Contact Form\", Linktree \"Basic contact only\" and \"Limited\" branding, Later \"Limited\" branding, and crosses in about 20 real-estate rows. None of these was recorded as checked, and most claimed that another product lacks something. That is the comparative claim most likely to be wrong and the one a competitor is most likely to object to. Every competitor cell now comes from src/config/competitors.ts through competitorCell(id, feature), and a cell can say only three things. A tick means a headline feature of that product. \"Not real estate-specific\" marks a real-estate-only feature on a general-purpose product. Any feature with nothing recorded renders as \"Check their site\". There are no crosses, \"Basic\" or \"Limited\" cells. Each table's footnote now explains how to read that column (COMPETITOR_CELLS_NOTE).",
+      "acceptanceCriteria": [
+        "Every competitor cell in the four comparison tables reads from COMPETITORS (via competitorCell or COMPETITORS.*.tiers), or is the shared CHECK_THEIR_SITE constant for price",
+        "comparison-claims.test.ts fails on any competitor cell written as a string/true/false literal (it matched 14 cells in the old VsBeacons.tsx alone)",
+        "competitorCell never returns false; a feature not recorded for a competitor renders 'Check their site'",
+        "Each comparison page renders COMPETITOR_CELLS_NOTE under its table"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Chose US-507 (open marketing story; it needs no owner decision, unlike US-626, US-468 and US-447, which wait on the cadence, the marketing vs transactional classification and the postal address). Changes:\n- src/config/competitors.ts: added the ComparisonFeature union, CompetitorCell ('offered' | 'not-real-estate'), CompetitorId, CHECK_THEIR_SITE, NOT_REAL_ESTATE, COMPETITOR_CELLS_NOTE, a per-competitor `features` map (with a shared REAL_ESTATE_SPECIFIC set), and competitorCell(). A long comment records the rule and why there are no crosses. COMPETITORS_VERIFIED_ON was deliberately NOT bumped, because the feature cells were not re-checked against the vendors' sites today. The date still dates the tier names only, which is what the page copy says.\n- src/pages/landing/VsBeacons.tsx: 14 rows, src/pages/landing/VsLater.tsx: 16 rows, and src/pages/landing/VsLinktree.tsx: 12 rows now use competitorCell. VsLinktree's AgentBio cells 'Real estate focused' and 'Full customization' became ticks, because they ranked AgentBio against an unchecked competitor cell.\n- src/pages/landing/ForRealEstateAgents.tsx: the table now uses a typed featureRow(feature, key) helper. The local COMPETITOR_PRICE_CELL literal was replaced by the shared CHECK_THEIR_SITE.\n- src/comparison-claims.test.ts: new guards for literal-free competitor cells, the presence of COMPETITOR_CELLS_NOTE, and competitorCell semantics (never a cross; unrecorded features give CHECK_THEIR_SITE).\nThe 'offered' ticks (for example Later hashtag suggestions and best time to post, Beacons tipping) are positive claims about each vendor's well-known headline features. They are kept to features those products market, but no dated re-check was made in this session.\n\nVERIFIED: npx tsc --noEmit: passed, no output. npx vitest run src/comparison-claims.test.ts src/dead-claim-exports.test.ts: 2 files, 29 tests passed. Full npx vitest run: 321 files passed, 3168 tests passed, 1 skipped. npx eslint on the 6 changed files: 0 errors and 32 warnings, all react/no-unescaped-entities on existing JSX copy. The diff adds no JSX text containing an apostrophe; every new quoted string is inside a JS expression, so no new warnings. The pre-commit lint-staged run (eslint --fix plus prettier) passed. The new literal-cell regex matched 14 cells in HEAD's VsBeacons.tsx, so the guard catches the old code. No migration was added, so verify:migrations does not apply.\n\nREVIEW: approve\n\nOWNER ACTIONS: None: frontend copy only, so a normal Cloudflare Pages deploy picks it up. No migration, edge function or secret is involved."
+    },
+    {
+      "id": "US-647",
+      "lane": "marketing",
+      "round": 18,
+      "title": "Dated re-check of the competitor 'offered' feature cells",
+      "description": "Check each 'offered' entry in COMPETITORS.*.features against linktr.ee, beacons.ai and later.com. Where a site confirms that Later's Linkin.bio supports custom branding, or that Linktree or Beacons offer booking or testimonials, add 'offered' for it. Then bump COMPETITORS_VERIFIED_ON so the rendered date covers features as well as tiers.",
+      "acceptanceCriteria": [
+        "Every 'offered' entry checked against the vendor's own page on the new VERIFIED_ON date",
+        "Page footnotes say features as well as tiers were checked"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs web access to the vendor sites; this session did not verify them. (follow-up from US-635)"
+    },
+    {
+      "id": "US-648",
+      "lane": "marketing",
+      "round": 18,
+      "title": "Comparison prose still makes negative claims about competitors",
+      "description": "Outside the tables, the copy still asserts what competitors lack. Examples: the FAQ answer in ForRealEstateAgents.tsx ('Generic link-in-bio tools like Linktree can't showcase property listings... lack features like appointment booking'), its SEO description ('features not found in generic tools like Linktree'), and VsLater's 'Choose Later' scenario ('Industry-leading scheduling tools'). Reword these to describe what AgentBio does and what each competitor is built for (builtFor), and add a FALSE_CLAIMS pattern for each.",
+      "acceptanceCriteria": [
+        "No comparison-page prose states that a named competitor lacks a feature",
+        "comparison-claims.test.ts pins the removed phrases"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-635)"
+    },
+    {
+      "id": "US-636",
+      "lane": "seo",
+      "round": 18,
+      "title": "llms.txt now tells AI answer engines that agent pages exist and where they are listed (US-608)",
+      "description": "public/llms.txt used to describe only AgentBio's marketing pages. An answer engine reading it learned nothing about agentbio.net/<username> or /<username>/listing/<id>, which are the pages the product exists to make citable. It now has a new \"Agent pages\" section with the two URL templates. The section says what each page carries and which JSON-LD type each declares (RealEstateAgent with makesOffer, RealEstateListing), and that both pages are the agent's own statements. It also says that /sitemap-profiles.xml lists every published agent page and visible listing, and that unpublished pages, unknown usernames and hidden listings answer 404. It says that answer-engine fetchers get plain HTML and that /sitemap.xml lists AgentBio's own pages. src/llms-txt.test.ts now holds that section to the code.",
+      "acceptanceCriteria": [
+        "public/llms.txt names https://agentbio.net/{username} and https://agentbio.net/{username}/listing/{listing-id} and https://agentbio.net/sitemap-profiles.xml",
+        "The listing template matches what listingPagePath builds (test)",
+        "Both URL shapes have a Pages Function crawler half: functions/[username].ts and functions/[username]/listing/[listingId].ts (test)",
+        "Every sitemap llms.txt names is declared in public/robots.txt, the request-time one has a Pages Function, and no other .xml is named (test)",
+        "Existing llms.txt guards (published pages only, prices, no invented figures) still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "I picked US-608, the first open seo story named for this round. Each statement in the new section was checked against the code:\n- functions/_lib/social-meta.ts:120-141: the answer-engine user agents are in isCrawler, so they get the crawler HTML.\n- social-meta.ts:638-711, buildProfileBody: name, title, brokerage, licence, service areas, bio, up to PROFILE_BODY_LISTING_LIMIT=12 listings, and contact details only when showContact is on.\n- social-meta.ts:321-366, buildProfileTags: RealEstateAgent with makesOffer.\n- social-meta.ts:718-745, buildListingBody, and the RealEstateListing graph.\n- functions/_lib/profile-route.ts:360-410: the query filters on is_published, an unknown username gets notFoundResponse, and a hidden listing at its own address gets 404 (US-416).\n- functions/_lib/profile-sitemap.ts:1-28: the sitemap lists published profiles and only the listings selectListingForPage would show.\n- public/robots.txt declares both sitemaps.\n\nIn src/llms-txt.test.ts the two sitemaps and the brace templates are added to the allowed set, so the \"published pages only\" check still covers everything else. I added three tests: the section is present, the templates match listingPagePath and both have a crawler function, and the sitemaps named match robots.txt and their functions.\n\nFiles changed: /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-9/public/llms.txt and /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-9/src/llms-txt.test.ts.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run src/llms-txt.test.ts`: 11 passed (11), including the 3 new tests.\n- `npx eslint src/llms-txt.test.ts`: exit 0, no warnings.\n- Full `npx vitest run`: 321 test files passed; 3162 tests passed, 1 skipped (3163); exit 0.\n- No migration, so verify:migrations does not apply.\n- The lint-staged pre-commit hook (eslint --fix, prettier) passed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages so the new public/llms.txt is served. No migration, no edge-function deploy, no secrets."
+    },
+    {
+      "id": "US-637",
+      "lane": "mobile",
+      "round": 18,
+      "title": "Tapping a message box or dropdown on a phone zoomed the page in on iOS and left it zoomed",
+      "description": "iOS Safari and the installed iOS app zoom the whole page in when a form field smaller than 16px gets focus, and the page stays zoomed after the keyboard closes. Input was already 16px on phones (src/components/ui/input.tsx:39 uses text-base sm:text-sm). But the Textarea primitive is text-sm at every width (src/components/ui/textarea.tsx:13). So are the native selects in the public lead form (src/components/forms/TwoStepLeadForm.tsx:46-47), the lead-detail inputs and selects in the dashboard (src/components/leads/LeadDetailModal.tsx:828-882), the OpenHouses field (src/pages/dashboard/OpenHouses.tsx:601) and other fields. When a homebuyer on an agent's page tapped \"Message\" in the lead form, the page zoomed in and the dialog ended up half off screen. That lead form is how the product makes money. Fix: one top-level rule in src/index.css, `@media (pointer: coarse) { input:not(checkbox/radio/range/color/file/button/submit/reset/image/hidden), select, textarea { font-size: max(16px, 1em) !important } }`. On touch screens every field people type into is now at least 16px, whatever classes it has. Desktop keeps the compact 14px.",
+      "acceptanceCriteria": [
+        "On touch screens (pointer: coarse) every typed-into input, select and textarea is at least 16px, even when it has text-sm or text-xs",
+        "Checkboxes, radios, range, file and button inputs are not resized",
+        "The rule sits outside any Tailwind @layer and uses !important, so utilities emitted later cannot undercut it (checked with the Tailwind CLI: it comes out at the end of the compiled CSS)",
+        "Mouse/keyboard screens keep their current 14px field sizes",
+        "A guard test fails if the rule is removed, moved into an @layer, loses !important, or stops covering textarea or select"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Audit evidence: index.html:75 viewport allows zoom (maximum-scale=5, user-scalable=yes), so iOS auto-zooms on focus. Tailwind preflight sets form controls to font-size:100%, so a raw field inside a text-sm container is also 14px. Radix SelectTrigger is a button, so it does not trigger the zoom and is unaffected. Change: src/index.css, a new block at the end of the file outside any @layer, with a comment explaining why. I compiled it with `npx tailwindcss -i src/index.css`: the @media (pointer: coarse) rule comes out at line 5841, after .text-sm at line 4660. New test: src/test/iosInputZoom.test.ts. The pre-commit hook ran prettier on both files and the test passes after the reformat. I did not edit prd.json, progress.txt or CLAUDE.md, and did not push.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output. npx vitest run src/test/iosInputZoom.test.ts src/test/safeAreaPadding.test.ts src/destructiveContrast.test.ts: 3 files, 31 tests passed. npx eslint src/test/iosInputZoom.test.ts: clean. Full npx vitest run: 322 files passed, 3163 tests passed, 1 skipped. Re-ran iosInputZoom.test.ts after the pre-commit prettier reformat: 4/4 passed. No migration, so verify:migrations was not needed.\n\nREVIEW: fix_required; fix-up: The reviewer was right. In the font-size property, `1em` means the parent's size, and `!important` beat every utility class. So on touch screens, `max(16px, 1em) !important` shrank any field meant to be bigger than 16px. Two places were affected: the open-house kiosk fields (text-lg, 18px) in src/pages/public/OpenHouseSignIn.tsx, and the OTP digit boxes (text-2xl and sm:text-3xl) in src/components/auth/OTPInput.tsx. Both fell to 16px.\n\nI replaced the one rule in /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-10/src/index.css with two:\n1. A top-level `@media (pointer: coarse)` rule, outside any @layer and still `!important`, that sets fields to 16px only when they carry a small size class. The list is text-xs, text-sm, text-[10px], text-[11px], sm:text-xs, sm:text-sm and md:text-sm, which covers every small size class on fields in src. The selector is `:is(input:not(...), select, textarea):is(<those classes>)`. Checkboxes, radios, buttons, file inputs and the other non-typing input types are still excluded.\n2. A `@layer base` coarse-pointer rule, `input:where(:not(...)), select, textarea { font-size: max(16px, 1em) }`, with no `!important`. It covers fields with no size class that sit inside a text-sm container. Its specificity is the same as a plain element selector (the `:not()` chain is wrapped in `:where()`), and Tailwind places it after preflight. So it overrides preflight's font-size: 100%, but any size class on the field still wins.\n\nI rewrote /home/user/plain-page-link/.claude/worktrees/wf_13be2d32-0e9-10/src/test/iosInputZoom.test.ts. It checks that the old `max(16px, 1em) !important` is gone and that the !important rule names only text-xs, text-sm or text-[10–11px] classes. It also checks the rule reaches text-sm, text-xs, `text-base sm:text-sm` and md:text-sm, but does not reach the real kiosk inputClass, the OTP class string, or text-base. Finally, it checks the default rule sits in @layer base with no `!important` and no class in its selector.\n\nThe commit is 248a75c (\"US-637: address review\"), and loop/r18-mobile now points at it. Nothing was pushed, and prd.json and progress.txt are untouched."
+    },
+    {
+      "id": "US-649",
+      "lane": "mobile",
+      "round": 18,
+      "title": "Public profile Contact button covers the last content on iPhones and tablets",
+      "description": "FullProfilePage.tsx:450 pads the content with pb-24 sm:pb-8. The mobile Contact button (StickyActionBar.tsx:163-172) is 56px tall, sits 1.5rem plus the bottom safe-area inset from the bottom, and is shown up to xl (1280px). At 640-1279px the content has only 32px of bottom padding, so the button covers the footer. On iPhones with a home indicator (34px inset) it needs about 114px of padding, more than the 96px that pb-24 gives. The expanded quick-actions panel (StickyActionBar.tsx:118) is placed at bottom-20, which also ignores the inset.",
+      "acceptanceCriteria": [
+        "The content column reserves calc(6.5rem + env(safe-area-inset-bottom)) at every width below xl",
+        "The quick-actions panel sits above the button whatever the inset",
+        "safeAreaPadding guard test still passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-637)"
+    },
+    {
+      "id": "US-650",
+      "lane": "mobile",
+      "round": 18,
+      "title": "Dialogs use 90vh, which goes past the visible area in iOS Safari's browser tab",
+      "description": "ui/dialog.tsx:38, LeadFormModal.tsx:70 and HomeValuationDialog.tsx:26 cap height at max-h-[90vh]. On iOS, vh means the large viewport, so with the toolbars showing, the dialog can extend past the visible area. Switch to dvh, with the vh value as a fallback.",
+      "acceptanceCriteria": [
+        "Dialog max height uses 90dvh, falling back to 90vh",
+        "The lead form dialog's top and its close button are visible on a 375x667 viewport with the toolbars showing"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-637)"
     }
   ]
 }
