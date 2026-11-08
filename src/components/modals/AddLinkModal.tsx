@@ -370,7 +370,7 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
               <DialogDescription>Choose a template or create a custom link</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-4 max-h-[60vh] supports-[height:100dvh]:max-h-[60dvh] overflow-y-auto pr-1">
               {/* Custom Link Button */}
               <button
                 onClick={handleCustomLink}

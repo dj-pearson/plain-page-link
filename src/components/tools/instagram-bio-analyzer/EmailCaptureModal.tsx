@@ -73,7 +73,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl overflow-y-auto">
         {/* Header with gradient */}
         <div className="bg-gradient-to-r from-teal-500 to-teal-500 -mx-6 -mt-6 p-8 text-white mb-6">
           <div className="flex items-center gap-3 mb-2">

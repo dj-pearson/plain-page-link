@@ -132,7 +132,7 @@ export function ContactDetail({ contactId, open, onOpenChange }: ContactDetailPr
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="overflow-y-auto sm:max-w-3xl">
           {isLoading ? (
             <div className="flex justify-center py-12">
               <DialogTitle className="sr-only">Loading client</DialogTitle>

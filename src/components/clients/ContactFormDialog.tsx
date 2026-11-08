@@ -194,7 +194,7 @@ export function ContactFormDialog({
 }: ContactFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{contact ? 'Edit client' : 'Add client'}</DialogTitle>
           <DialogDescription>

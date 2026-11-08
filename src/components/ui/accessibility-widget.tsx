@@ -206,7 +206,7 @@ export function AccessibilityWidget() {
           aria-modal="true"
           className={cn(
             'fixed bottom-36 md:bottom-20 right-4 z-[90]',
-            'w-80 max-h-[70vh] overflow-y-auto',
+            'w-80 max-h-[70vh] supports-[height:100dvh]:max-h-[70dvh] overflow-y-auto',
             'bg-white dark:bg-gray-900 rounded-xl shadow-2xl',
             'border border-gray-200 dark:border-gray-700',
             'p-4'

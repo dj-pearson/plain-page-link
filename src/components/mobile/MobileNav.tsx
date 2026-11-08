@@ -142,7 +142,7 @@ export function MobileNav() {
 
       {/* More Menu Dialog */}
       <Dialog open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-        <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-h-[80vh] supports-[height:100dvh]:max-h-[80dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Menu</DialogTitle>
           </DialogHeader>

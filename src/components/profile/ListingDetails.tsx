@@ -244,7 +244,7 @@ export default function ListingDetails({
             showNext();
           }
         }}
-        className="relative bg-gray-900 aspect-[4/3] sm:aspect-[16/9] max-h-[65vh] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
+        className="relative bg-gray-900 aspect-[4/3] sm:aspect-[16/9] max-h-[65vh] supports-[height:100dvh]:max-h-[65dvh] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
       >
         <AnimatePresence mode="wait">
           <motion.img

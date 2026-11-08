@@ -409,7 +409,7 @@ export function PageList() {
 
       {/* Template Selector Dialog */}
       <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] supports-[height:100dvh]:max-h-[80dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Choose a Template</DialogTitle>
             <DialogDescription>

@@ -67,7 +67,7 @@ export function LeadFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl overflow-y-auto">
         {/* Radix requires a title on every dialog; without one a screen reader
             announces the dialog with no name at all. The forms inside carry
             their own visible heading, so this one is hidden (US-112). */}
