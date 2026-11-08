@@ -227,21 +227,31 @@ export default function OnboardingWizardPage() {
       }
 
       // Send welcome email (non-blocking)
+      // No body. The function reads the address from the caller's JWT and
+      // the name and username from that user's own profile row — it used to
+      // take all three from here, unauthenticated, which made it a branded
+      // relay to any address (US-119).
+      // edgeFunctions.invoke never throws; it returns { error }. The old
+      // try/catch never fired, so a failed send was silent and the toast below
+      // still sent the agent to their inbox (US-616).
+      let welcomeEmailSent = false;
       try {
-        // No body. The function reads the address from the caller's JWT and
-        // the name and username from that user's own profile row — it used to
-        // take all three from here, unauthenticated, which made it a branded
-        // relay to any address (US-119).
-        await edgeFunctions.invoke('send-welcome-email', {});
+        const { error: emailError } = await edgeFunctions.invoke('send-welcome-email', {});
+        if (emailError) {
+          logger.error('Welcome email failed (non-critical)', emailError);
+        } else {
+          welcomeEmailSent = true;
+        }
       } catch (emailError) {
         logger.error('Welcome email failed (non-critical)', emailError as Error);
-        // Don't block navigation if email fails
       }
 
       // Success!
       toast({
-        title: '🎉 Welcome to AgentBio!',
-        description: 'Your profile is ready to share. Check your email for next steps!',
+        title: 'Welcome to AgentBio',
+        description: welcomeEmailSent
+          ? 'Your profile is saved. We emailed you a short list of next steps.'
+          : 'Your profile is saved. Your dashboard shows what to do next.',
       });
       return true;
     } catch (error) {

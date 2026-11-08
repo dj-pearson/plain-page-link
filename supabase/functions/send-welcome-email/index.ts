@@ -6,6 +6,7 @@ import { successResponse, errorResponse, handleUnexpectedError } from '../_share
 import { requireAuth } from '../_shared/auth.ts'
 import { isServiceRoleRequest } from '../_shared/service-auth.ts'
 import { getSiteUrl } from '../_shared/env.ts';
+import { buildWelcomeEmail } from '../_shared/welcome-email.ts';
 
 /**
  * The welcome email, sent to the agent who just finished onboarding.
@@ -72,7 +73,7 @@ serve(async (req) => {
     // The name and the profile URL: from the agent's own profile row.
     const { data: profile } = await supabase
       .from('profiles')
-      .select('username, full_name')
+      .select('username, full_name, is_published')
       .eq('id', userId)
       .maybeSingle()
 
@@ -80,162 +81,29 @@ serve(async (req) => {
       return errorResponse('That account has no profile yet', 'PROFILE_NOT_FOUND', req, 404)
     }
 
-    const userName = profile.full_name || profile.username
-    const profileUrl = `${getSiteUrl()}/${profile.username}`
-
-    // Send welcome email
-    await sendEmail({
-      to: recipient,
-      subject: '🎉 Welcome to AgentBio! Your Profile is Ready',
-      body: `Hi ${userName},
-
-Welcome to AgentBio! Your professional real estate portfolio is now live and ready to share.
-
-Your Profile URL:
-${profileUrl}
-
-Here's what you can do next:
-
-1. Add Your Instagram Bio Link
-   Share your AgentBio profile on Instagram, Facebook, and all your social media.
-
-2. Upload Your Sold Properties
-   Showcase your track record with before/after photos and success stories.
-
-3. Customize Your Theme
-   Match your personal brand with custom colors, fonts, and layouts.
-
-4. Add More Listings
-   Feature your active listings with photos, prices, and details.
-
-5. Set Up Lead Capture
-   Your buyer, seller, and home valuation forms are ready to capture qualified leads.
-
-Need Help?
-- Check out our video tutorials
-- Join our agent community
-- Contact support: support@agentbio.net
-
-Ready to start? Visit your dashboard:
-${getSiteUrl()}/dashboard
-
-Best regards,
-The AgentBio Team
-
-P.S. Share your first listing today and see how AgentBio helps you convert Instagram followers into clients!`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 0 auto; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
-    .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
-    .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.95; }
-    .content { background: #ffffff; padding: 40px 30px; }
-    .profile-box { background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-left: 4px solid #667eea; padding: 20px; margin: 25px 0; border-radius: 8px; }
-    .profile-url { font-size: 18px; font-weight: 600; color: #667eea; word-break: break-all; }
-    .steps { margin: 30px 0; }
-    .step { margin-bottom: 20px; padding-left: 35px; position: relative; }
-    .step-number { position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: #667eea; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: bold; }
-    .step h3 { margin: 0 0 5px 0; font-size: 16px; color: #1f2937; }
-    .step p { margin: 0; font-size: 14px; color: #6b7280; }
-    .button { display: inline-block; background: #667eea; color: white !important; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; }
-    .button:hover { background: #5568d3; }
-    .help-section { background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin: 25px 0; }
-    .footer { background: #f9fafb; padding: 30px; text-align: center; font-size: 14px; color: #6b7280; }
-    .footer a { color: #667eea; text-decoration: none; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>🎉 Welcome to AgentBio!</h1>
-      <p>Your professional real estate portfolio is live</p>
-    </div>
-
-    <div class="content">
-      <p>Hi ${userName},</p>
-
-      <p>Welcome to AgentBio! Your professional real estate portfolio is now <strong>live and ready to share</strong> with potential clients.</p>
-
-      <div class="profile-box">
-        <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280; font-weight: 600;">YOUR PROFILE URL</p>
-        <div class="profile-url">${profileUrl}</div>
-      </div>
-
-      <p>Here's what you can do to make the most of your AgentBio profile:</p>
-
-      <div class="steps">
-        <div class="step">
-          <div class="step-number">1</div>
-          <h3>📱 Add to Instagram Bio</h3>
-          <p>Replace your current link with your AgentBio URL and start converting followers into clients.</p>
-        </div>
-
-        <div class="step">
-          <div class="step-number">2</div>
-          <h3>🏡 Upload Sold Properties</h3>
-          <p>Showcase your track record with photos and success stories to build trust with potential clients.</p>
-        </div>
-
-        <div class="step">
-          <div class="step-number">3</div>
-          <h3>🎨 Customize Your Theme</h3>
-          <p>Match your personal brand with custom colors, fonts, and professional layouts.</p>
-        </div>
-
-        <div class="step">
-          <div class="step-number">4</div>
-          <h3>📋 Add Active Listings</h3>
-          <p>Feature your current properties with photos, prices, and all the details buyers need.</p>
-        </div>
-
-        <div class="step">
-          <div class="step-number">5</div>
-          <h3>📊 Monitor Your Analytics</h3>
-          <p>Track profile views, link clicks, and lead sources to optimize your marketing.</p>
-        </div>
-      </div>
-
-      <div style="text-align: center;">
-        <a href="${getSiteUrl()}/dashboard" class="button">
-          Go to Your Dashboard →
-        </a>
-      </div>
-
-      <div class="help-section">
-        <p style="margin: 0 0 10px 0; font-weight: 600; color: #1f2937;">Need Help?</p>
-        <p style="margin: 0; font-size: 14px; color: #6b7280;">
-          • Check out our <a href="${getSiteUrl()}/blog" style="color: #667eea;">video tutorials</a><br>
-          • Join our agent community<br>
-          • Email us: <a href="mailto:support@agentbio.net" style="color: #667eea;">support@agentbio.net</a>
-        </p>
-      </div>
-
-      <p style="color: #6b7280; font-size: 14px;">
-        <strong>P.S.</strong> Share your first listing today and see how AgentBio helps you convert Instagram followers into clients!
-      </p>
-
-      <p>Best regards,<br><strong>The AgentBio Team</strong></p>
-    </div>
-
-    <div class="footer">
-      <p><strong>AgentBio</strong> - Link-in-Bio for Real Estate Agents</p>
-      <p style="margin: 10px 0 0 0;">
-        <a href="${profileUrl}">View Your Profile</a> •
-        <a href="${getSiteUrl()}/dashboard">Dashboard</a> •
-        <a href="${getSiteUrl()}/blog">Blog</a>
-      </p>
-      <p style="margin: 15px 0 0 0; font-size: 12px;">
-        This email was sent because you created an account at AgentBio.net
-      </p>
-    </div>
-  </div>
-</body>
-</html>`
+    // US-616: the copy lives in _shared/welcome-email.ts, where it is tested
+    // and scanned for unsupported claims.
+    const email = buildWelcomeEmail({
+      displayName: profile.full_name || profile.username,
+      username: profile.username,
+      siteUrl: getSiteUrl(),
+      isPublished: profile.is_published,
     })
+
+    // sendEmail never throws; it reports. This used to ignore the result and
+    // answer 'Welcome email sent' to every call, so onboarding told the agent
+    // to check their inbox for a message that was never sent.
+    const sent = await sendEmail({
+      to: recipient,
+      subject: email.subject,
+      body: email.text,
+      html: email.html,
+    })
+
+    if (!sent.ok) {
+      console.error(`[send-welcome-email] send failed for ${userId}: ${sent.error ?? 'unknown error'}`)
+      return errorResponse('The welcome email could not be sent', 'EMAIL_SEND_FAILED', req, 502)
+    }
 
     return successResponse({ message: 'Welcome email sent' }, req)
 
