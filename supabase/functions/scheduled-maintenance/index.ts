@@ -7,7 +7,7 @@ import { getAgentContacts } from '../_shared/agent-contact.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 import { digestSchedule, runDigests, summarizeDigestReport } from './digests.ts';
-import { supabaseDigestStore } from './digest-store.ts';
+import { isMissingColumn, supabaseDigestStore } from './digest-store.ts';
 import {
   chaseOverdueLeads,
   summarizeOverdueReport,
@@ -45,6 +45,25 @@ import {
 
 /** The overdue-lead chaser's reads and writes, over the service-role client. */
 function overdueStore(supabase: SupabaseClient): OverdueStore {
+  // Until migration 20261107000433 is applied there is no profiles.timezone:
+  // every agent is emailed at once, as before, rather than the task failing.
+  let hasTimezone = true;
+
+  async function readTimeZones(userIds: string[]): Promise<Map<string, string | null>> {
+    const zones = new Map<string, string | null>();
+    if (!hasTimezone || userIds.length === 0) return zones;
+    const { data, error } = await supabase.from('profiles').select('id, timezone').in('id', userIds);
+    if (error && isMissingColumn(error)) {
+      hasTimezone = false;
+      return zones;
+    }
+    if (error) throw new Error(`reading agent time zones: ${error.message}`);
+    for (const row of (data ?? []) as { id: string; timezone: string | null }[]) {
+      zones.set(row.id, row.timezone ?? null);
+    }
+    return zones;
+  }
+
   return {
     async listCandidates(from, to, offset, limit) {
       const { data, error } = await supabase
@@ -82,11 +101,65 @@ function overdueStore(supabase: SupabaseClient): OverdueStore {
       return ids;
     },
     async getAgents(userIds) {
-      const agents = new Map<string, { email: string | null; preferences: Record<string, unknown> | null }>();
+      const agents = new Map<
+        string,
+        { email: string | null; preferences: Record<string, unknown> | null; timeZone: string | null }
+      >();
+      // A failed zone read fails the chunk: emailing at 3am because the zone
+      // could not be read is the thing quiet hours exist to prevent.
+      const zones = await readTimeZones(userIds);
       for (const [id, c] of await getAgentContacts(supabase, userIds)) {
-        agents.set(id, { email: c.email, preferences: c.notificationPreferences });
+        agents.set(id, { email: c.email, preferences: c.notificationPreferences, timeZone: zones.get(id) ?? null });
       }
       return agents;
+    },
+    async listHeldChases(since) {
+      const held: Awaited<ReturnType<OverdueStore['listHeldChases']>> = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('id, user_id, data')
+          .eq('type', OVERDUE_NOTIFICATION_TYPE)
+          .eq('data->>email_pending', 'true')
+          .gte('created_at', since)
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw new Error(`reading held chases: ${error.message}`);
+        for (const row of (data ?? []) as { id: string; user_id: string; data: unknown }[]) {
+          const payload = row.data as Record<string, unknown> | null;
+          if (payload && typeof payload.lead_id === 'string') {
+            held.push({ notificationId: row.id, user_id: row.user_id, lead_id: payload.lead_id, data: payload });
+          }
+        }
+        if ((data ?? []).length < pageSize) break;
+      }
+      return held;
+    },
+    async listStillWaiting(leadIds) {
+      if (leadIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('leads')
+        .select('id, user_id, name, created_at, lead_type')
+        .in('id', leadIds)
+        .eq('status', 'new')
+        .is('first_responded_at', null);
+      if (error) throw new Error(`reading held leads: ${error.message}`);
+      return data ?? [];
+    },
+    async releaseHeld(held) {
+      const rest = { ...held.data };
+      delete rest.email_pending;
+      // Conditional on email_pending still being set: two overlapping runs
+      // cannot both own the email.
+      const { data, error } = await supabase
+        .from('notifications')
+        .update({ data: rest })
+        .eq('id', held.notificationId)
+        .eq('data->>email_pending', 'true')
+        .select('id');
+      if (error) throw new Error(error.message);
+      return (data ?? []).length > 0;
     },
     async claim(notification) {
       const { error } = await supabase.from('notifications').insert(notification);

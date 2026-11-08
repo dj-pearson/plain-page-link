@@ -5,6 +5,7 @@ import {
   buildChaseEmail,
   candidateWindow,
   chaseOverdueLeads,
+  inQuietHours,
   slaHoursFor,
   summarizeOverdueReport,
   LOOKBACK_HOURS,
@@ -30,6 +31,21 @@ function lead(id: string, userId: string, hoursAgo: number, name = `Lead ${id}`)
   };
 }
 
+type StoredNotification = OverdueNotification & { created_at: string; id?: string };
+
+/** A notification an earlier night-time run claimed with its email held. */
+function heldRow(leadId: string, userId: string, hoursAgo: number): StoredNotification {
+  return {
+    id: `held-${leadId}`,
+    user_id: userId,
+    type: 'lead_overdue',
+    title: 't',
+    message: 'm',
+    data: { lead_id: leadId, hours_waiting: 4, email_pending: true },
+    created_at: new Date(NOW.getTime() - hoursAgo * HOUR).toISOString(),
+  };
+}
+
 /**
  * An in-memory store that behaves like the database: the leads table filtered
  * and ordered as the real query is, and notifications with the unique index.
@@ -37,12 +53,16 @@ function lead(id: string, userId: string, hoursAgo: number, name = `Lead ${id}`)
 function memoryStore(opts: {
   leads: OverdueLead[];
   agents?: Record<string, OverdueAgent | null>;
-  notifications?: (OverdueNotification & { created_at: string })[];
+  notifications?: StoredNotification[];
   failChasedRead?: boolean;
   failEmail?: boolean;
   failAgentsRead?: boolean;
+  failHeldRead?: boolean;
+  failWaitingRead?: boolean;
+  /** Leads answered since they were chased (no longer `new`). */
+  answered?: Set<string>;
 }) {
-  const notifications = [...(opts.notifications ?? [])];
+  const notifications: StoredNotification[] = (opts.notifications ?? []).map((n) => ({ ...n, data: { ...n.data } }));
   const emails: { to: string; subject: string; body: string }[] = [];
   const candidateCalls: { from: string; to: string; offset: number }[] = [];
   const agentCalls: string[][] = [];
@@ -80,8 +100,34 @@ function memoryStore(opts: {
         (n) => n.type === notification.type && n.user_id === notification.user_id && n.data.lead_id === notification.data.lead_id
       );
       if (dup) return 'duplicate';
-      notifications.push({ ...notification, created_at: clock.toISOString() });
+      notifications.push({
+        ...notification,
+        data: { ...notification.data },
+        created_at: clock.toISOString(),
+        id: `n${notifications.length}`,
+      });
       return 'claimed';
+    },
+    async listHeldChases(since) {
+      if (opts.failHeldRead) throw new Error('held read timeout');
+      return notifications
+        .filter((n) => n.type === 'lead_overdue' && n.data.email_pending === true && n.created_at >= since)
+        .map((n) => ({
+          notificationId: n.id ?? '',
+          user_id: n.user_id,
+          lead_id: n.data.lead_id,
+          data: { ...n.data } as Record<string, unknown>,
+        }));
+    },
+    async listStillWaiting(leadIds) {
+      if (opts.failWaitingRead) throw new Error('leads read timeout');
+      return opts.leads.filter((l) => leadIds.includes(l.id) && !opts.answered?.has(l.id));
+    },
+    async releaseHeld(held) {
+      const row = notifications.find((n) => n.id === held.notificationId);
+      if (!row || row.data.email_pending !== true) return false;
+      delete row.data.email_pending;
+      return true;
     },
     async sendEmail(email) {
       if (opts.failEmail) return { ok: false, error: 'resend 500' };
@@ -309,6 +355,174 @@ describe('chaseOverdueLeads (US-309)', () => {
     expect(report.truncated).toBe(true);
     expect(report.claimed).toBe(MAX_CANDIDATES);
     expect(summarizeOverdueReport(report)).toContain(`stopped at ${MAX_CANDIDATES}`);
+  });
+});
+
+describe('inQuietHours (US-457)', () => {
+  it('is 21:00 to 07:00 on the agent’s own clock', () => {
+    // New York is on standard time (UTC-5) on 2026-11-08.
+    expect(inQuietHours(new Date('2026-11-08T01:59:00Z'), 'America/New_York')).toBe(false); // 20:59
+    expect(inQuietHours(new Date('2026-11-08T02:00:00Z'), 'America/New_York')).toBe(true); // 21:00
+    expect(inQuietHours(new Date('2026-11-08T11:59:00Z'), 'America/New_York')).toBe(true); // 06:59
+    expect(inQuietHours(new Date('2026-11-08T12:00:00Z'), 'America/New_York')).toBe(false); // 07:00
+  });
+  it('has no quiet hours without a usable zone', () => {
+    expect(inQuietHours(new Date('2026-11-08T03:00:00Z'), null)).toBe(false);
+    expect(inQuietHours(new Date('2026-11-08T03:00:00Z'), undefined)).toBe(false);
+    expect(inQuietHours(new Date('2026-11-08T03:00:00Z'), 'Not/AZone')).toBe(false);
+  });
+});
+
+describe('chaseOverdueLeads quiet hours (US-457)', () => {
+  // NOW is 15:17 UTC: 07:17 in Los Angeles (UTC-8), 00:17 next day in Tokyo (UTC+9).
+  const LA = 'America/Los_Angeles';
+  const TOKYO = 'Asia/Tokyo';
+  const night = new Date('2026-11-07T07:17:00Z'); // 23:17 in Los Angeles
+  const laAgent = { u1: { email: 'u1@example.com', preferences: {}, timeZone: LA } };
+
+  it('claims the notification on time but holds the email during the agent’s night', async () => {
+    const m = memoryStore({
+      leads: [lead('a', 'u1', 3)],
+      agents: { u1: { email: 'u1@example.com', preferences: {}, timeZone: TOKYO } },
+    });
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.claimed).toBe(1);
+    expect(report.held).toBe(1);
+    expect(m.emails).toHaveLength(0);
+    expect(m.notifications).toHaveLength(1);
+    expect(m.notifications[0].data).toMatchObject({ lead_id: 'a', email_pending: true });
+    expect(summarizeOverdueReport(report)).toContain('held for quiet hours 1');
+  });
+
+  it('emails an agent in their daytime at once, with no pending flag', async () => {
+    const m = memoryStore({ leads: [lead('a', 'u1', 3)], agents: laAgent });
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.held).toBe(0);
+    expect(m.emails).toHaveLength(1);
+    expect(m.notifications[0].data).not.toHaveProperty('email_pending');
+  });
+
+  it('an agent with no zone is emailed at once, as before', async () => {
+    const at = new Date(night.getTime());
+    const m = memoryStore({
+      leads: [{ ...lead('a', 'u1', 0), created_at: new Date(at.getTime() - 3 * HOUR).toISOString() }],
+      agents: { u1: { email: 'u1@example.com', preferences: {}, timeZone: null } },
+    });
+    await chaseOverdueLeads(m.store, { now: at, siteUrl: SITE });
+    expect(m.emails).toHaveLength(1);
+  });
+
+  it('sends nothing all night, then one email at the first run after 07:00 local', async () => {
+    const leads = [
+      { ...lead('a', 'u1', 0, 'Dana'), created_at: new Date(night.getTime() - 3 * HOUR).toISOString() },
+      { ...lead('b', 'u1', 0, 'Sam'), created_at: new Date(night.getTime() + 1 * HOUR).toISOString() },
+    ];
+    const m = memoryStore({ leads, agents: laAgent });
+    // Hourly runs from 23:17 to 06:17 Los Angeles time.
+    for (let h = 0; h <= 7; h++) {
+      await chaseOverdueLeads(m.store, { now: new Date(night.getTime() + h * HOUR), siteUrl: SITE });
+    }
+    expect(m.emails).toHaveLength(0);
+    expect(m.notifications).toHaveLength(2);
+
+    // 07:17: both held leads go out together.
+    const morning = new Date(night.getTime() + 8 * HOUR);
+    const report = await chaseOverdueLeads(m.store, { now: morning, siteUrl: SITE });
+    expect(report.released).toBe(2);
+    expect(m.emails).toHaveLength(1);
+    expect(m.emails[0].subject).toBe('2 leads are still waiting to hear from you');
+    expect(m.emails[0].body).toContain('Dana (buyer, 11h)');
+    expect(m.notifications.every((n) => n.data.email_pending === undefined)).toBe(true);
+
+    // And never again.
+    await chaseOverdueLeads(m.store, { now: new Date(morning.getTime() + HOUR), siteUrl: SITE });
+    expect(m.emails).toHaveLength(1);
+  });
+
+  it('folds held leads and this run’s new claims into one email', async () => {
+    const m = memoryStore({
+      leads: [lead('a', 'u1', 12), lead('b', 'u1', 3)],
+      agents: laAgent,
+      notifications: [heldRow('a', 'u1', 8)],
+    });
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.released).toBe(1);
+    expect(report.claimed).toBe(1);
+    expect(m.emails).toHaveLength(1);
+    expect(m.emails[0].body).toContain('?lead=a');
+    expect(m.emails[0].body).toContain('?lead=b');
+  });
+
+  it('a lead answered overnight is released without an email', async () => {
+    const m = memoryStore({
+      leads: [lead('a', 'u1', 12)],
+      answered: new Set(['a']),
+      agents: laAgent,
+      notifications: [heldRow('a', 'u1', 8)],
+    });
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.released).toBe(0);
+    expect(m.emails).toHaveLength(0);
+    expect(m.notifications[0].data.email_pending).toBeUndefined();
+  });
+
+  it('an agent who turned chasing off overnight has held leads released without an email', async () => {
+    const m = memoryStore({
+      leads: [lead('a', 'u1', 12)],
+      agents: { u1: { email: 'u1@example.com', preferences: { leads: 'off' }, timeZone: LA } },
+      notifications: [heldRow('a', 'u1', 8)],
+    });
+    await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(m.emails).toHaveLength(0);
+    expect(m.notifications[0].data.email_pending).toBeUndefined();
+  });
+
+  it('keeps held leads held while the agent is still in quiet hours', async () => {
+    const m = memoryStore({
+      leads: [lead('a', 'u1', 12)],
+      agents: { u1: { email: 'u1@example.com', preferences: {}, timeZone: TOKYO } },
+      notifications: [heldRow('a', 'u1', 8)],
+    });
+    await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(m.emails).toHaveLength(0);
+    expect(m.notifications[0].data.email_pending).toBe(true);
+  });
+
+  it('keeps held leads held when the still-waiting read fails, then sends them next run', async () => {
+    const m = memoryStore({
+      leads: [lead('a', 'u1', 12)],
+      agents: laAgent,
+      notifications: [heldRow('a', 'u1', 8)],
+      failWaitingRead: true,
+    });
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.errors[0]).toContain('reading held leads');
+    expect(m.emails).toHaveLength(0);
+    expect(m.notifications[0].data.email_pending).toBe(true);
+  });
+
+  it('a held row another run already released is not emailed again', async () => {
+    const m = memoryStore({
+      leads: [lead('a', 'u1', 12)],
+      agents: laAgent,
+      notifications: [{ ...heldRow('a', 'u1', 8), data: { lead_id: 'a', hours_waiting: 4 } }],
+    });
+    // A stale listing: the row was released between the read and the update.
+    m.store.listHeldChases = async () => [
+      { notificationId: 'held-a', user_id: 'u1', lead_id: 'a', data: { lead_id: 'a', email_pending: true } },
+    ];
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.released).toBe(0);
+    expect(report.claimed).toBe(0);
+    expect(m.emails).toHaveLength(0);
+  });
+
+  it('a failed held read is reported but new leads are still chased', async () => {
+    const m = memoryStore({ leads: [lead('a', 'u1', 3)], failHeldRead: true });
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.claimed).toBe(1);
+    expect(m.emails).toHaveLength(1);
+    expect(report.errors).toEqual(['reading held chases: held read timeout']);
   });
 });
 

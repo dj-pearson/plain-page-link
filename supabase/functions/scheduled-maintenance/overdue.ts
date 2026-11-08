@@ -29,8 +29,20 @@
  * claimed. A lead is therefore chased at most once, and a missed run is made
  * up by the next one as long as the lead is still inside the window.
  *
+ * US-457 (US-318): quiet hours. An agent with profiles.timezone set is not
+ * emailed between 21:00 and 07:00 on their own clock. The notification is
+ * still claimed on time, so the bell shows the lead at once; the claim
+ * carries data.email_pending, and the first run after 07:00 local emails
+ * every held lead that is still unanswered, folded into that run's email.
+ * Releasing a held row is itself a conditional claim (only the run that
+ * clears email_pending sends), so a held lead is still emailed at most once.
+ * An agent with no zone is emailed at once, as before: guessing UTC would
+ * hold an American agent's emails through their afternoon.
+ *
  * No Deno globals here, so it runs under vitest.
  */
+
+import { normalizeTimeZone, zonedParts } from '../_shared/timeZone.ts';
 
 /** Settings offers these (src/components/settings/LeadNotificationPreferences.tsx). */
 export const SLA_HOURS_OPTIONS = [1, 2, 4, 8, 24] as const;
@@ -53,6 +65,10 @@ const EMAIL_LIST_LIMIT = 10;
 
 export const OVERDUE_NOTIFICATION_TYPE = 'lead_overdue';
 
+/** No chase email from QUIET_START_HOUR:00 until QUIET_END_HOUR:00, agent's local time. */
+export const QUIET_START_HOUR = 21;
+export const QUIET_END_HOUR = 7;
+
 const HOUR_MS = 3_600_000;
 
 export interface OverdueLead {
@@ -66,6 +82,8 @@ export interface OverdueLead {
 export interface OverdueAgent {
   email: string | null;
   preferences: Record<string, unknown> | null;
+  /** profiles.timezone. Null or unusable means no quiet hours (emailed at once). */
+  timeZone?: string | null;
 }
 
 export interface OverdueNotification {
@@ -73,7 +91,15 @@ export interface OverdueNotification {
   type: string;
   title: string;
   message: string;
-  data: { lead_id: string; hours_waiting: number };
+  data: { lead_id: string; hours_waiting: number; email_pending?: true };
+}
+
+/** A claimed chase whose email was held for the agent's quiet hours. */
+export interface HeldChase {
+  notificationId: string;
+  user_id: string;
+  lead_id: string;
+  data: Record<string, unknown>;
 }
 
 /** Everything the chaser touches. Each method throws on a failed read or write. */
@@ -90,6 +116,15 @@ export interface OverdueStore {
   getAgents(userIds: string[]): Promise<Map<string, OverdueAgent>>;
   /** Insert the notification. 'duplicate' when the lead was already chased. */
   claim(notification: OverdueNotification): Promise<'claimed' | 'duplicate'>;
+  /** lead_overdue notifications created at or after `since` whose email is still held. */
+  listHeldChases(since: string): Promise<HeldChase[]>;
+  /** Of these lead ids, the leads still `new` with no response. */
+  listStillWaiting(leadIds: string[]): Promise<OverdueLead[]>;
+  /**
+   * Clear email_pending on one held row, only if it is still set. True when
+   * this call cleared it (this run owns the email), false when another run did.
+   */
+  releaseHeld(held: HeldChase): Promise<boolean>;
   sendEmail(email: { to: string; subject: string; body: string }): Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -99,6 +134,10 @@ export interface OverdueReport {
   alreadyChased: number;
   notYetDue: number;
   chasingOff: number;
+  /** Leads claimed during the agent's quiet hours, email held until morning. */
+  held: number;
+  /** Held leads emailed this run, now the agent's quiet hours are over. */
+  released: number;
   truncated: boolean;
   errors: string[];
 }
@@ -123,14 +162,31 @@ export function hoursWaiting(lead: Pick<OverdueLead, 'created_at'>, now: Date): 
   return Math.floor((now.getTime() - new Date(lead.created_at).getTime()) / HOUR_MS);
 }
 
-export function buildChaseNotification(lead: OverdueLead, now: Date): OverdueNotification {
+/**
+ * True while `timeZone`'s wall clock is in [QUIET_START_HOUR, QUIET_END_HOUR).
+ * An unset or unusable zone has no quiet hours.
+ */
+export function inQuietHours(now: Date, timeZone: string | null | undefined): boolean {
+  const zone = normalizeTimeZone(timeZone);
+  if (!zone) return false;
+  const { hour } = zonedParts(now, zone);
+  return hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR;
+}
+
+export function buildChaseNotification(
+  lead: OverdueLead,
+  now: Date,
+  opts: { holdEmail?: boolean } = {}
+): OverdueNotification {
   const hours = hoursWaiting(lead, now);
   return {
     user_id: lead.user_id,
     type: OVERDUE_NOTIFICATION_TYPE,
     title: `${lead.name} is still waiting`,
     message: `This ${lead.lead_type ?? 'lead'} has had no response for ${hours}h.`,
-    data: { lead_id: lead.id, hours_waiting: hours },
+    data: opts.holdEmail
+      ? { lead_id: lead.id, hours_waiting: hours, email_pending: true }
+      : { lead_id: lead.id, hours_waiting: hours },
   };
 }
 
@@ -188,6 +244,8 @@ export async function chaseOverdueLeads(
     alreadyChased: 0,
     notYetDue: 0,
     chasingOff: 0,
+    held: 0,
+    released: 0,
     truncated: false,
     errors: [],
   };
@@ -204,7 +262,17 @@ export async function chaseOverdueLeads(
       break;
     }
   }
-  if (candidates.length === 0) return report;
+
+  // Emails held overnight. A failed read only delays them to the next run; it
+  // must not stop new leads being chased.
+  let heldChases: HeldChase[] = [];
+  try {
+    heldChases = await store.listHeldChases(from);
+  } catch (error) {
+    report.errors.push(`reading held chases: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  if (candidates.length === 0 && heldChases.length === 0) return report;
 
   const byAgent = new Map<string, OverdueLead[]>();
   for (const lead of candidates) {
@@ -230,11 +298,17 @@ export async function chaseOverdueLeads(
     if (pending.length > 0) pendingBy.set(agentId, pending);
   }
 
+  const heldBy = new Map<string, HeldChase[]>();
+  for (const held of heldChases) {
+    heldBy.set(held.user_id, [...(heldBy.get(held.user_id) ?? []), held]);
+  }
+
   // Every address in one read per chunk (US-378: this was two round trips per
-  // agent). A failed chunk leaves its agents' leads unclaimed for next run.
+  // agent). A failed chunk leaves its agents' leads unclaimed (and held
+  // emails held) for next run.
   const agents = new Map<string, OverdueAgent>();
   const readFailed = new Set<string>();
-  for (const ids of chunk([...pendingBy.keys()], 200)) {
+  for (const ids of chunk([...new Set([...pendingBy.keys(), ...heldBy.keys()])], 200)) {
     try {
       for (const [id, agent] of await store.getAgents(ids)) agents.set(id, agent);
     } catch (error) {
@@ -245,7 +319,55 @@ export async function chaseOverdueLeads(
     }
   }
 
-  for (const [agentId, pending] of pendingBy) {
+  // Held emails whose agent is out of quiet hours. Which leads are still
+  // waiting is read before anything is released, so a failed read leaves
+  // them all held for the next run instead of releasing them unsent.
+  const releasedBy = new Map<string, OverdueLead[]>();
+  const dueHeld = [...heldBy].filter(([agentId]) => {
+    const agent = agents.get(agentId);
+    return agent !== undefined && !inQuietHours(now, agent.timeZone);
+  });
+  if (dueHeld.length > 0) {
+    const waiting = new Map<string, OverdueLead>();
+    let waitingRead = true;
+    try {
+      const leadIds = dueHeld.flatMap(([, rows]) => rows.map((row) => row.lead_id));
+      for (const ids of chunk(leadIds, 200)) {
+        for (const lead of await store.listStillWaiting(ids)) waiting.set(lead.id, lead);
+      }
+    } catch (error) {
+      waitingRead = false;
+      report.errors.push(`reading held leads: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (waitingRead) {
+      for (const [agentId, rows] of dueHeld) {
+        const chasingOn = agents.get(agentId)?.preferences?.leads !== 'off';
+        const toEmail: OverdueLead[] = [];
+        for (const row of rows) {
+          try {
+            if (!(await store.releaseHeld(row))) continue;
+          } catch (error) {
+            report.errors.push(
+              `releasing held lead ${row.lead_id.slice(0, 8)}: ${error instanceof Error ? error.message : String(error)}`
+            );
+            continue;
+          }
+          // Answered overnight, deleted, or chasing since turned off: released
+          // without an email.
+          const lead = waiting.get(row.lead_id);
+          if (lead && lead.user_id === agentId && chasingOn) toEmail.push(lead);
+        }
+        if (toEmail.length > 0) {
+          releasedBy.set(agentId, toEmail);
+          report.released += toEmail.length;
+        }
+      }
+    }
+  }
+
+  for (const agentId of new Set([...pendingBy.keys(), ...releasedBy.keys()])) {
+    const pending = pendingBy.get(agentId) ?? [];
+    const released = releasedBy.get(agentId) ?? [];
     const agent = agents.get(agentId);
     if (!agent) {
       // Leave the leads unclaimed so the next run tries again.
@@ -257,6 +379,7 @@ export async function chaseOverdueLeads(
       continue;
     }
 
+    const quiet = inQuietHours(now, agent.timeZone);
     const slaMs = slaHoursFor(agent.preferences) * HOUR_MS;
     const claimedNow: OverdueLead[] = [];
     for (const lead of pending) {
@@ -265,13 +388,14 @@ export async function chaseOverdueLeads(
         continue;
       }
       try {
-        const outcome = await store.claim(buildChaseNotification(lead, now));
+        const outcome = await store.claim(buildChaseNotification(lead, now, { holdEmail: quiet }));
         if (outcome === 'duplicate') {
           report.alreadyChased++;
           continue;
         }
         claimedNow.push(lead);
         report.claimed++;
+        if (quiet) report.held++;
       } catch (error) {
         report.errors.push(
           `lead ${lead.id.slice(0, 8)}: ${error instanceof Error ? error.message : String(error)}`
@@ -281,8 +405,12 @@ export async function chaseOverdueLeads(
 
     // The claim is what makes this at-most-once: a lead whose email fails is
     // still in the agent's notifications and is not emailed again.
-    if (claimedNow.length > 0 && agent.email) {
-      const email = buildChaseEmail(claimedNow, siteUrl, now);
+    // In quiet hours the claim carries email_pending and the morning run
+    // sends it; otherwise this run's claims and any leads released from
+    // overnight go out in one email.
+    const toEmail = quiet ? [] : [...released, ...claimedNow];
+    if (toEmail.length > 0 && agent.email) {
+      const email = buildChaseEmail(toEmail, siteUrl, now);
       const result = await store.sendEmail({ to: agent.email, ...email });
       if (result.ok) report.agentsEmailed++;
       else report.errors.push(`email to agent ${agentId.slice(0, 8)} failed: ${result.error ?? 'unknown'}`);
@@ -297,6 +425,8 @@ export function summarizeOverdueReport(report: OverdueReport): string {
     `chased ${report.claimed}, agents emailed ${report.agentsEmailed}, ` +
     `already chased ${report.alreadyChased}, not yet due ${report.notYetDue}, ` +
     `chasing off ${report.chasingOff}` +
+    (report.held > 0 ? `, held for quiet hours ${report.held}` : '') +
+    (report.released > 0 ? `, released after quiet hours ${report.released}` : '') +
     (report.truncated ? `, stopped at ${MAX_CANDIDATES} candidates` : '')
   );
 }
