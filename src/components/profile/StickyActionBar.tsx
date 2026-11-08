@@ -47,19 +47,20 @@ export function StickyActionBar({
 
   // Define available actions based on profile.
   //
-  // US-206: Text and Schedule were bg-green-600 and bg-orange-600, which give
-  // white label text 3.30:1 and 3.56:1. Call, Email and Home Value were already
-  // above 4.5:1 on their 600 shades — green and orange are simply the two hues
-  // where the 600 step is not dark enough, which is why only one of the five
-  // ever showed up in a report.
+  // Every button used to carry its own fixed hue (blue, green, purple, orange,
+  // indigo), so the bar on a page themed in forest green or black still read as
+  // a rainbow of stock colours, and the first thing a phone visitor saw ignored
+  // the agent's theme (US-464). The colours now come from the theme alone:
+  // the first action is filled with the theme primary (--primary, which
+  // PROFILE_MAIN_STYLE points at --theme-primary on the public page, with a
+  // contrast-picked foreground), the rest are a light tint of it carrying
+  // near-black text, so contrast holds whatever colour the agent picked.
   const actions = [
     profile.phone && {
       id: 'phone',
       label: 'Call',
       icon: Phone,
       action: () => handleAction('phone', profile.phone ?? ''),
-      color: 'bg-blue-600 hover:bg-blue-700',
-      mobileColor: 'bg-blue-600',
     },
     profile.phone &&
       profile.sms_enabled && {
@@ -67,41 +68,36 @@ export function StickyActionBar({
         label: 'Text',
         icon: MessageSquare,
         action: () => handleAction('sms', profile.phone ?? ''),
-        color: 'bg-green-700 hover:bg-green-800',
-        mobileColor: 'bg-green-700',
       },
     profile.email_display && {
       id: 'email',
       label: 'Email',
       icon: Mail,
       action: () => handleAction('email', profile.email_display ?? ''),
-      color: 'bg-purple-600 hover:bg-purple-700',
-      mobileColor: 'bg-purple-600',
     },
     onScheduleShowing && {
       id: 'schedule',
       label: 'Schedule',
       icon: Calendar,
       action: () => handleAction('schedule'),
-      color: 'bg-orange-700 hover:bg-orange-800',
-      mobileColor: 'bg-orange-700',
     },
     onGetHomeValue && {
       id: 'valuation',
       label: 'Home Value',
       icon: Home,
       action: () => handleAction('valuation'),
-      color: 'bg-indigo-600 hover:bg-indigo-700',
-      mobileColor: 'bg-indigo-600',
     },
   ].filter(Boolean) as Array<{
     id: string;
     label: string;
     icon: React.ElementType;
     action: () => void;
-    color: string;
-    mobileColor: string;
   }>;
+
+  const actionColor = (index: number) =>
+    index === 0
+      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+      : 'bg-primary/10 text-gray-900 hover:bg-primary/20';
 
   // If no actions available, don't render
   if (actions.length === 0) {
@@ -126,7 +122,7 @@ export function StickyActionBar({
               className="fixed bottom-20 left-0 right-0 z-50 px-4"
               style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
-              <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-gray-900">Quick Actions</h3>
                   <button
@@ -138,21 +134,22 @@ export function StickyActionBar({
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {actions.map((action) => {
+                  {actions.map((action, index) => {
                     const Icon = action.icon;
                     return (
                       <button
                         key={action.id}
+                        type="button"
                         onClick={() => {
                           action.action();
                           setIsExpanded(false);
                         }}
                         className={cn(
-                          'flex flex-col items-center gap-2 p-4 rounded-xl text-white font-semibold transition-all',
-                          action.color
+                          'flex flex-col items-center gap-2 p-4 rounded-xl font-semibold transition-colors',
+                          actionColor(index)
                         )}
                       >
-                        <Icon className="h-6 w-6" />
+                        <Icon className="h-6 w-6" aria-hidden="true" />
                         <span className="text-sm">{action.label}</span>
                       </button>
                     );
@@ -201,21 +198,22 @@ export function StickyActionBar({
           transition={{ delay: 0.5, type: 'spring', damping: 25, stiffness: 200 }}
           className="fixed right-6 top-1/2 -translate-y-1/2 z-40"
         >
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-4 w-[200px]">
+          <div className="bg-white rounded-2xl shadow-2xl p-4 w-[200px]">
             <h3 className="font-semibold text-gray-900 mb-3 text-center text-sm">Quick Contact</h3>
             <div className="space-y-2">
-              {actions.map((action) => {
+              {actions.map((action, index) => {
                 const Icon = action.icon;
                 return (
                   <button
                     key={action.id}
+                    type="button"
                     onClick={action.action}
                     className={cn(
-                      'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white font-semibold transition-all text-sm',
-                      action.color
+                      'w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold transition-colors text-sm',
+                      actionColor(index)
                     )}
                   >
-                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                     <span>{action.label}</span>
                   </button>
                 );
