@@ -83,27 +83,35 @@ function sameValue(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export function mergeRepeatEnquiry(earlier: EarlierLead, incoming: RepeatEnquiry): RepeatMerge {
-  const earlierMessage = clean(earlier.message);
-  const incomingMessage = clean(incoming.message);
+/**
+ * Add a later message from the same visitor to the one already stored, never
+ * replacing it. Used by the repeat fold and by step two of a form (US-565).
+ * A message that repeats one already stored is not news and adds nothing.
+ */
+export function appendVisitorMessage(
+  earlierMessage: string | null | undefined,
+  incomingMessage: string | null | undefined
+): { message: string | null; isNew: boolean } {
+  const earlier = clean(earlierMessage);
+  const incoming = clean(incomingMessage);
 
   // New unless it repeats one of the messages already stored: a resubmission
   // of the same text is not news, a short reply that happens to appear inside
   // a longer earlier message still is.
-  const storedMessages = earlierMessage.split(MESSAGE_SEPARATOR.trim()).map((part) => part.trim());
-  const messageIsNew = incomingMessage !== '' && !storedMessages.includes(incomingMessage);
+  const storedMessages = earlier.split(MESSAGE_SEPARATOR.trim()).map((part) => part.trim());
+  const isNew = incoming !== '' && !storedMessages.includes(incoming);
+  if (!isNew) return { message: earlierMessage ?? null, isNew };
+  if (earlier === '') return { message: incoming, isNew };
 
-  let message: string | null = earlier.message;
-  if (messageIsNew) {
-    if (earlierMessage === '') {
-      message = incomingMessage;
-    } else {
-      const combined = `${earlierMessage}${MESSAGE_SEPARATOR}${incomingMessage}`;
-      // Over the cap the stored copy is cut, never the earlier words.
-      message =
-        combined.length > MERGED_MESSAGE_MAX ? `${combined.slice(0, MERGED_MESSAGE_MAX - 1)}…` : combined;
-    }
-  }
+  const combined = `${earlier}${MESSAGE_SEPARATOR}${incoming}`;
+  // Over the cap the stored copy is cut, never the earlier words.
+  const message =
+    combined.length > MERGED_MESSAGE_MAX ? `${combined.slice(0, MERGED_MESSAGE_MAX - 1)}…` : combined;
+  return { message, isNew };
+}
+
+export function mergeRepeatEnquiry(earlier: EarlierLead, incoming: RepeatEnquiry): RepeatMerge {
+  const { message, isNew: messageIsNew } = appendVisitorMessage(earlier.message, incoming.message);
 
   const earlierForm = earlier.form_data ?? {};
   const incomingForm = incoming.form_data ?? {};

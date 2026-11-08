@@ -7,6 +7,7 @@
  * columns and form_data, never who the lead belongs to or how to reach them.
  */
 import { sanitizeString, validateStringLength } from './validation.ts';
+import { appendVisitorMessage } from './lead-repeat.ts';
 
 export const ENRICH_TOKEN_TTL_MINUTES = 30;
 export const ENRICH_TOKEN_RE = /^[0-9a-f]{64}$/;
@@ -67,4 +68,34 @@ export function buildEnrichment(raw: Record<string, unknown>): EnrichmentUpdate 
   }
 
   return { columns, formData, errors };
+}
+
+/** The lead as step two finds it: what step one already stored. */
+export interface EnrichTarget {
+  message: string | null;
+  form_data: Record<string, unknown> | null;
+}
+
+/**
+ * The columns step two writes onto the lead (updated_at and the token reset
+ * are the caller's).
+ *
+ * The qualifiers are step two's to set, but leads.message is what the visitor
+ * wrote in step one, often the very text the agent was just emailed about.
+ * Writing buildEnrichment's message straight over it threw that away (US-565),
+ * the same overwrite US-513 fixed for the repeat fold, so a step-two message
+ * is appended to the step-one message instead. form_data answers are merged,
+ * a later answer to the same question winning.
+ */
+export function enrichmentUpdate(target: EnrichTarget, enrichment: EnrichmentUpdate): Record<string, unknown> {
+  const { message: incomingMessage, ...qualifiers } = enrichment.columns;
+  const update: Record<string, unknown> = {
+    ...qualifiers,
+    form_data: { ...(target.form_data ?? {}), ...enrichment.formData },
+  };
+  if (typeof incomingMessage === 'string') {
+    const { message, isNew } = appendVisitorMessage(target.message, incomingMessage);
+    if (isNew) update.message = message;
+  }
+  return update;
 }
