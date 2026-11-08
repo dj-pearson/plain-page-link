@@ -202,8 +202,8 @@ export function useGDPR() {
         title: 'Data Export Complete',
         description: 'Your data has been downloaded successfully.',
       });
-      // The GET closes a pending queued request, if there was one.
-      queryClient.invalidateQueries({ queryKey: ['exportRequests'] });
+      // The GET leaves any queued request as it was (US-424), so the list of
+      // requests is unchanged and needs no refetch.
     },
     onError: (error: Error) => {
       if (shouldOfferQueuedExport(error)) {

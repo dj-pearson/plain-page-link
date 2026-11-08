@@ -78,10 +78,12 @@ describe('describeExportRequest', () => {
     expect(v.tone).toBe('neutral');
   });
 
-  it('a request closed by an immediate download is completed with no link', () => {
+  it('a request an older immediate download closed says no link was sent', () => {
     const v = describeExportRequest(row({ status: 'completed' }), NOW);
-    expect(v.label).toBe('Completed');
-    expect(v.detail).toBeNull();
+    expect(v.label).toBe('Closed');
+    expect(v.tone).toBe('neutral');
+    expect(v.detail).toMatch(/no link was emailed/i);
+    expect(v.canResend).toBe(false);
   });
 
   it('a failed request gives the reason in words for the subject', () => {

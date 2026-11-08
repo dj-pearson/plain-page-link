@@ -1,7 +1,8 @@
 /**
  * GDPR Data Export Edge Function
  *
- * GET builds the export in this request and returns it as a download.
+ * GET builds the export in this request and returns it as a download. It
+ * does not touch the subject's queued requests (US-424).
  * POST queues it: scheduled-maintenance builds the same document into the
  * private gdpr-exports bucket and emails the subject a link that expires
  * (US-397, _shared/gdpr-export-queue.ts). An account too large to export in one
@@ -202,31 +203,10 @@ serve(async (req: Request) => {
       // decryptSecret passes through any value that is not enc:v1: prefixed.
       const exportData = await buildExportDocument(user, collected, decryptSecret);
 
-      // Close the newest pending export request, if the subject made one.
-      // A request the queue has already claimed is 'processing' and is left
-      // to it.
-      // (An UPDATE with order/limit is not something PostgREST does by
-      // default, so find the row first and update it by id.)
-      const { data: pending, error: pendingError } = await serviceSupabase
-        .from('gdpr_data_requests')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('request_type', 'export')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (pendingError) {
-        console.error('[gdpr-export] could not read pending export request:', pendingError.message);
-      } else if (pending) {
-        const { error: closeError } = await serviceSupabase
-          .from('gdpr_data_requests')
-          .update({ status: 'completed', completed_at: new Date().toISOString() })
-          .eq('id', pending.id);
-        if (closeError) {
-          console.error('[gdpr-export] could not close export request:', closeError.message);
-        }
-      }
+      // A queued export the subject made earlier is deliberately left alone
+      // (US-424). This download has no file in the bucket and sends no email,
+      // so marking the request completed showed 'Completed' with no link; the
+      // queue still builds it and emails the link the subject asked for.
 
       const { error: auditError } = await serviceSupabase.rpc('log_audit_event', {
         p_user_id: user.id,

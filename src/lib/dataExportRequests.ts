@@ -121,8 +121,15 @@ export function describeExportRequest(
                 'The link has expired and the file was deleted. Request a new export if you need one.',
             };
       }
-      // Closed by an immediate download rather than built by the queue.
-      return { ...base, label: 'Completed', tone: 'done', detail: null };
+      // Only the immediate download ever closed a request without a file: the
+      // queue always sets file_expires_at, and keeps it after the purge. It no
+      // longer does (US-424), but older rows were closed that way.
+      return {
+        ...base,
+        label: 'Closed',
+        tone: 'neutral',
+        detail: 'Closed when you used Download now. No link was emailed for this request.',
+      };
     }
     case 'failed':
       return {
