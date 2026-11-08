@@ -2346,6 +2346,25 @@ check('lead_stats counts every lead the caller owns, and only those', () => {
     for (const s of ['new', 'contacted', 'converted']) {
       if (stats.by_status?.[s] !== 40) out.push(`by_status.${s} is ${stats.by_status?.[s]}, expected 40`);
     }
+    // US-534: the assignee filter narrows the counts the way the list does.
+    // Hand 10 of my leads to `other`, then ask for theirs, mine unassigned,
+    // and (as `other`) the leads assigned to them.
+    q(`UPDATE public.leads SET assigned_to = '${other}'
+         WHERE id IN (SELECT id FROM public.leads WHERE user_id = '${me}' ORDER BY name LIMIT 10);`);
+    const asMe = (args) =>
+      JSON.parse(q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}'; SELECT public.lead_stats(${args})::text;`)[0]);
+    const held = asMe(`p_assignee => '${other}'`);
+    if (held.total !== 10) out.push(`p_assignee => other counted ${held.total}, expected 10`);
+    const unassigned = asMe(`p_assignee => 'unassigned'`);
+    if (unassigned.total !== 110) out.push(`p_assignee => 'unassigned' counted ${unassigned.total}, expected 110`);
+    const junk = asMe(`p_assignee => 'not-a-uuid'`);
+    if (junk.total !== 0) out.push(`a malformed p_assignee counted ${junk.total}, expected 0`);
+    if (asMe('').total !== 120) out.push('p_assignee left out no longer counts every owned lead');
+    const [assignedRaw] = q(
+      `SET ROLE authenticated; SET request.jwt.claim.sub = '${other}'; SELECT public.lead_stats(p_assignee => '${other}')::text;`
+    );
+    const assigned = JSON.parse(assignedRaw);
+    if (assigned.total !== 10) out.push(`an assignee's "assigned to me" counted ${assigned.total}, expected 10`);
     try {
       q(`SET ROLE anon; SELECT public.lead_stats();`);
       out.push('anon can call lead_stats');
