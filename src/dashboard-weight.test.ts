@@ -203,12 +203,9 @@ describe('dashboard-weight budgets cover the real routes (US-535)', () => {
     expect(ROUTE_MUST_NOT_INCLUDE['charts-vendor'].allow).toEqual([]);
   });
 
-  it('allows date-vendor only on the routes that still import date-fns (US-574)', () => {
-    // The allow list may only shrink. Adding a route here puts 6.2 KB gzip
-    // back on it; use src/lib/dateFormat.ts or relativeTime.ts instead.
-    expect(ROUTE_MUST_NOT_INCLUDE['date-vendor'].allow).toEqual([
-      'src/pages/dashboard/Clients.tsx',
-      'src/pages/dashboard/OpenHouses.tsx',
-    ]);
+  it('keeps date-vendor off every dashboard route (US-574, US-655)', () => {
+    // Adding a route here puts 6.2 KB gzip back on it; use
+    // src/lib/dateFormat.ts or relativeTime.ts instead.
+    expect(ROUTE_MUST_NOT_INCLUDE['date-vendor'].allow).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 import { lazy, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowWords } from '@/lib/relativeTime';
 import { AlertCircle, ChevronRight, Plus, RefreshCw, Search, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -297,7 +297,7 @@ export default function Clients() {
                           <NextTouch contact={c} now={now} />
                           <span className="text-muted-foreground">
                             {c.last_contacted_at
-                              ? `Last contacted ${formatDistanceToNow(new Date(c.last_contacted_at))} ago`
+                              ? `Last contacted ${formatDistanceToNowWords(new Date(c.last_contacted_at))} ago`
                               : 'Not contacted yet'}
                           </span>
                         </p>

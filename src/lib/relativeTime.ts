@@ -47,8 +47,16 @@ export function differenceInMonths(left: Date, right: Date): number {
   return result === 0 ? 0 : result;
 }
 
-/** The distance from `base` to `date` in words, with "ago" or "in". */
-export function formatDistanceWithSuffix(date: Date, base: Date): string {
+/**
+ * date-fns formatDistance(date, base) without a suffix: "3 days", "about 1
+ * hour". The direction is not stated. Used where the caller writes its own
+ * "ago" (US-655).
+ */
+export function formatDistanceWords(date: Date, base: Date): string {
+  return distance(date, base).words;
+}
+
+function distance(date: Date, base: Date): { words: string; comparison: number } {
   const comparison = compareAsc(date, base);
   if (Number.isNaN(date.getTime()) || Number.isNaN(base.getTime())) {
     throw new RangeError('Invalid time value');
@@ -92,6 +100,12 @@ export function formatDistanceWithSuffix(date: Date, base: Date): string {
     }
   }
 
+  return { words, comparison };
+}
+
+/** The distance from `base` to `date` in words, with "ago" or "in". */
+export function formatDistanceWithSuffix(date: Date, base: Date): string {
+  const { words, comparison } = distance(date, base);
   return comparison > 0 ? `in ${words}` : `${words} ago`;
 }
 
@@ -102,4 +116,12 @@ export function formatDistanceWithSuffix(date: Date, base: Date): string {
  */
 export function formatDistanceToNowWithSuffix(date: Date | number): string {
   return formatDistanceWithSuffix(date instanceof Date ? date : new Date(date), new Date());
+}
+
+/**
+ * date-fns formatDistanceToNow(date) without a suffix: the distance from now,
+ * in words, either direction. Throws RangeError on an invalid date.
+ */
+export function formatDistanceToNowWords(date: Date | number): string {
+  return formatDistanceWords(date instanceof Date ? date : new Date(date), new Date());
 }

@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { formatDistance, differenceInMonths as dfDifferenceInMonths } from 'date-fns';
-import { formatDistanceWithSuffix, differenceInMonths } from './relativeTime';
+import {
+  formatDistanceWithSuffix,
+  formatDistanceWords,
+  formatDistanceToNowWords,
+  differenceInMonths,
+} from './relativeTime';
 import { formatRelativeTime } from './format';
 
 const SECOND = 1000;
@@ -105,5 +110,33 @@ describe('formatDistanceWithSuffix (US-558)', () => {
     expect(formatRelativeTime(new Date(Date.now() - 10 * SECOND).toISOString())).toBe(
       'less than a minute ago'
     );
+  });
+});
+
+describe('formatDistanceWords (US-655)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('matches date-fns formatDistance without a suffix, past and future', () => {
+    const next = rng(655);
+    for (let i = 0; i < 3000; i++) {
+      const magnitude = 10 ** (next() * 11.8);
+      const sign = next() < 0.5 ? -1 : 1;
+      const baseMs = Date.UTC(2020, 0, 1) + next() * 8 * 365 * DAY;
+      const b = new Date(baseMs);
+      const date = new Date(baseMs + sign * magnitude);
+      expect(formatDistanceWords(date, b), `${b.toISOString()} -> ${date.toISOString()}`).toBe(
+        formatDistance(date, b)
+      );
+    }
+  });
+
+  it('measures from now and throws on an invalid date', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 8, 12, 0, 0));
+    expect(formatDistanceToNowWords(new Date(2026, 10, 5, 12, 0, 0))).toBe('3 days');
+    expect(formatDistanceToNowWords(new Date(2026, 10, 8, 14, 0, 0).getTime())).toBe(
+      'about 2 hours'
+    );
+    expect(() => formatDistanceToNowWords(new Date('nope'))).toThrow(RangeError);
   });
 });
