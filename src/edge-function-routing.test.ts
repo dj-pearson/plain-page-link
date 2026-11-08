@@ -81,6 +81,29 @@ describe('edge-function routing (US-199)', () => {
     expect(unreachable).toEqual([]);
   });
 
+  it('calls functions on VITE_FUNCTIONS_URL, not supabase.functions.invoke (US-611)', () => {
+    // supabase.functions.invoke posts to ${VITE_SUPABASE_URL}/functions/v1.
+    // Kong sends that to the self-hosted edge runtime, which has no functions
+    // deployed and answers every name with a 500 (docs/deploy/edge-functions.md).
+    // The functions are served at VITE_FUNCTIONS_URL, which callEdgeFunction
+    // uses. The public review page called invoke() and every review failed.
+    //
+    // KNOWN is the existing caller nobody has moved yet; it belongs to another
+    // lane and is recorded as a finding. Shrink this list, never grow it.
+    const KNOWN = new Set(['src/lib/pii.ts']);
+    const offenders = sourceFiles(join(ROOT, 'src'))
+      .filter((file) => {
+        // Comments may name it (this change's own explanation does); calls may not.
+        const code = readFileSync(file, 'utf-8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/^\s*\/\/.*$/gm, '');
+        return /supabase\s*\.\s*functions\s*\.\s*invoke\b/.test(code);
+      })
+      .map((file) => file.slice(ROOT.length + 1))
+      .filter((file) => !KNOWN.has(file));
+    expect(offenders).toEqual([]);
+  });
+
   it('routes nothing that does not exist', () => {
     // The old map's 'submit-contact' named a directory that is not in the repo.
     // Its entry would have thrown on import rather than 404ing, which is the
