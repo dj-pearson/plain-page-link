@@ -9,10 +9,11 @@
  * the same key labels as leads' (_shared/spam-guard.ts), so equal hashes mean
  * equal addresses or numbers.
  *
- * There is no SQL backfill (the key is not in the database). Before matching,
- * this hashes a bounded batch of the caller's contacts that have never been
- * hashed, and says whether any remain, so the client can ask again until the
- * whole sphere is covered. A contact's fingerprints are cleared by trigger
+ * There is no SQL backfill (the key is not in the database). Contacts are
+ * hashed when they are written (pii-crypto index_contacts) and by
+ * scheduled-maintenance (US-640); as a last resort this still hashes a bounded
+ * batch of the caller's never-hashed contacts before matching, and says
+ * whether any remain, so the client can ask again. A contact's fingerprints are cleared by trigger
  * whenever its ciphertext changes (20261108000629), so edited contacts come
  * back through here too.
  *
@@ -22,7 +23,16 @@
  *
  * No Deno globals, so vitest covers it (contactMatch.test.ts).
  */
-import { emailLookupHash, phoneLookupHash } from '../_shared/spam-guard.ts';
+import {
+  hashUnhashedContacts,
+  lookupHashes,
+  type ContactHashDeps,
+  type ContactHashes,
+  type UnhashedContactRow,
+} from '../_shared/contact-lookup-hashes.ts';
+
+export { lookupHashes };
+export type { ContactHashes, UnhashedContactRow };
 
 /** Contacts hashed per call: up to two 100k-iteration PBKDF2 decrypts each. */
 export const HASH_BATCH = 40;
@@ -36,18 +46,6 @@ export interface MatchLeadRow {
   assigned_to: string | null;
   encrypted_email: string | null;
   encrypted_phone: string | null;
-}
-
-export interface UnhashedContactRow {
-  id: string;
-  encrypted_email: string | null;
-  encrypted_phone: string | null;
-  updated_at: string;
-}
-
-export interface ContactHashes {
-  email_hash: string | null;
-  phone_hash: string | null;
 }
 
 export interface CandidateRow extends ContactHashes {
@@ -71,30 +69,10 @@ export type MatchResult =
   | { status: 'locked' }
   | { status: 'ok'; matches: ContactMatch[]; complete: boolean };
 
-export interface ContactMatchDeps {
-  hashSecret: string;
-  /** Plaintext, or null when the value is empty or will not decrypt. */
-  decrypt(value: string | null): Promise<string | null>;
+export interface ContactMatchDeps extends ContactHashDeps {
   loadLead(leadId: string): Promise<MatchLeadRow | null>;
   isLeadLocked(ownerId: string, leadId: string): Promise<boolean>;
-  /** Up to `limit` of the user's contacts with no lookup_hashed_at. */
-  loadUnhashedContacts(userId: string, limit: number): Promise<UnhashedContactRow[]>;
-  /** Stores the fingerprints, unless the row changed since it was read. */
-  saveContactHashes(row: UnhashedContactRow, hashes: ContactHashes): Promise<void>;
   findCandidates(userId: string, hashes: ContactHashes): Promise<CandidateRow[]>;
-}
-
-/** Both fingerprints of a plaintext email/phone pair. */
-export async function lookupHashes(
-  email: string | null,
-  phone: string | null,
-  secret: string
-): Promise<ContactHashes> {
-  const [emailHash, phoneHash] = await Promise.all([
-    email ? emailLookupHash(email, secret) : Promise.resolve(null),
-    phone ? phoneLookupHash(phone, secret) : Promise.resolve(null),
-  ]);
-  return { email_hash: emailHash, phone_hash: phoneHash };
 }
 
 export async function matchContactsForLead(
@@ -123,21 +101,9 @@ export async function matchContactsForLead(
     return { status: 'ok', matches: [], complete: true };
   }
 
-  // One more than the batch tells us whether any remain after this call.
-  const unhashed = await deps.loadUnhashedContacts(callerId, batch + 1);
-  const toHash = unhashed.slice(0, batch);
-  await Promise.all(
-    toHash.map(async (row) => {
-      const [contactEmail, contactPhone] = await Promise.all([
-        deps.decrypt(row.encrypted_email),
-        deps.decrypt(row.encrypted_phone),
-      ]);
-      await deps.saveContactHashes(
-        row,
-        await lookupHashes(contactEmail, contactPhone, deps.hashSecret)
-      );
-    })
-  );
+  // A row that fails to hash stays unhashed and is retried next call (or by
+  // scheduled-maintenance); it does not stop the match.
+  const hashing = await hashUnhashedContacts(deps, callerId, batch);
 
   const candidates = await deps.findCandidates(callerId, leadHashes);
   const matches: ContactMatch[] = [];
@@ -160,6 +126,6 @@ export async function matchContactsForLead(
   return {
     status: 'ok',
     matches: matches.slice(0, MAX_MATCHES),
-    complete: unhashed.length <= batch,
+    complete: hashing.complete,
   };
 }

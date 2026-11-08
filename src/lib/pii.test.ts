@@ -6,6 +6,7 @@ import {
   decryptLeadContacts,
   decryptOwnProfilePhone,
   findContactsMatchingLead,
+  indexOwnContacts,
 } from './pii';
 
 /**
@@ -85,6 +86,10 @@ vi.mock('@/integrations/supabase/client', () => ({
         if (body.op === 'match_contacts_for_lead') {
           const reply = matchReplies.length > 1 ? matchReplies.shift() : matchReplies[0];
           return { data: reply ?? null, error: null };
+        }
+
+        if (body.op === 'index_contacts') {
+          return { data: { hashed: 1, failed: 0, complete: true }, error: null };
         }
 
         if (body.op === 'decrypt_profile') {
@@ -259,5 +264,17 @@ describe('findContactsMatchingLead (US-629)', () => {
   it('throws when pii-crypto cannot answer, so the caller can decide', async () => {
     failNextCall = true;
     await expect(findContactsMatchingLead('lead-1')).rejects.toThrow();
+  });
+});
+
+describe('indexOwnContacts (US-640)', () => {
+  it('sends only the op: the rows are chosen by the JWT, not the caller', async () => {
+    expect(await indexOwnContacts()).toBe(true);
+    expect(invocations).toEqual([{ op: 'index_contacts', body: { op: 'index_contacts' } }]);
+  });
+
+  it('never throws when pii-crypto is unreachable', async () => {
+    failNextCall = true;
+    await expect(indexOwnContacts()).resolves.toBe(false);
   });
 });

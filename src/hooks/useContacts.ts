@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { decryptContactDetails, encryptPIIBatch } from '@/lib/pii';
+import { decryptContactDetails, encryptPIIBatch, indexOwnContacts } from '@/lib/pii';
 import { errorHandler } from '@/lib/errorHandler';
 
 type ContactRow = Database['public']['Tables']['contacts']['Row'];
@@ -253,7 +253,12 @@ export function useContacts() {
       if (error) throw error;
       return data.id as string;
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      // US-640: fingerprint the new contact now, so converting a lead with
+      // the same email or phone finds it. Best-effort; never awaited.
+      void indexOwnContacts();
+    },
     onError: (error) =>
       errorHandler.captureException(error as Error, {
         action: 'create_contact',
@@ -272,7 +277,13 @@ export function useContacts() {
         .eq('user_id', user.id);
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onSuccess: (_data, { input }) => {
+      invalidate();
+      // US-640: a changed email or phone clears the contact's fingerprints
+      // (trigger, 20261108000629); recompute them now rather than leaving the
+      // contact invisible to the duplicate check until the next sweep.
+      if (input.email !== undefined || input.phone !== undefined) void indexOwnContacts();
+    },
     onError: (error) =>
       errorHandler.captureException(error as Error, {
         action: 'update_contact',
