@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { PageConfig, BlockConfig } from '@/types/pageBuilder';
-import type { PageBlock, PageTheme, PageSEO } from '@/types/pageBuilder';
+import type { BlockType, PageBlock, PageTheme, PageSEO } from '@/types/pageBuilder';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
@@ -31,12 +31,18 @@ interface PageBuilderStore {
   isSaving: boolean;
 
   // Actions
-  setPage: (page: PageConfig | null) => void;
+  /**
+   * Open a page in the editor. `saved: true` says the page is exactly what is
+   * stored (opened from the list or loaded by id), so it is not dirty and
+   * autosave does not rewrite it on open. A page that has never been written —
+   * one just created from a template — omits it, and autosave inserts it.
+   */
+  setPage: (page: PageConfig | null, options?: { saved?: boolean }) => void;
   loadPage: (pageId: string) => Promise<void>;
   loadUserPages: () => Promise<PageConfig[]>;
   selectBlock: (blockId: string | null) => void;
   setIsDragging: (isDragging: boolean) => void;
-  addBlockToPage: (type: any, position?: number) => Promise<void>;
+  addBlockToPage: (type: BlockType, position?: number) => Promise<void>;
   removeBlockFromPage: (blockId: string) => void;
   updateBlockConfig: (blockId: string, config: Partial<BlockConfig>) => void;
   reorderPageBlocks: (sourceIndex: number, destIndex: number) => void;
@@ -96,13 +102,19 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
   lastSavedSnapshot: null,
 
   // Set the current page
-  setPage: (page) => {
+  //
+  // lastSavedSnapshot is reset here as well. It used to survive a page switch,
+  // so it still held the previous page's snapshot: every page opened looked
+  // dirty, and autosave rewrote it three seconds after opening — bumping its
+  // updated_at, which is what the page list sorts by (US-671).
+  setPage: (page, options) => {
     if (page === null) {
       set({
         page: null,
         history: [],
         historyIndex: -1,
         selectedBlockId: null,
+        lastSavedSnapshot: null,
       });
     } else {
       set({
@@ -110,6 +122,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         history: [page],
         historyIndex: 0,
         selectedBlockId: null,
+        lastSavedSnapshot: options?.saved ? pageSnapshot(page) : null,
       });
     }
   },
@@ -142,7 +155,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         updatedAt: new Date(data.updated_at),
       };
 
-      get().setPage(pageConfig);
+      get().setPage(pageConfig, { saved: true });
     } catch (error) {
       logger.error('Failed to load page', error as Error);
       toast.error('Failed to load page');
@@ -200,9 +213,16 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
   },
 
   // Add a block to the page (with auto-population)
+  //
+  // Auto-population fetches the agent's profile and listings, so this awaits
+  // the network. It used to build the result from the page as it was when the
+  // click happened and then overwrite whatever the page had become: a second
+  // block added before the first had populated replaced the first, and a
+  // keystroke typed meanwhile was rolled back (US-671). Only the new block is
+  // taken from the populated copy; it is spliced into the page as it is now.
   addBlockToPage: async (type, position) => {
-    const { page, history, historyIndex } = get();
-    if (!page) return;
+    const startPage = get().page;
+    if (!startPage) return;
 
     try {
       // Get current user for auto-population
@@ -210,7 +230,29 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         data: { user },
       } = await supabase.auth.getUser();
 
-      const newPage = await addBlock(page, type, position, user?.id);
+      const populated = await addBlock({ ...startPage, blocks: [] }, type, undefined, user?.id);
+      const newBlock = populated.blocks[0];
+      if (!newBlock) return;
+
+      const { page, history, historyIndex } = get();
+      // The agent left this page, or opened another, while the block populated.
+      if (!page || page.id !== startPage.id) return;
+
+      const at =
+        position !== undefined
+          ? Math.max(0, Math.min(position, page.blocks.length))
+          : page.blocks.length;
+      const blocks = [...page.blocks];
+      blocks.splice(at, 0, newBlock);
+      const newPage: PageConfig = {
+        ...page,
+        // New objects, not `block.order = index` on the existing ones: those
+        // are shared with the undo history.
+        blocks: blocks.map((block, index) =>
+          block.order === index ? block : { ...block, order: index }
+        ),
+        updatedAt: new Date(),
+      };
       const newHistory = history.slice(0, historyIndex + 1);
       newHistory.push(newPage);
 
@@ -218,7 +260,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         page: newPage,
         history: newHistory,
         historyIndex: newHistory.length - 1,
-        selectedBlockId: newPage.blocks[newPage.blocks.length - 1]?.id,
+        selectedBlockId: newBlock.id,
       });
     } catch (error) {
       logger.error('Error adding block', error as Error);
@@ -438,12 +480,31 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
   },
 
   // Publish page
+  //
+  // If the write fails the page goes back to its earlier published state.
+  // Otherwise the badge read "Published" under a "Failed to publish" toast, and
+  // the still-dirty page was published by autosave three seconds later, after
+  // the agent had been told it was not (US-671).
   publishPage: async () => {
     const { page, updatePageMeta, savePage } = get();
     if (!page) return;
+    const wasPublished = page.published;
 
     updatePageMeta({ published: true });
-    await savePage();
+    try {
+      await savePage();
+    } catch (error) {
+      if (!wasPublished) {
+        const { page: current, history, historyIndex } = get();
+        if (current && current.id === page.id && current.published) {
+          const reverted = { ...current, published: false };
+          const newHistory = [...history];
+          newHistory[historyIndex] = reverted;
+          set({ page: reverted, history: newHistory });
+        }
+      }
+      throw error;
+    }
   },
 
   // Set as active page (will be shown on profile)

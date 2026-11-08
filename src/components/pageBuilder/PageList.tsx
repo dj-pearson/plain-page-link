@@ -198,7 +198,9 @@ export function PageList() {
   };
 
   const handleEdit = (page: PageConfig) => {
-    setPage(page);
+    // Straight from the database, so not dirty: autosave must not rewrite it
+    // just because it was opened (US-671).
+    setPage(page, { saved: true });
     navigate('/dashboard/page-builder');
   };
 
