@@ -10,9 +10,19 @@ import { mockAuthenticatedUser } from '@/test/mocks/auth';
 let queryResult: MockQueryResult;
 let authUser: { id: string } | null;
 const fromMock = vi.fn((_table: string) => createQueryBuilder(queryResult));
+const removeMock = vi.fn(
+  async (_paths: string[]): Promise<{ data: unknown; error: { message: string } | null }> => ({
+    data: [],
+    error: null,
+  })
+);
+const storageFromMock = vi.fn((_bucket: string) => ({ remove: removeMock }));
 
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (table: string) => fromMock(table) },
+  supabase: {
+    from: (table: string) => fromMock(table),
+    storage: { from: (bucket: string) => storageFromMock(bucket) },
+  },
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
@@ -257,6 +267,123 @@ describe('useListings', () => {
       expect(caught).toBeTruthy();
       expect(cachedIds()).toEqual(['a', 'b', 'c']);
       expect(logAuditEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * US-451: deleting a listing, or dropping a photo from one, only changed the
+   * row, so the originals and their WebP variants stayed public in the bucket.
+   */
+  describe('photo cleanup', () => {
+    const BASE = 'https://db.example.com/storage/v1/object/public/listing-photos';
+    const uid = mockAuthenticatedUser.id;
+    const photo = (name: string) => `${BASE}/${uid}/l1/${name}`;
+    const rows = [
+      {
+        ...listingRow,
+        id: 'l1',
+        photos: [photo('a.jpg'), photo('b.jpg'), photo('shared.jpg')],
+        image: photo('a.jpg'),
+      },
+      { ...listingRow, id: 'l2', photos: [photo('shared.jpg')], image: null },
+    ];
+    let client: QueryClient;
+    const clientWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const variants = (name: string) => {
+      const stem = `${uid}/l1/${name.replace(/\.jpg$/, '')}`;
+      return [`${uid}/l1/${name}`, `${stem}-200.webp`, `${stem}-400.webp`, `${stem}-800.webp`];
+    };
+
+    beforeEach(() => {
+      client = createTestQueryClient();
+      client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity, staleTime: 0 } });
+      queryResult = { data: rows, error: null };
+      fromMock.mockImplementation(() => createQueryBuilder(queryResult));
+      removeMock.mockClear();
+      storageFromMock.mockClear();
+    });
+
+    const loaded = async () => {
+      const hook = renderHook(() => useListings(), { wrapper: clientWrapper });
+      await waitFor(() => expect(hook.result.current.listings).toHaveLength(2));
+      return hook;
+    };
+
+    it('removes a deleted listing photos and variants, keeping ones another listing uses', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: [{ id: 'l1' }], error: null }));
+
+      await act(async () => {
+        await result.current.deleteListing.mutateAsync('l1');
+      });
+
+      await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+      expect(storageFromMock).toHaveBeenCalledWith('listing-photos');
+      const removed = removeMock.mock.calls[0][0];
+      expect(removed).toEqual([...variants('a.jpg'), ...variants('b.jpg')]);
+      expect(removed).not.toContain(`${uid}/l1/shared.jpg`);
+    });
+
+    it('leaves storage alone when the delete removed no row', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: [], error: null }));
+
+      await act(async () => {
+        await result.current.deleteListing.mutateAsync('l1');
+      });
+      expect(removeMock).not.toHaveBeenCalled();
+    });
+
+    it('leaves storage alone when the delete fails', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() =>
+        createQueryBuilder({ data: null, error: { message: 'permission denied' } })
+      );
+
+      await act(async () => {
+        await result.current.deleteListing.mutateAsync('l1').catch(() => undefined);
+      });
+      expect(removeMock).not.toHaveBeenCalled();
+    });
+
+    it('removes only the photos an edit drops', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: rows[0], error: null }));
+
+      await act(async () => {
+        await result.current.updateListing.mutateAsync({
+          id: 'l1',
+          photos: [photo('b.jpg'), photo('shared.jpg')],
+          image: photo('b.jpg'),
+        });
+      });
+
+      await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+      expect(removeMock.mock.calls[0][0]).toEqual(variants('a.jpg'));
+    });
+
+    it('does not touch storage for an edit that leaves photos alone', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: rows[0], error: null }));
+
+      await act(async () => {
+        await result.current.updateListing.mutateAsync({ id: 'l1', price: '1' });
+      });
+      expect(removeMock).not.toHaveBeenCalled();
+    });
+
+    it('still resolves the delete when storage refuses the cleanup', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: [{ id: 'l1' }], error: null }));
+      removeMock.mockResolvedValueOnce({ data: null, error: { message: 'storage down' } });
+
+      let caught: unknown;
+      await act(async () => {
+        await result.current.deleteListing.mutateAsync('l1').catch((e: unknown) => (caught = e));
+      });
+      await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+      expect(caught).toBeUndefined();
     });
   });
 
