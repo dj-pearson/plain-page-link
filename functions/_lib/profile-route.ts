@@ -396,6 +396,9 @@ export async function serveProfileRoute(
   // Undefined means injectSocialTags' heading-and-summary body.
   let body: string | undefined;
   let listingGone = false;
+  // The page an answer engine reads about the agent (US-539): /:username, and
+  // the legacy /:username?listing=<id> whenever that listing is not described.
+  let wantsProfileBody = !listingId;
 
   if (listingId) {
     const lookup = await fetchVisibleListing(base, apiKey, profile.id, listingId);
@@ -418,13 +421,19 @@ export async function serveProfileRoute(
     // turn every listing URL into a deindexing event. The legacy
     // /:username?listing= link stays 200, because that URL is the profile.
     listingGone = listingPath && lookup.state === 'hidden';
+    // The legacy link IS the profile (it stays 200), so when its listing is
+    // not shown it gets the profile's body, not just the heading and summary
+    // (US-552). The body is held to the same visibility rule, so the hidden
+    // home is never named there either. /:username/listing/:id is the
+    // listing's own address and keeps the agent card.
+    wantsProfileBody = !listingPath && lookup.state !== 'visible';
   }
 
   // The agent's page itself: what answer engines read about them (US-539).
   // Read alongside the document rather than before it.
   const [assetResponse, bodyOptions] = await Promise.all([
     next(),
-    listingId ? Promise.resolve(null) : fetchProfileBodyOptions(base, apiKey, profile.id),
+    wantsProfileBody ? fetchProfileBodyOptions(base, apiKey, profile.id) : Promise.resolve(null),
   ]);
   if (bodyOptions) {
     // The JSON-LD names the same visible homes the body lists (US-551).
@@ -456,7 +465,7 @@ export async function serveProfileRoute(
     );
   }
 
-  headers.set('x-agentbio-prerender', listingId ? 'listing' : 'profile');
+  headers.set('x-agentbio-prerender', wantsProfileBody ? 'profile' : 'listing');
 
   return new Response(linkProfileManifest(injectSocialTags(html, tags, body), username), {
     status: assetResponse.status,
