@@ -10,6 +10,7 @@ import {
   buildProfileTags,
   injectSocialTags,
   isCrawler,
+  isReservedNonRoute,
   isReservedSegment,
   type ListingMeta,
   type ProfileMeta,
@@ -187,8 +188,15 @@ export async function serveProfileRoute(
 ): Promise<Response> {
   const { request, env, next } = context;
 
-  if (!segment || isReservedSegment(segment)) {
+  if (!segment) {
     return next();
+  }
+  if (isReservedSegment(segment)) {
+    // A reserved word that is not a page (/about, /legal, /api, ...) is a 404
+    // for crawlers and people alike (US-435). It used to fall through to the
+    // /:username rewrite and answer 200 with the homepage. Real routes and
+    // assets still fall through untouched.
+    return isReservedNonRoute(segment) ? notFoundResponse(context) : next();
   }
 
   // Usernames are stored lower case, so /JaneDoe used to query

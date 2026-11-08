@@ -133,6 +133,42 @@ export function isReservedSegment(segment: string): boolean {
   return RESERVED_SEGMENTS.has(segment.toLowerCase());
 }
 
+/**
+ * Reserved segments that are not pages on their own (US-435).
+ *
+ * Each is kept out of the username lookup, but App.tsx has no route at the bare
+ * segment: /auth and /onboarding are prefixes whose children are routes,
+ * /assets and /icons are asset directories, /api holds only /api/sentry, and
+ * /legal, /about, /contact, /help and /support have never been URLs here.
+ * Being one segment, each matched the /:username rule and answered 200 with the
+ * prerendered homepage — a soft 404. The profile route answers them with
+ * dist/404.html instead.
+ *
+ * Not here: segments that ARE routes (/dashboard, /admin, /blog, /tools,
+ * /pricing) and the two prefixes _redirects sends to the homepage with a 301
+ * (/features, /for). src/spa-routes.test.ts holds every reserved segment to one
+ * of those three answers, so a new entry has to say which it is.
+ */
+const RESERVED_NON_ROUTE_SEGMENTS = new Set([
+  'auth',
+  'onboarding',
+  'legal',
+  'about',
+  'contact',
+  'help',
+  'support',
+  'api',
+  'assets',
+  'icons',
+]);
+
+export function isReservedNonRoute(segment: string): boolean {
+  return RESERVED_NON_ROUTE_SEGMENTS.has(segment.toLowerCase());
+}
+
+/** Every named reserved segment, for the test that holds each to an answer. */
+export const RESERVED_SEGMENT_NAMES: readonly string[] = [...RESERVED_SEGMENTS];
+
 function escapeAttribute(value: string): string {
   return value
     .replace(/&/g, '&amp;')

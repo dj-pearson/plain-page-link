@@ -216,12 +216,51 @@ describe('GET /:username', () => {
   });
 
   it('does not touch an app route that happens to be one segment', async () => {
-    for (const segment of ['dashboard', 'auth', 'blog']) {
+    for (const segment of ['dashboard', 'pricing', 'blog']) {
       fetchMock.mockClear();
-      const { promise } = call({ path: `/${segment}`, username: segment });
-      await promise;
+      const next = vi.fn(async () => indexResponse());
+      const response = await call({ path: `/${segment}`, username: segment, next }).promise;
       expect(fetchMock, segment).not.toHaveBeenCalled();
+      expect(next, segment).toHaveBeenCalledTimes(1);
+      expect(response.status, segment).toBe(200);
     }
+  });
+
+  it('answers 404 for a reserved word that is not a page, for people and crawlers (US-435)', async () => {
+    // /about, /legal, /api ... are kept out of the username lookup but are not
+    // routes; they used to fall through to the /:username rewrite and answer
+    // 200 with the prerendered homepage.
+    for (const userAgent of [CRAWLER, HUMAN]) {
+      for (const segment of [
+        'about',
+        'legal',
+        'contact',
+        'help',
+        'support',
+        'api',
+        'auth',
+        'About',
+      ]) {
+        fetchMock.mockClear();
+        const next = vi.fn(async () => indexResponse());
+        const response = await call({ path: `/${segment}`, username: segment, userAgent, next })
+          .promise;
+        expect(response.status, segment).toBe(404);
+        expect(await response.text(), segment).toBe(NOT_FOUND_HTML);
+        expect(response.headers.get('x-agentbio-prerender'), segment).toBe('not-found');
+        expect(next, segment).not.toHaveBeenCalled();
+        expect(fetchMock, segment).not.toHaveBeenCalled();
+      }
+    }
+  });
+
+  it('still serves an asset whose name is reserved', async () => {
+    const next = vi.fn(
+      async () => new Response('User-agent: *', { headers: { 'content-type': 'text/plain' } })
+    );
+    const response = await call({ path: '/robots.txt', username: 'robots.txt', next }).promise;
+    expect(response.status).toBe(200);
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('describes the listing when one is deep-linked', async () => {
