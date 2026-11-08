@@ -57,7 +57,12 @@ app and the frontend depend on each other in both directions:
    - a public avatar or listing photo URL still loads while signed out;
    - an agent can replace their avatar;
    - with the anon key, `storage.from('listing-photos').list('')` returns `[]`.
-6. **Search consoles.** Submit `/sitemap-profiles.xml` to Google Search
+6. **Check the pages.dev alias.** `curl -sI https://agentbio.pages.dev/` shows
+   `x-robots-tag: noindex`; `curl -sI https://agentbio.net/` shows none.
+7. **Stripe setting.** Check "after all retries fail" in the Stripe dashboard.
+   If it cancels the subscription, access ends then; if it leaves it unpaid,
+   the past-due grace (now counted from the last paid period) ends access.
+8. **Search consoles.** Submit `/sitemap-profiles.xml` to Google Search
    Console and Bing if you have not already.
 
 ## Migrations not yet in production (filename order)
@@ -97,6 +102,8 @@ app and the frontend depend on each other in both directions:
 20261108000557_lead_stats_type_search_filter.sql
 20261108000559_lead_lookup_hashes_not_browser_readable.sql
 20261108000592_storage_media_not_listable.sql
+20261108000610_contact_touch_follows_deleted_interactions.sql
+20261108000615_past_due_grace_from_paid_period.sql
 ```
 
 ## What changes for users the moment it ships

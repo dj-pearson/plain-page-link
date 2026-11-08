@@ -6258,3 +6258,88 @@ Other findings:
 - [mobile] src/components/layout/DashboardLayout.tsx:147: the sticky header uses safe-area-inset-top with no padding clash today. If someone later adds py-* to the <header> element itself, the new guard test will catch it.
 - [mobile] src/components/mobile/MobileNav.tsx:72: the nav's bottom padding is the bare inset. That is correct for the bar, but any future content placed above it should use the calc pattern, not stacked classes.
 - [mobile] docs/architecture/TECH_SPEC_PWA_MOBILE.md still says 'Ready for Development' and describes a Laravel backend, an IndexedDB sync manager and FCM push. All three conflict with the owner decisions (no push) and with the code. Fold the cleanup into US-511.
+
+---
+
+## Continuous improvement loop — round 17 — 2026-11-08 (US-609 to US-618 done)
+
+Nine approved outright; enterprise needed one fix-up. No merge conflicts. Closed US-511, US-597, US-601, US-605, US-606, US-607. Security found any signed-up account could auto-publish blog articles and submit URLs to Google as AgentBio; profile found every public review submission failed (sent to a runtime that serves nothing). CLAUDE.md no longer lists the deleted offline-storage files.
+Final: tsc clean (app + node config), 3159 unit tests pass (from 3100), verify:migrations OK (91 files), vite build OK, eslint 556 warnings (CI ratchet 560 -> 556).
+
+- US-609 [listings] Importing a CSV of listings reloaded the whole listing list and sent an audit call once for every row
+- US-610 [leads] Deleting a wrongly logged touch no longer hides a client from the stay-in-touch due list
+- US-611 [profile] Reviews submitted on the public review page always failed, because they were sent to an edge runtime that serves nothing
+- US-612 [uiux] A failed notification-settings read let the next save reset every other setting to its default
+- US-613 [performance] The listing page served the uploaded original photo (often several MB) as its largest image
+- US-614 [security] Any signed-up account could auto-publish articles on the company blog and submit URLs to Google as AgentBio
+- US-615 [enterprise] A past-due agent kept paid features for a whole unpaid billing period plus 7 days
+- US-616 [marketing] The welcome email promised video tutorials, a community and a live page that might not exist, and failed sends were silent
+- US-617 [seo] The production agentbio.pages.dev alias was still indexable, duplicating every agent and listing page
+- US-618 [mobile] Unused offline-storage code and its idb package removed; the dashboard's "Due today" Done button is now a 44px tap target on phones and can't send a completion twice
+
+Owner actions:
+- US-610: Apply migration supabase/migrations/20261108000610_contact_touch_follows_deleted_interactions.sql (it only replaces a function and its trigger; no data changes and no new grants)
+- US-612: Redeploy Cloudflare Pages (frontend only). There is no migration, edge function or secret.
+- US-613: Redeploy Cloudflare Pages (frontend only). No migration, no edge-function deploy, no secret.
+- US-614: Redeploy the edge-functions image (functions.agentbio.net, Coolify) so that generate-article and google-indexing pick up the admin gate
+- US-615: Apply migration 20261108000615_past_due_grace_from_paid_period.sql to production. It replaces public.resolve_user_plan.
+- US-615: Optional, from the US-605 notes: check the Stripe dashboard setting 'after all retries fail'. If it cancels, customer.subscription.deleted already cuts access. If it leaves subscriptions past_due or unpaid, this migration is what ends the grace after 7 days.
+- US-616: Redeploy the send-welcome-email edge function (functions.agentbio.net / Coolify image) so the new template and the EMAIL_SEND_FAILED response go live
+- US-617: Redeploy Cloudflare Pages: there is a new Functions middleware at functions/_middleware.ts. No migration, no edge-function deploy and no new secret.
+- US-617: After deploy, check two things. `curl -sI https://agentbio.pages.dev/` should show `x-robots-tag: noindex`. `curl -sI https://agentbio.net/` should show no x-robots-tag header.
+- US-617: Confirm the Pages project's VITE_APP_URL is unset or https://agentbio.net. If it names another origin, agentbio.net itself is still never marked, but the host that variable names is treated as canonical too.
+- US-618: CLAUDE.md still lists src/hooks/useOfflineStorage.ts (line 142) and src/lib/offline-storage.ts (lines 157, 1081, 1150). Both files are now deleted. Remove those lines; I did not edit CLAUDE.md
+
+Opened:
+- US-619 [listings] verify:schema case: a multi-row listings insert cannot exceed the plan limit
+- US-620 [leads] Avoid duplicate clients when converting a lead whose email already belongs to a contact
+- US-621 [leads] Carry the lead's property and area onto the contact when converting
+- US-622 [profile] Move pii-crypto calls off supabase.functions.invoke
+- US-623 [uiux] TimeZoneSetting: a failed time-zone read shows the 'not saved yet' prompt
+- US-624 [uiux] ProfileDisplaySettings: a failed active-page read reads as 'no custom page'
+- US-625 [performance] Preload the next photo in the listing-page gallery
+- US-626 [marketing] Activation nudge for agents who finish onboarding but never publish, add a listing or get a lead
+- US-627 [listings] Open-house form time zone + past dates
+
+Other findings:
+- [listings] src/components/openHouses/OpenHouseFormDialog.tsx:76-79 and :70-72: defaultDate() uses the browser's 'today' (date-fns nextSaturday) and toIso() reads the date and time as the browser's local time, not the agent's stored time zone. progress.txt US-549 says the open-house form was moved to the stored time zone, but this file does not do that. An agent scheduling while travelling saves the open house at the wrong instant.
+- [listings] src/components/openHouses/OpenHouseFormDialog.tsx:51-65: the schema accepts a date in the past. An agent can 'schedule' an open house that is already over: it lands under Past at once, counts against open_houses_per_month, and the kiosk takes sign-ins for it for up to 12 hours afterwards.
+- [listings] src/components/openHouses/OpenHouseFormDialog.tsx: there is no overlap warning when a second open house is scheduled at the same time on the same listing.
+- [listings] US-598 (optional photo-URL column in the CSV import) is still open. It now fits on top of buildCsvListing and the batched path without other changes.
+- [listings] The lint-staged pre-commit hook again wrote a backup entry (c006a65) into the git stash that all worktrees share.
+- [leads] Nothing on the server stops contact_interactions.occurred_at being in the future. ContactDetail.tsx:597 sets max=today on the date input, but a direct PostgREST insert with a future occurred_at moves last_contacted_at ahead and pushes next_touch_at out. A CHECK (occurred_at <= now() + interval '1 day') or a LEAST(...,now()) in the trigger would close this.
+- [leads] AddLeadToClientsButton.tsx:25 calls useContacts(), which loads the whole contacts list (up to 2000 rows) just to get createContact, on every lead detail open. Splitting the create mutation out would remove that query.
+- [leads] No CSV import exists for contacts (US-129 is still open). An agent with an existing past-client list has to type every client in one by one.
+- [leads] US-463 can be marked passing. The LegacyLead family is already gone from src/types/lead.ts.
+- [leads] The lint-staged pre-commit hook again wrote a backup entry (56b3811) into the git stash that all worktrees share.
+- [profile] src/lib/pii.ts:42,116,146,173: supabase.functions.invoke('pii-crypto') reaches ${SUPABASE_URL}/functions/v1. docs/deploy/edge-functions.md:18 measured that host returning 500 for every name, so lead decryption and PII encryption may be broken in production. I allowlisted it in the new guard instead of fixing it, because it is outside this lane.
+- [profile] src/pages/public/SubmitReview.tsx: the page still reads the profile with a direct profiles select. If the profile is unpublished it shows 'Agent Not Found', while submit-review answers 'not accepting reviews'. That is consistent, but an agent who sends review links before publishing gets clients who see 'not found'. The dashboard's RequestTestimonialModal could warn when the profile is unpublished.
+- [profile] src/pages/public/SubmitReview.tsx uses bg-gradient-to-br from-blue-50 to-purple-50 on every state. The craft floor in CLAUDE.md lists blue/purple gradients as a default to refuse. A uiux polish item.
+- [uiux] src/hooks/useAgentTimeZone.ts and TimeZoneSetting.tsx:27 have the same failed-read-as-unsaved pattern, recorded as a next slice.
+- [uiux] When routing rules fail to load, the LeadRoutingRules 'Add' form stays enabled. Creating a rule is safe, but the agent cannot see existing priorities. Consider disabling Add until the rules have loaded.
+- [uiux] US-601 can be marked passed for PlanUsageCard and the Clients key-dates/activity panels. Testimonials already met it. Settings is done for notifications and routing rules; TimeZoneSetting and ProfileDisplaySettings remain.
+- [performance] src/pages/public/ListingPage.tsx ~251: the 32px breadcrumb avatar loads the full stored avatar_url. It belongs with US-604.
+- [performance] src/components/pageBuilder/blocks/ImageBlock.tsx:71 and GalleryBlock.tsx:87,178 render agent-supplied image URLs with no width/height or loading=lazy. That can cause layout shift and eager downloads on page-builder pages. These are arbitrary URLs, so variants do not apply.
+- [performance] src/components/listings/SocialShareDialog.tsx:153 and ListingPhotoManager.tsx:118 (dashboard) load listing originals for small previews. sizedImage(…, 400) would do.
+- [performance] The lint-staged pre-commit hook again wrote a backup entry (15a9c5f) into the git stash that all worktrees share.
+- [performance] US-603, US-604, US-581 and US-582 are still open; I did not take them this round.
+- [security] docs/setup/MAKE_COM_INTEGRATION.md still says generate-article accepts x-api-key (US-444). It now accepts only an admin JWT or the service-role key. The owner still needs to decide whether the doc should be corrected or ab_ API keys wired in.
+- [security] supabase/functions/_shared/service-auth.ts:12-19: isServiceRoleRequest compares the bearer token with === (not constant-time) and takes everything after 'Bearer ' with no scheme check. Low risk, but a timing-safe compare would be cheap. Every requireAdminOrServiceRole caller depends on it.
+- [security] src/hooks/useGoogleIndexing.ts and EdgeFunctions.submitGoogleIndexing (src/lib/edgeFunctions.ts:368) have no callers. Either wire them into the admin SEO screens or delete them.
+- [enterprise] [enterprise] verify:schema fails locally on 'every table referenced in code exists' because of placeholder strings in supabase/functions/_shared/resend-webhook.test.ts (0123456789abcdefghijklmn, nmlkjihgfedcba9876543210). The table-reference scan should skip them (e.g. exclude *.test.ts or allowlist them), or CI's verify-backend job will go red.
+- [enterprise] [enterprise] supabase/functions/stripe-webhook/handler.ts dunning path still ignores the result of deps.sendEmail ({ok:false} is silent), as progress.txt already notes. Not taken this round.
+- [enterprise] [enterprise] If create-checkout-session ever switches proration_behavior to 'always_invoice', a failed mid-period proration invoice could make a subscription past_due within a paid period. The 7-day grace from current_period_start would then cut access early. The comment in migration 20261108000615 records this assumption.
+- [enterprise] [enterprise] US-467 still needs the product decision recorded. US-528, US-549, US-567, US-583, US-584 and US-386 remain open.
+- [marketing] US-606 (hosted-Supabase OAuth fallback drops attribution) is still open. Its first criterion, deciding whether the fallback is still supported, is an owner decision, so I did not take it.
+- [marketing] supabase/functions/send-welcome-email/index.ts has no once-only guard or rate limit. Any signed-in agent can call it repeatedly and receive the email again. It only reaches their own address, so the risk is low, but a welcome_email_sent_at marker would make it idempotent.
+- [marketing] src/pages/auth/Register.tsx:157 toast says 'Welcome to AgentBio. Setting up your profile...'. src/pages/dashboard/Overview.tsx:46 says 'Welcome Back!' to anyone not flagged as new. This is the same wording problem progress.txt noted for AuthCallback.
+- [marketing] The welcome email footer still has no postal address. That needs the owner's address (same blocker as US-447). The email is transactional, so CAN-SPAM's footer rules apply less strictly than for marketing email.
+- [marketing] Other places that may assume edgeFunctions.invoke throws should be checked: grep 'edgeFunctions.invoke' for try/catch-only error handling with the same silent-failure pattern.
+- [seo] US-389's remaining criterion can probably be marked passing. The custom-domain canonical decision is recorded in functions/_lib/site-origin.ts:15-22: nothing routes a custom domain to a profile, so the configured origin is canonical.
+- [seo] I am assuming that adding a root _middleware.ts does not change how many requests invoke Functions (and so Workers billing), because the dynamic functions/[username].ts route should already make Pages' generated _routes.json include all paths. I did not check this against a real deploy. If the generated routes turn out to be narrower, the middleware only marks the routes it is included on, and a public/_routes.json would be needed to cover static assets on the alias.
+- [seo] US-608 (llms.txt names agent pages and /sitemap-profiles.xml) and US-530 (named AI-bot groups in public/robots.txt do not inherit Disallow: /api/) are both small and still open for the next seo round.
+- [seo] If www.agentbio.net is bound to the Pages project, it is now noindex. A 301 from www to the apex would be better than a header for that host. That is a Cloudflare dashboard redirect rule, not code.
+- [mobile] CLAUDE.md:142,157,1081,1150 still refer to the deleted useOfflineStorage.ts and offline-storage.ts. The 'Mobile & PWA' key-files list also names src/lib/sync-manager.ts, which was deleted in US-494
+- [mobile] docs/architecture/TECH_SPEC_PWA_MOBILE.md is still mostly the October 2025 plan (Laravel backend, FCM push sections 5.x). I added a current-state note at the top; it may be worth rewriting or moving to docs/archive/
+- [mobile] docs/setup/GETTING_STARTED.md:240-250 still lists a Laravel/MySQL backend and 'Zustand or Redux Toolkit', which is stale
+- [mobile] DueFollowUps: once the update succeeds the button is enabled again until the tasks query refetches, so a quick second tap in that gap re-sends the (idempotent) update and shows a second toast. Updating the cached list optimistically would close that gap

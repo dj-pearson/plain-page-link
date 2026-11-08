@@ -139,7 +139,6 @@ plain-page-link/
 │   │   ├── useSubscription.ts  # Subscription management
 │   │   ├── useArticles.ts      # Blog article management
 │   │   ├── useTestimonials.ts  # Testimonials management
-│   │   ├── useOfflineStorage.ts # PWA offline support
 │   │   ├── useAutoSave.ts      # Auto-save functionality
 │   │   └── use*.ts             # Other domain-specific hooks
 │   │
@@ -154,7 +153,6 @@ plain-page-link/
 │   │
 │   ├── lib/                # Utility libraries & helpers
 │   │   ├── errorHandler.ts         # Centralized error handling
-│   │   ├── offline-storage.ts      # IndexedDB for offline PWA
 │   │   ├── analytics.ts            # Analytics utilities
 │   │   ├── lead-scoring.ts         # Lead scoring algorithms
 │   │   ├── seo.ts                  # SEO utilities
@@ -1078,7 +1076,6 @@ logger.authEvent('login_success', user.id);
 
 **PWA Features:**
 - `usePullToRefresh` hook for mobile refresh patterns
-- Offline storage with IndexedDB (`src/lib/offline-storage.ts`)
 - 44px minimum touch targets for iOS compliance
 
 **Mobile Components (`src/components/mobile/`):**
@@ -1147,7 +1144,6 @@ try {
 ### Mobile & PWA
 
 - `src/hooks/usePullToRefresh.ts` - Pull-to-refresh functionality
-- `src/lib/offline-storage.ts` - IndexedDB offline storage
 - `src/components/mobile/MobileNav.tsx` - Mobile navigation
 
 ---
