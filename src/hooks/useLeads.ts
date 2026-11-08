@@ -288,16 +288,28 @@ export function useLeads(filters: LeadFilters = {}) {
    * was looking at (US-104).
    */
   const bulkUpdateStatus = useMutation({
-    mutationFn: async ({ ids, patch }: { ids: string[]; patch: Record<string, unknown> }) => {
+    mutationFn: async ({
+      ids,
+      patch,
+    }: {
+      ids: string[];
+      patch: Record<string, unknown>;
+    }): Promise<string[]> => {
       if (!user?.id) throw new Error('User not authenticated');
-      // Scoped by user_id as well as id: RLS covers it, but the same
-      // defence-in-depth the single-row mutations use.
-      const { error } = await supabase
+      if (ids.length === 0) return [];
+      // US-588: the owner OR the assignee, as the leads UPDATE policy allows
+      // (and as the detail dialog's single-lead status change already does).
+      // Scoped by user_id alone, a teammate's bulk change to the leads
+      // assigned to them matched no row and was reported as done. Returns the
+      // ids the server changed, so the page reports what really happened.
+      const { data, error } = await supabase
         .from('leads')
         .update(patch)
         .in('id', ids)
-        .eq('user_id', user.id);
+        .or(`user_id.eq.${user.id},assigned_to.eq.${user.id}`)
+        .select('id');
       if (error) throw error;
+      return (data ?? []).map((row) => row.id);
     },
     onSuccess: invalidateLeadCaches,
   });
@@ -328,11 +340,20 @@ export function useLeads(filters: LeadFilters = {}) {
     onSuccess: invalidateLeadCaches,
   });
 
+  // Only the owner can delete a lead (an assignee cannot destroy the team's
+  // record of it). Returns the ids the server actually deleted (US-588).
   const bulkDelete = useMutation({
-    mutationFn: async (ids: string[]) => {
+    mutationFn: async (ids: string[]): Promise<string[]> => {
       if (!user?.id) throw new Error('User not authenticated');
-      const { error } = await supabase.from('leads').delete().in('id', ids).eq('user_id', user.id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from('leads')
+        .delete()
+        .in('id', ids)
+        .eq('user_id', user.id)
+        .select('id');
       if (error) throw error;
+      return (data ?? []).map((row) => row.id);
     },
     onSuccess: invalidateLeadCaches,
   });
