@@ -78,6 +78,10 @@ const CRAWLER = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_u
 const HUMAN =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
 
+const MANIFEST_LINK = /<link\b[^>]*\brel=["']?manifest["']?[^>]*>/gi;
+const manifestLinks = (html: string) => html.match(MANIFEST_LINK) ?? [];
+const withoutManifestLinks = (html: string) => html.replace(MANIFEST_LINK, '');
+
 const indexResponse = () =>
   new Response(INDEX_HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
 
@@ -232,14 +236,49 @@ describe('GET /:username', () => {
     expect(html).toContain('<title>Jane Doe — Associate Broker at Summit Realty</title>');
   });
 
-  it('leaves a person the SPA untouched, and does not query the database for them', async () => {
+  it("gives a person the SPA naming the agent's manifest, without a database read (US-553)", async () => {
     const { promise, next } = call({ userAgent: HUMAN });
     const response = await promise;
+    const html = await response.text();
 
-    expect(await response.text()).toBe(INDEX_HTML);
+    expect(manifestLinks(html)).toEqual(['<link rel="manifest" href="/jane/manifest.json" />']);
+    // Apart from that one link, the document is the asset server's.
+    expect(withoutManifestLinks(html)).toBe(withoutManifestLinks(INDEX_HTML));
+    expect(response.status).toBe(200);
     expect(response.headers.get('x-agentbio-prerender')).toBeNull();
     expect(next).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("drops the asset's length and ETag but keeps its caching for a person", async () => {
+    const next = vi.fn(
+      async () =>
+        new Response(INDEX_HTML, {
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            'content-length': String(INDEX_HTML.length),
+            etag: '"asset-etag"',
+            'cache-control': 'public, max-age=0, must-revalidate',
+          },
+        })
+    );
+    const response = await call({ userAgent: HUMAN, next }).promise;
+    expect(response.headers.get('content-length')).toBeNull();
+    expect(response.headers.get('etag')).toBeNull();
+    expect(response.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate');
+  });
+
+  it('passes a non-HTML or failed asset response to a person unchanged', async () => {
+    for (const asset of [
+      new Response('{}', { headers: { 'content-type': 'application/json' } }),
+      new Response('<html><head></head></html>', {
+        status: 500,
+        headers: { 'content-type': 'text/html' },
+      }),
+    ]) {
+      const response = await call({ userAgent: HUMAN, next: async () => asset }).promise;
+      expect(response).toBe(asset);
+    }
   });
 
   it('does not touch an app route that happens to be one segment', async () => {
@@ -571,9 +610,11 @@ describe('/:username/listing/:listingId (US-275)', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('leaves a person the SPA untouched', async () => {
+  it("gives a person the SPA naming the agent's manifest (US-553)", async () => {
     const { promise, next } = callListing({ path: '/jane/listing/abc-123', userAgent: HUMAN });
-    expect(await (await promise).text()).toBe(INDEX_HTML);
+    const html = await (await promise).text();
+    expect(manifestLinks(html)).toEqual(['<link rel="manifest" href="/jane/manifest.json" />']);
+    expect(withoutManifestLinks(html)).toBe(withoutManifestLinks(INDEX_HTML));
     expect(next).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
