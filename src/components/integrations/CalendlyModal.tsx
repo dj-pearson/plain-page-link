@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +17,7 @@ import { useSpamGuard } from '@/hooks/useSpamGuard';
 import { HoneypotField } from '@/components/forms/HoneypotField';
 import { logger } from '@/lib/logger';
 import { trackFormSubmit } from '@/lib/analyticsEvents';
+import { httpsOnlyUrl } from '@/lib/profileUrls';
 
 /**
  * Schedule a showing through the agent's Calendly (US-221).
@@ -83,7 +90,8 @@ export function CalendlyModal({
         },
         spam: signals(),
       }).then((result) => {
-        if (!result.success) logger.error('Calendly booking lead was not recorded', new Error(result.error));
+        if (!result.success)
+          logger.error('Calendly booking lead was not recorded', new Error(result.error));
       });
     };
     window.addEventListener('message', onMessage);
@@ -96,26 +104,39 @@ export function CalendlyModal({
     setVisitor({ name: name.trim(), email: email.trim() });
   };
 
+  // US-290: only an https:// link is framed or linked. calendly_url is the
+  // agent's own text, rows saved before the US-456 check can hold anything,
+  // and CalendlyEmbed's fallback puts the URL in an <a href>.
+  const safeCalendlyUrl = httpsOnlyUrl(calendlyUrl);
   const attribution = getLeadAttribution();
   const url = visitor
-    ? buildCalendlyUrl(calendlyUrl, {
+    ? buildCalendlyUrl(safeCalendlyUrl, {
         name: visitor.name,
         email: visitor.email,
         listingAddress,
         utm: attribution,
       })
-    : calendlyUrl;
+    : safeCalendlyUrl;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="text-2xl font-semibold mb-1">{title}</DialogTitle>
-          <DialogDescription>{booked ? "You're booked — a confirmation is on its way." : subtitle}</DialogDescription>
-          {listingAddress && <p className="text-sm text-primary font-medium mt-2">Property: {listingAddress}</p>}
+          <DialogDescription>
+            {booked ? "You're booked — a confirmation is on its way." : subtitle}
+          </DialogDescription>
+          {listingAddress && (
+            <p className="text-sm text-primary font-medium mt-2">Property: {listingAddress}</p>
+          )}
         </DialogHeader>
 
-        {visitor ? (
+        {!safeCalendlyUrl ? (
+          <p className="p-6 text-sm text-muted-foreground">
+            Online booking isn&apos;t available for this agent right now. Use the contact form to
+            ask for a time instead.
+          </p>
+        ) : visitor ? (
           <div className="overflow-y-auto" style={{ height: '650px' }}>
             <CalendlyEmbed url={url} minHeight="650px" />
           </div>

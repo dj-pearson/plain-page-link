@@ -10,6 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SkeletonProfile } from '@/components/ui/skeleton';
 import { planLimitKeyFromError, UPGRADE_PATH } from '@/lib/planLimits';
 import { urlSchemeErrorFrom } from '@/lib/urlSchemeErrors';
+import {
+  normalizeProfileUrls,
+  PROFILE_URL_FIELDS,
+  PROFILE_URL_FIELD_NAMES,
+  type ProfileUrlErrors,
+  type ProfileUrlField,
+} from '@/lib/profileUrls';
 
 function emptyForm() {
   return {
@@ -133,6 +140,51 @@ function describeSaveError(error: unknown): SaveError {
   };
 }
 
+const INPUT_CLASS =
+  'w-full px-4 py-2 bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary';
+
+interface UrlInputProps {
+  field: ProfileUrlField;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder: string;
+  error?: string;
+}
+
+/**
+ * A profile link field (US-290). type="text" with inputMode="url" rather than
+ * type="url": the browser's URL check refuses "zillow.com/me", which the save
+ * now fixes by adding https://, and it accepts "javascript:x", which the save
+ * refuses — so the check runs in handleSubmit and the error is shown here.
+ */
+function UrlInput({ field, value, onChange, placeholder, error }: UrlInputProps) {
+  const errorId = `profile-${field}-error`;
+  return (
+    <>
+      <input
+        id={`profile-${field}`}
+        type="text"
+        inputMode="url"
+        autoComplete="url"
+        autoCapitalize="none"
+        spellCheck={false}
+        name={field}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        className={`${INPUT_CLASS} ${error ? 'border-destructive' : 'border-input'}`}
+      />
+      {error && (
+        <p id={errorId} className="mt-1 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function Profile() {
   const { profile, isLoading, updateProfile } = useProfile();
   const { uploadAvatar, uploading } = useAvatarUpload();
@@ -144,6 +196,8 @@ export default function Profile() {
   // What the server holds, as the form spells it — the baseline for "unsaved".
   const [savedForm, setSavedForm] = useState<ProfileForm>(emptyForm);
   const [saveError, setSaveError] = useState<SaveError | null>(null);
+  const [urlErrors, setUrlErrors] = useState<ProfileUrlErrors>({});
+  const [tab, setTab] = useState('basic');
   const hydrated = useRef(false);
 
   // States for managing array inputs
@@ -174,6 +228,13 @@ export default function Profile() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
+    if (name in urlErrors) {
+      setUrlErrors((prev) => {
+        const next = { ...prev };
+        delete next[name as ProfileUrlField];
+        return next;
+      });
+    }
     setFormData({
       ...formData,
       [name]: type === 'number' ? Number(value) : value,
@@ -288,7 +349,27 @@ export default function Profile() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveError(null);
-    const submitted = formData;
+    // US-290: check the link fields before anything is sent. A bare host
+    // gains https://; a value that is not a web address is refused next to
+    // its field, and the tab holding the first one is brought forward,
+    // because the other tabs are not mounted.
+    const { values: urls, errors } = normalizeProfileUrls(formData);
+    const refused = PROFILE_URL_FIELD_NAMES.filter((field) => errors[field]);
+    setUrlErrors(errors);
+    if (refused.length > 0) {
+      setTab(PROFILE_URL_FIELDS[refused[0]]);
+      setSaveError({
+        message:
+          refused.length === 1
+            ? `Your profile was not saved: ${errors[refused[0]]}`
+            : 'Your profile was not saved: some links are not web addresses. Fix the fields marked below.',
+        planLimit: false,
+      });
+      return;
+    }
+    const submitted = { ...formData, ...urls };
+    // Show what will be stored ("https://zillow.com/me", not "zillow.com/me").
+    setFormData(submitted);
     try {
       // The username is not editable here any more, so it must not be sent:
       // this form used to submit whatever was in the field, raw and
@@ -425,7 +506,7 @@ export default function Profile() {
       </div>
 
       {/* Tabbed Content */}
-      <Tabs defaultValue="basic" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="basic">Basic Info</TabsTrigger>
           <TabsTrigger value="professional">Professional</TabsTrigger>
@@ -815,14 +896,12 @@ export default function Profile() {
                 >
                   Website URL
                 </label>
-                <input
-                  id="profile-website_url"
-                  type="url"
-                  name="website_url"
+                <UrlInput
+                  field="website_url"
                   value={formData.website_url}
                   onChange={handleChange}
                   placeholder="https://yourwebsite.com"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.website_url}
                 />
               </div>
               <div className="md:col-span-2">
@@ -832,14 +911,12 @@ export default function Profile() {
                 >
                   Calendly Booking URL
                 </label>
-                <input
-                  id="profile-calendly_url"
-                  type="url"
-                  name="calendly_url"
+                <UrlInput
+                  field="calendly_url"
                   value={formData.calendly_url}
                   onChange={handleChange}
                   placeholder="https://calendly.com/yourname/30min"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.calendly_url}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Add your Calendly link to enable "Book a Showing" on your listings
@@ -950,14 +1027,12 @@ export default function Profile() {
                 >
                   Facebook URL
                 </label>
-                <input
-                  id="profile-facebook_url"
-                  type="url"
-                  name="facebook_url"
+                <UrlInput
+                  field="facebook_url"
                   value={formData.facebook_url}
                   onChange={handleChange}
                   placeholder="https://facebook.com/yourpage"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.facebook_url}
                 />
               </div>
               <div>
@@ -967,14 +1042,12 @@ export default function Profile() {
                 >
                   Instagram URL
                 </label>
-                <input
-                  id="profile-instagram_url"
-                  type="url"
-                  name="instagram_url"
+                <UrlInput
+                  field="instagram_url"
                   value={formData.instagram_url}
                   onChange={handleChange}
                   placeholder="https://instagram.com/yourusername"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.instagram_url}
                 />
               </div>
               <div>
@@ -984,14 +1057,12 @@ export default function Profile() {
                 >
                   LinkedIn URL
                 </label>
-                <input
-                  id="profile-linkedin_url"
-                  type="url"
-                  name="linkedin_url"
+                <UrlInput
+                  field="linkedin_url"
                   value={formData.linkedin_url}
                   onChange={handleChange}
                   placeholder="https://linkedin.com/in/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.linkedin_url}
                 />
               </div>
               <div>
@@ -1001,14 +1072,12 @@ export default function Profile() {
                 >
                   TikTok URL
                 </label>
-                <input
-                  id="profile-tiktok_url"
-                  type="url"
-                  name="tiktok_url"
+                <UrlInput
+                  field="tiktok_url"
                   value={formData.tiktok_url}
                   onChange={handleChange}
                   placeholder="https://tiktok.com/@yourusername"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.tiktok_url}
                 />
               </div>
               <div>
@@ -1018,14 +1087,12 @@ export default function Profile() {
                 >
                   YouTube URL
                 </label>
-                <input
-                  id="profile-youtube_url"
-                  type="url"
-                  name="youtube_url"
+                <UrlInput
+                  field="youtube_url"
                   value={formData.youtube_url}
                   onChange={handleChange}
                   placeholder="https://youtube.com/@yourchannel"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.youtube_url}
                 />
               </div>
               <div>
@@ -1035,14 +1102,12 @@ export default function Profile() {
                 >
                   Zillow Profile URL
                 </label>
-                <input
-                  id="profile-zillow_url"
-                  type="url"
-                  name="zillow_url"
+                <UrlInput
+                  field="zillow_url"
                   value={formData.zillow_url}
                   onChange={handleChange}
                   placeholder="https://zillow.com/profile/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.zillow_url}
                 />
               </div>
               <div>
@@ -1052,14 +1117,12 @@ export default function Profile() {
                 >
                   Realtor.com Profile URL
                 </label>
-                <input
-                  id="profile-realtor_com_url"
-                  type="url"
-                  name="realtor_com_url"
+                <UrlInput
+                  field="realtor_com_url"
                   value={formData.realtor_com_url}
                   onChange={handleChange}
                   placeholder="https://realtor.com/realestateagents/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.realtor_com_url}
                 />
               </div>
             </div>
