@@ -19,9 +19,6 @@ export const mockLead: Lead = {
   status: 'new',
   source: 'public_profile',
   form_data: { listing_id: 1, budget: '400000-450000' },
-  email_hash: null,
-  update_token_hash: null,
-  update_token_expires_at: null,
   visitor_id: null,
 
   assigned_to: null,
@@ -76,5 +73,13 @@ export const makeLead = (overrides: Partial<Lead> = {}): Lead => ({
  */
 export const mockLeadRow: LeadRow = (() => {
   const { email, phone, ...rest } = mockLead;
-  return { ...rest, encrypted_email: email, encrypted_phone: phone, phone_hash: null };
+  return {
+    ...rest,
+    encrypted_email: email,
+    encrypted_phone: phone,
+    phone_hash: null,
+    email_hash: null,
+    update_token_hash: null,
+    update_token_expires_at: null,
+  };
 })();

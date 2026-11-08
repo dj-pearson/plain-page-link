@@ -37,6 +37,13 @@ describe('LEAD_COLUMNS (US-254)', () => {
     expect(grantedLeadColumns()).not.toContain('phone_hash');
   });
 
+  it('never asks for the lookup hashes or the step-two token, which only submit-lead reads (US-559)', () => {
+    for (const col of ['email_hash', 'update_token_hash', 'update_token_expires_at']) {
+      expect(split(LEAD_COLUMNS)).not.toContain(col);
+      expect(grantedLeadColumns()).not.toContain(col);
+    }
+  });
+
   it('names every readable column in types.ts, once', () => {
     const cols = split(LEAD_COLUMNS);
     expect(new Set(cols).size).toBe(cols.length);
