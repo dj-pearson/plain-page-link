@@ -2980,6 +2980,68 @@ check("the browser cannot select a lead's ciphertext, and a copied one is recogn
 });
 
 // ---------------------------------------------------------------------------
+// US-629: contact lookup fingerprints are the service role's alone.
+//   contacts.email_hash / phone_hash let pii-crypto find the client a lead
+//   already is. The browser cannot read them (column grant), cannot write them
+//   (trigger), and a changed email or phone clears them so a stale hash never
+//   matches.
+// ---------------------------------------------------------------------------
+check("contact lookup hashes are unreadable and unwritable by the browser, and reset on edit", () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000629a01';
+  const contact = '00000000-dead-beef-0000-000000629c01';
+  const as = (sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${agent}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  const hashes = () =>
+    q(`SELECT coalesce(email_hash, '-') || ' ' || coalesce(phone_hash, '-') || ' ' ||
+              (lookup_hashed_at IS NOT NULL)::text
+         FROM public.contacts WHERE id = '${contact}';`)[0];
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'us629@example.test') ON CONFLICT (id) DO NOTHING;`);
+
+    // The browser's own insert cannot plant a fingerprint.
+    as(`INSERT INTO public.contacts (id, user_id, first_name, relationship, encrypted_email, email_hash, lookup_hashed_at)
+          VALUES ('${contact}', '${agent}', 'C', 'past_client', 'enc:v1:a', 'planted', now()) RETURNING id;`);
+    if (hashes() !== '- - false') out.push(`a browser insert stored fingerprints: ${hashes()}`);
+
+    for (const col of ['email_hash', 'phone_hash', 'lookup_hashed_at', '*']) {
+      if (!refused(() => as(`SELECT ${col} FROM public.contacts WHERE id = '${contact}';`)))
+        out.push(`authenticated could select contacts.${col}`);
+    }
+    if (refused(() => as(`SELECT id, first_name, encrypted_email, next_touch_at FROM public.contacts WHERE id = '${contact}';`)))
+      out.push('the owner could not read their own contact');
+    if (!refused(() => q(`SET ROLE anon; SELECT id FROM public.contacts;`))) out.push('anon could select contacts');
+
+    // The service role writes them; the browser cannot overwrite them.
+    q(`SET ROLE service_role; UPDATE public.contacts SET email_hash = 'e1', phone_hash = 'p1', lookup_hashed_at = now() WHERE id = '${contact}';`);
+    if (hashes() !== 'e1 p1 true') out.push(`the service role could not store fingerprints: ${hashes()}`);
+    as(`UPDATE public.contacts SET email_hash = 'forged', notes = 'n' WHERE id = '${contact}';`);
+    if (hashes() !== 'e1 p1 true') out.push(`a browser update changed the fingerprints: ${hashes()}`);
+
+    // A new email clears them, so the contact is hashed again.
+    as(`UPDATE public.contacts SET encrypted_email = 'enc:v1:b' WHERE id = '${contact}';`);
+    if (hashes() !== '- - false') out.push(`changing the email left the fingerprints: ${hashes()}`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.contacts WHERE user_id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // US-322: an agent marks their own notifications read, and changes nothing else.
 //   "Users update own notifications" checked only the row, and UPDATE was
 //   granted table-wide, so the owner could rewrite a system-written row —

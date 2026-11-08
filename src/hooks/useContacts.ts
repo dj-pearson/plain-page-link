@@ -76,6 +76,14 @@ export interface HouseholdMember {
 const SUMMARY_COLUMNS =
   'id, lead_id, first_name, last_name, relationship, preferred_contact, city, household, interests, tags, touch_frequency_days, last_contacted_at, next_touch_at, created_at, updated_at';
 
+/**
+ * The columns the detail view selects: every column the browser may read.
+ * Not `*`: contacts carries a column grant (20261108000629), and the lookup
+ * fingerprints (email_hash, phone_hash, lookup_hashed_at) are not in it.
+ */
+const DETAIL_COLUMNS =
+  'id, user_id, lead_id, first_name, last_name, encrypted_email, encrypted_phone, relationship, preferred_contact, address, city, state, zip_code, occupation, employer, referred_by, source, household, interests, tags, notes, touch_frequency_days, last_contacted_at, next_touch_at, created_at, updated_at';
+
 export type ContactSummary = Pick<
   ContactRow,
   | 'id'
@@ -95,7 +103,15 @@ export type ContactSummary = Pick<
 > & { household: HouseholdMember[] };
 
 /** A contact as the detail view consumes it: the row, decrypted. */
-export type Contact = Omit<ContactRow, 'encrypted_email' | 'encrypted_phone' | 'household'> & {
+export type Contact = Omit<
+  ContactRow,
+  | 'encrypted_email'
+  | 'encrypted_phone'
+  | 'household'
+  | 'email_hash'
+  | 'phone_hash'
+  | 'lookup_hashed_at'
+> & {
   email: string | null;
   phone: string | null;
   household: HouseholdMember[];
@@ -302,7 +318,7 @@ export function useContact(contactId: string | null | undefined) {
       if (!user?.id || !contactId) return null;
       const { data, error } = await supabase
         .from('contacts')
-        .select('*')
+        .select(DETAIL_COLUMNS)
         .eq('id', contactId)
         .eq('user_id', user.id)
         .maybeSingle();
