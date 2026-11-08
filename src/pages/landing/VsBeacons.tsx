@@ -24,10 +24,11 @@ const PAID_PLANS = PRICING_PLANS.filter((p) => p.price_monthly > 0).sort(
 );
 const FREE_PLAN = PRICING_PLANS.find((p) => p.price_monthly === 0);
 
-/** e.g. "Starter $29, Professional $49" */
-const AGENTBIO_PLANS_CELL = PAID_PLANS.slice(0, 2)
-  .map((p) => `${p.name} $${p.price_monthly}`)
-  .join(', ');
+/** Every paid plan, e.g. "Starter $29, Professional $49, Team $99, Enterprise $299" */
+const AGENTBIO_PLANS_CELL =
+  PAID_PLANS.length > 0
+    ? PAID_PLANS.map((p) => `${p.name} $${p.price_monthly}`).join(', ')
+    : 'No paid plans';
 
 /** e.g. "3 listings, 5 links" */
 const AGENTBIO_FREE_CELL = FREE_PLAN
@@ -37,13 +38,31 @@ const AGENTBIO_FREE_CELL = FREE_PLAN
 /** e.g. "5 on Free, 15 on Starter, unlimited from Professional" */
 const AGENTBIO_LINKS_CELL = linkAllowanceSummary();
 
-const PRICE_FAQ_ANSWER = `AgentBio has ${
-  FREE_PLAN ? `a free plan (${AGENTBIO_FREE_CELL}) and ` : ''
-}paid plans from ${PAID_PLANS.slice(0, 2)
-  .map((p) => `${p.name} at $${p.price_monthly}`)
-  .join(
-    ' to '
-  )} a month. We do not quote Beacons' prices, because they change and a copy on our site would soon be wrong; compare their plans on beacons.ai with ours. The more useful question is which features you will use: AgentBio's plans pay for listings, lead forms and showing booking, Beacons' for creator tools like a store and a media kit.`;
+/*
+ * Names every paid plan. A two-plan "from X to Y" range understated the top
+ * of the range (Team and Enterprise cost more than Professional).
+ * e.g. "paid plans at $29 (Starter), $49 (Professional), $99 (Team) and $299 (Enterprise) a month"
+ */
+const PAID_PLANS_PHRASE = ((): string => {
+  const parts = PAID_PLANS.map((p) => `$${p.price_monthly} (${p.name})`);
+  if (parts.length === 0) return '';
+  const list =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `paid plan${parts.length === 1 ? '' : 's'} at ${list} a month`;
+})();
+
+const AGENTBIO_PLANS_SENTENCE = [
+  FREE_PLAN ? `a free plan (${AGENTBIO_FREE_CELL})` : '',
+  PAID_PLANS_PHRASE,
+]
+  .filter(Boolean)
+  .join(' and ');
+
+const PRICE_FAQ_ANSWER = `${
+  AGENTBIO_PLANS_SENTENCE ? `AgentBio has ${AGENTBIO_PLANS_SENTENCE}. ` : ''
+}We do not quote Beacons' prices, because they change and a copy on our site would soon be wrong; compare their plans on beacons.ai with ours. The more useful question is which features you will use: AgentBio's plans pay for listings, lead forms and showing booking, Beacons' for creator tools like a store and a media kit.`;
 
 const FAQ_ENTRIES: FaqEntry[] = [
   {
