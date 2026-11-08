@@ -49,7 +49,6 @@ const ALLOWED_5XX = new Set(['health-check']);
  * new one has to be justified here.
  */
 const MISSING_SERVER_CONFIG = new Set([
-  'generate-article',
   'generate-social-post',
 ]);
 
@@ -70,6 +69,10 @@ const ADMIN_ONLY = new Set([
   'trigger-rebuild',
   // US-248: was under MISSING_SERVER_CONFIG, which hid that it never checked.
   'generate-marketing-post',
+  // US-614: generate-article was under MISSING_SERVER_CONFIG too, and took any
+  // signed-in account; google-indexing took any signed-in account.
+  'generate-article',
+  'google-indexing',
 ]);
 
 const log = (...args) => console.log('[smoke]', ...args);

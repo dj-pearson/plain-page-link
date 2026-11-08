@@ -9,7 +9,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { handleError, successResponse, ValidationError, AppError } from '../_shared/errors.ts';
-import { requireAuth } from '../_shared/auth.ts';
+import { requireAdmin } from '../_shared/auth.ts';
 
 const GOOGLE_INDEXING_API_URL = 'https://indexing.googleapis.com/v3/urlNotifications:publish';
 const GOOGLE_BATCH_API_URL = 'https://indexing.googleapis.com/batch';
@@ -173,14 +173,20 @@ Deno.serve(async (req) => {
       throw new ValidationError('Method not allowed. Use POST.');
     }
 
-    // Create Supabase client
+    // Service role: requireAdmin reads user_roles for the caller, which RLS
+    // would hide from an anon-key client.
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Require authenticated user
-    const user = await requireAuth(req, supabase);
+    // US-614: admins only. This submits URLs to Google under the company's
+    // service account — URL_DELETED included — against a shared daily quota.
+    // Any signed-in account used to be enough, so a free signup could ask
+    // Google to drop agentbio.net pages from the index, or burn the quota.
+    // Nothing in the app calls it yet (useGoogleIndexing has no caller); it is
+    // tooling for the company's own site, not for an agent's page.
+    const user = await requireAdmin(req, supabase);
 
     // Parse request body
     const body: IndexingRequest = await req.json();

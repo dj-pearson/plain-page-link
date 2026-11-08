@@ -127,3 +127,68 @@ describe('functions run-scheduled-audit calls admit the service role', () => {
     });
   }
 });
+
+// US-614: two functions that act as the company accepted any signed-in account.
+// generate-article inserts a 'published' row on the company blog (and steers
+// the model with the caller's `customInstructions`); google-indexing submits
+// URLs, URL_DELETED included, under the company's Google service account.
+// Their helpers hold bare fetch() calls above the handler, so the generic
+// source-order check above does not fit; this one measures from the handler.
+describe('functions that publish as the company refuse non-admin accounts (US-614)', () => {
+  const CASES = [
+    {
+      name: 'generate-article',
+      gate: 'requireAdminOrServiceRole',
+      handler: 'export default async (req: Request) =>',
+      bodyRead: 'await req.text()',
+      work: ["from('content_suggestions')", 'aiResponse = await fetchWithTimeout(', ".from('articles')"],
+    },
+    {
+      name: 'google-indexing',
+      gate: 'requireAdmin',
+      handler: 'Deno.serve(async (req) =>',
+      bodyRead: 'await req.json()',
+      work: ['await getAccessToken(credentials)', 'submitUrl(url, action, accessToken)'],
+    },
+  ] as const;
+
+  for (const { name, gate, handler, bodyRead, work } of CASES) {
+    describe(name, () => {
+      const src = source(name);
+      const start = src.indexOf(handler);
+      const call = src.indexOf(`await ${gate}(req, supabase)`);
+
+      it(`imports ${gate} and no weaker check`, () => {
+        expect(src).toMatch(new RegExp(`import \\{ ${gate} \\} from '\\.\\./_shared/auth\\.ts'`));
+        expect(src).not.toMatch(/\brequireAuth\b|\bgetAuthenticatedUser\b|\bisServiceRoleRequest\b/);
+      });
+
+      it('awaits the gate in the handler before the body is read and before any work', () => {
+        expect(start).toBeGreaterThan(-1);
+        expect(call).toBeGreaterThan(start);
+        expect(call).toBeLessThan(src.indexOf(bodyRead));
+        for (const marker of work) {
+          const at = src.indexOf(marker, start);
+          expect(at, marker).toBeGreaterThan(-1);
+          expect(call, marker).toBeLessThan(at);
+        }
+        // Not swallowed: the handler's catch answers with the HttpError's status.
+        expect(src).toMatch(/return handleUnexpectedError\(error, req\);|return handleError\(error, req\);/);
+      });
+    });
+  }
+
+  it('google-indexing checks the role with a client that can read user_roles', () => {
+    const src = source('google-indexing');
+    const client = src.slice(src.indexOf('const supabase = createClient('), src.indexOf('await requireAdmin('));
+    expect(client).toContain("Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')");
+    expect(client).not.toContain('SUPABASE_ANON_KEY');
+  });
+
+  it('generate-article checks the Claude key only after the gate', () => {
+    const src = source('generate-article');
+    expect(src.indexOf('if (!CLAUDE_API_KEY)')).toBeGreaterThan(
+      src.indexOf('await requireAdminOrServiceRole(req, supabase)')
+    );
+  });
+});
