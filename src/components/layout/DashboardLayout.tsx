@@ -223,7 +223,7 @@ export default function DashboardLayout() {
             last 64px of every dashboard page sat under the nav (US-596). */}
         <main
           id="main-content"
-          className="p-4 sm:p-5 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6"
+          className="p-4 sm:px-5 sm:pt-5 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6"
           tabIndex={-1}
         >
           <Outlet />

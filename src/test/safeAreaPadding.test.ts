@@ -116,6 +116,14 @@ describe('safe-area padding helpers (US-596)', () => {
 
   it('the dashboard clears the mobile nav and the home indicator', () => {
     const layout = readFileSync(join(SRC, 'components/layout/DashboardLayout.tsx'), 'utf8');
-    expect(layout).toContain('pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6');
+    expect(layout).toContain(
+      'p-4 sm:px-5 sm:pt-5 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6'
+    );
+    // A bare sm:p-5 shorthand inside the 640px media query would override the
+    // base bottom padding and put content under the nav from 640 to 767px,
+    // where MobileNav (md:hidden) is still on screen.
+    const main = layout.match(/id="main-content"\s+className="([^"]+)"/);
+    expect(main).not.toBeNull();
+    expect(main![1].split(/\s+/)).not.toContain('sm:p-5');
   });
 });
