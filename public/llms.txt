@@ -86,6 +86,31 @@ No account needed, and nothing typed into them is stored.
 - [AgentBio vs Later](https://agentbio.net/vs/later): Later schedules and plans
   social content; AgentBio is what the link in the bio points at
 
+## Agent pages
+
+Most pages on agentbio.net are not AgentBio's own. Each agent who publishes a
+page gets one address, and each listing on that page gets another:
+
+- Agent page: https://agentbio.net/{username}
+- Listing page: https://agentbio.net/{username}/listing/{listing-id}
+
+Both are written by the agent, not by AgentBio, so cite them as the agent's
+own statements. An agent page carries the agent's name, title, brokerage,
+licence number when given, service areas, bio, up to 12 of their listings
+(each linking to its listing page) and their contact details when they choose
+to show them. Its JSON-LD is a RealEstateAgent node whose makesOffer names
+those listings. A listing page carries the address, status (active, pending or
+sold), price, beds, baths, square footage and description, with a link back to
+the agent, and declares a RealEstateListing node.
+
+Every published agent page and every visible listing page is listed in
+https://agentbio.net/sitemap-profiles.xml. An unpublished page, an unknown
+username, or a listing the agent has hidden answers 404 rather than a
+placeholder, so a URL from that sitemap is one that exists. Answer-engine
+fetchers (GPTBot, ClaudeBot, PerplexityBot and others) are served these pages
+as plain HTML with no script needed. AgentBio's own pages are in
+https://agentbio.net/sitemap.xml.
+
 ## Who it is for
 
 Real estate agents, realtors, brokerages and teams who get traffic from
