@@ -29,7 +29,12 @@ import { useLeads, fetchAllLeads } from '@/hooks/useLeads';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { buildLeadStatusPatch } from '@/lib/leadStatus';
+import {
+  buildLeadStatusPatch,
+  LEAD_STATUSES,
+  leadStatusLabel,
+  type LeadStatus,
+} from '@/lib/leadStatus';
 import { exportToCSV } from '@/lib/exportUtils';
 import { cn } from '@/lib/utils';
 import { useLeadContactAction } from '@/hooks/useLeadContactAction';
@@ -452,17 +457,17 @@ export default function Leads() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<
-      string,
-      { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }
-    > = {
-      new: { variant: 'default', label: 'New' },
-      contacted: { variant: 'secondary', label: 'Contacted' },
-      qualified: { variant: 'outline', label: 'Qualified' },
-      converted: { variant: 'default', label: 'Converted' },
+    const variants: Record<LeadStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+      new: 'default',
+      contacted: 'secondary',
+      qualified: 'outline',
+      nurturing: 'secondary',
+      converted: 'default',
+      closed: 'default',
+      lost: 'outline',
     };
-    const config = statusMap[status] || { variant: 'outline', label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const variant = variants[status as LeadStatus] ?? 'outline';
+    return <Badge variant={variant}>{leadStatusLabel(status)}</Badge>;
   };
 
   const getLeadTypeIcon = (type: string) => {
@@ -782,11 +787,11 @@ export default function Leads() {
                       <SelectValue placeholder="Update status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="contacted">Contacted</SelectItem>
-                      <SelectItem value="qualified">Qualified</SelectItem>
-                      <SelectItem value="converted">Converted</SelectItem>
-                      <SelectItem value="lost">Lost</SelectItem>
+                      {LEAD_STATUSES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Button

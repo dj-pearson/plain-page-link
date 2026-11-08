@@ -17,11 +17,62 @@
  */
 import type { Lead } from '@/types/lead';
 
+/**
+ * The one lead status vocabulary (US-278 / US-428).
+ *
+ * Migration 20261107000428 adds `leads_status_check` with exactly these
+ * values, in this order; leadStatus.test.ts reads the migration and holds the
+ * two together. Every picker (the lead modal, the bulk action, the workflow
+ * builder's update_lead step) and every badge reads this list, so a status
+ * cannot be offered in one place and unknown in another — which is what had
+ * happened: the UI offered new/contacted/qualified/converted/lost while this
+ * file also honoured nurturing and closed, and nothing in the database stopped
+ * any other string.
+ *
+ *   converted  the lead became a client (the agent's win)
+ *   closed     the deal itself completed
+ *   nurturing  a long-horizon lead the agent keeps warm
+ *   lost       did not convert
+ */
+export const LEAD_STATUSES = [
+  { value: 'new', label: 'New' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'qualified', label: 'Qualified' },
+  { value: 'nurturing', label: 'Nurturing' },
+  { value: 'converted', label: 'Converted' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'lost', label: 'Lost' },
+] as const;
+
+export type LeadStatus = (typeof LEAD_STATUSES)[number]['value'];
+
+export const LEAD_STATUS_VALUES: readonly LeadStatus[] = LEAD_STATUSES.map((s) => s.value);
+
+export function isLeadStatus(value: unknown): value is LeadStatus {
+  return typeof value === 'string' && (LEAD_STATUS_VALUES as readonly string[]).includes(value);
+}
+
+/** The label for a stored status; an unexpected value is shown as-is. */
+export function leadStatusLabel(status: string | null | undefined): string {
+  const value = status ?? 'new';
+  return LEAD_STATUSES.find((s) => s.value === value)?.label ?? value;
+}
+
 /** Statuses that mean the lead is finished, one way or the other. */
-const CLOSED_STATUSES = new Set(['converted', 'lost', 'closed']);
+export const CLOSED_STATUSES: ReadonlySet<string> = new Set<LeadStatus>([
+  'converted',
+  'closed',
+  'lost',
+]);
 
 /** Statuses that mean the agent has made contact. */
-const CONTACTED_STATUSES = new Set(['contacted', 'qualified', 'nurturing', 'converted', 'closed']);
+export const CONTACTED_STATUSES: ReadonlySet<string> = new Set<LeadStatus>([
+  'contacted',
+  'qualified',
+  'nurturing',
+  'converted',
+  'closed',
+]);
 
 export interface LeadStatusPatch {
   status: string;

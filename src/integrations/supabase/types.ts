@@ -2758,7 +2758,7 @@ export type Database = {
           property_address: string | null;
           referrer_url: string | null;
           source: string | null;
-          status: string | null;
+          status: string;
           timeline: string | null;
           update_token_expires_at: string | null;
           update_token_hash: string | null;
@@ -2792,7 +2792,7 @@ export type Database = {
           property_address?: string | null;
           referrer_url?: string | null;
           source?: string | null;
-          status?: string | null;
+          status?: string;
           timeline?: string | null;
           update_token_expires_at?: string | null;
           update_token_hash?: string | null;
@@ -2826,7 +2826,7 @@ export type Database = {
           property_address?: string | null;
           referrer_url?: string | null;
           source?: string | null;
-          status?: string | null;
+          status?: string;
           timeline?: string | null;
           update_token_expires_at?: string | null;
           update_token_hash?: string | null;

@@ -5,6 +5,7 @@ import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { assertLeadOwnedBy, taskAssignee } from './ownership.ts';
 import { maskEmail } from '../_shared/log-redaction.ts';
+import { isLeadStatus, LEAD_STATUS_VALUES } from '../_shared/lead-status.ts';
 
 /**
  * Execute Workflow - Multi-Step Workflow Orchestration
@@ -76,7 +77,16 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
     // reject the whole statement, so a workflow that set a score also failed to
     // apply the status and notes beside it (US-100).
     const updates: Record<string, any> = {};
-    if (status) updates.status = status;
+    if (status) {
+      // leads_status_check (US-428) refuses anything else; say which value and
+      // why, rather than surfacing a bare constraint violation in the run log.
+      if (!isLeadStatus(status)) {
+        throw new Error(
+          `update_lead: "${status}" is not a lead status (expected one of ${LEAD_STATUS_VALUES.join(', ')})`
+        );
+      }
+      updates.status = status;
+    }
     if (notes) updates.notes = notes;
 
     if (!resolvedLeadId) {

@@ -75,7 +75,7 @@ import {
   type QuickResponseChannel,
 } from '@/lib/leadQuickResponses';
 import { getLeadNextStep } from '@/lib/leadNextStep';
-import { buildLeadStatusPatch } from '@/lib/leadStatus';
+import { buildLeadStatusPatch, LEAD_STATUSES, type LeadStatus } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
 import { calendarDateInDays, dueDateToIso, taskDueAt } from '@/lib/localDate';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
@@ -159,13 +159,16 @@ function activityHeadline(a: LeadActivity): string {
   return a.title || a.activity_type.replace(/_/g, ' ');
 }
 
-const STATUS_OPTIONS = [
-  { value: 'new', label: 'New', color: 'bg-green-100 text-green-800' },
-  { value: 'contacted', label: 'Contacted', color: 'bg-blue-100 text-blue-800' },
-  { value: 'qualified', label: 'Qualified', color: 'bg-purple-100 text-purple-800' },
-  { value: 'converted', label: 'Converted', color: 'bg-emerald-100 text-emerald-800' },
-  { value: 'lost', label: 'Lost', color: 'bg-gray-100 text-gray-800' },
-];
+/** The dot beside each status in the picker. Keyed by LeadStatus so a new status cannot ship without one. */
+const STATUS_DOT: Record<LeadStatus, string> = {
+  new: 'bg-green-500',
+  contacted: 'bg-blue-500',
+  qualified: 'bg-purple-500',
+  nurturing: 'bg-amber-500',
+  converted: 'bg-emerald-600',
+  closed: 'bg-emerald-800',
+  lost: 'bg-gray-400',
+};
 
 export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: LeadDetailModalProps) {
   const [status, setStatus] = useState(lead?.status || 'new');
@@ -464,10 +467,13 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
+                {LEAD_STATUSES.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${option.color}`} />
+                      <span
+                        className={`w-2 h-2 rounded-full ${STATUS_DOT[option.value]}`}
+                        aria-hidden="true"
+                      />
                       {option.label}
                     </div>
                   </SelectItem>

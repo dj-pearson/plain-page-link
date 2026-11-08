@@ -14,6 +14,7 @@ import {
 import { ChevronDown, ChevronUp, Mail, Phone, User } from 'lucide-react';
 import type { RecentLead } from '@/hooks/useAnalytics';
 import { formatRelativeTime } from '@/lib/format';
+import { leadStatusLabel } from '@/lib/leadStatus';
 
 interface LeadsTableProps {
   leads: RecentLead[];
@@ -77,8 +78,12 @@ export function LeadsTable({ leads, onLeadClick }: LeadsTableProps) {
         return 'bg-yellow-100 text-yellow-800';
       case 'qualified':
         return 'bg-green-100 text-green-800';
+      case 'nurturing':
+        return 'bg-amber-100 text-amber-800';
       case 'converted':
         return 'bg-purple-100 text-purple-800';
+      case 'closed':
+        return 'bg-emerald-100 text-emerald-800';
       case 'lost':
         return 'bg-red-100 text-red-800';
       default:
@@ -208,7 +213,9 @@ export function LeadsTable({ leads, onLeadClick }: LeadsTableProps) {
                       <Badge variant="outline">{getLeadTypeLabel(lead.lead_type)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(lead.status ?? '')}>{lead.status}</Badge>
+                      <Badge className={getStatusColor(lead.status ?? '')}>
+                        {leadStatusLabel(lead.status)}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {lead.created_at ? formatRelativeTime(lead.created_at) : '—'}
