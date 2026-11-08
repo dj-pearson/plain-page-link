@@ -4402,7 +4402,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Needs a product decision on whether 'nurturing' and 'closed' are real statuses. Check the lead-routing and workflow triggers that read status before adding the CHECK. (follow-up slice from US-264) UNBLOCKED 2026-11-07: owner decided 'nurturing' and 'closed' ARE real lead statuses; include them in the one vocabulary."
+      "notes": "Needs a product decision on whether 'nurturing' and 'closed' are real statuses. Check the lead-routing and workflow triggers that read status before adding the CHECK. (follow-up slice from US-264) UNBLOCKED 2026-11-07: owner decided 'nurturing' and 'closed' ARE real lead statuses; include them in the one vocabulary. Slice 1 (one vocabulary + CHECK) done in round 8 as US-428; slices 2-3 remain."
     },
     {
       "id": "US-279",
@@ -4870,8 +4870,8 @@
         "Editor preview still fetches on its own"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-305)"
+      "passes": true,
+      "notes": " (follow-up from US-305) DONE in round 8 as US-429."
     },
     {
       "id": "US-306",
@@ -5349,8 +5349,8 @@
         "A missed run is still caught up exactly once per local day"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Needs a product decision on a timezone column, shared with US-318. digestSchedule in scheduled-maintenance/digests.ts is the seam. (follow-up from US-331) UNBLOCKED 2026-11-07: owner decided agents get a time zone setting (column + Settings control); build that first, then use it."
+      "passes": true,
+      "notes": "Needs a product decision on a timezone column, shared with US-318. digestSchedule in scheduled-maintenance/digests.ts is the seam. (follow-up from US-331) UNBLOCKED 2026-11-07: owner decided agents get a time zone setting (column + Settings control); build that first, then use it. DONE in round 8 as US-433."
     },
     {
       "id": "US-344",
@@ -5536,8 +5536,8 @@
         "The lead it creates carries listing_id"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-348)"
+      "passes": true,
+      "notes": " (follow-up from US-348) DONE in round 8 as US-427."
     },
     {
       "id": "US-349",
@@ -5975,8 +5975,8 @@
         "Tests cover revoked, expired and inactive keys"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-377)"
+      "passes": true,
+      "notes": " (follow-up from US-377) DONE in round 8 as US-432."
     },
     {
       "id": "US-378",
@@ -6488,8 +6488,8 @@
         "A failed attempt shows a destructive toast"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Overlaps the enterprise lane. The teams function will need redeploying. (follow-up from US-411)"
+      "passes": true,
+      "notes": "Overlaps the enterprise lane. The teams function will need redeploying. (follow-up from US-411) DONE in round 8 as US-430."
     },
     {
       "id": "US-420",
@@ -6548,7 +6548,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Pairs with US-402: a CI budget for dashboard routes should measure beyond entry + DashboardLayout, not just beyond the entry, because ui-vendor is already loaded by the layout. (follow-up from US-412)"
+      "notes": "Pairs with US-402: a CI budget for dashboard routes should measure beyond entry + DashboardLayout, not just beyond the entry, because ui-vendor is already loaded by the layout. (follow-up from US-412) Slice done in round 8 as US-431."
     },
     {
       "id": "US-413",
@@ -6640,8 +6640,8 @@
         "Scheduled senders skip opted-out captures"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-415)"
+      "passes": true,
+      "notes": " (follow-up from US-415) DONE in round 8 as US-434."
     },
     {
       "id": "US-416",
@@ -6673,8 +6673,8 @@
         "src/spa-routes.test.ts still agrees with App.tsx and _redirects"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Check each segment against App.tsx first; /legal may have child routes but no index. (follow-up from US-416)"
+      "passes": true,
+      "notes": "Check each segment against App.tsx first; /legal may have child routes but no index. (follow-up from US-416) DONE in round 8 as US-435."
     },
     {
       "id": "US-417",
@@ -6691,6 +6691,378 @@
       "priority": 2,
       "passes": true,
       "notes": "Change: public/sw.js:207-222. `isNeverCache` now calls the new `isUnderSegment` helper for '/auth' and '/functions'. The helper's comment cites US-323. Tests: src/sw.test.ts has two new cases next to the existing 'never caches a navigation under /auth' test (~line 334). They run the real worker in the vm harness (pagesWorker/navigate). (1) /auth, /auth/, /auth/reset-password, /functions and /functions/v1/x all pass through and the pages cache is never created. (2) /authorname, /authentic-homes and /functionsrealty get a response and land in agentbio-sw-pages-v1. I checked the regression test against the old code: with the HEAD sw.js swapped back in temporarily, the US-323 case fails (1 failed / 31 passed); with the fix restored, all pass. The /functions prefix had the same flaw as /auth, so it is fixed in the same helper. This app has no route under /functions; Pages Functions sit at /api and /[username].\n\nVERIFIED: npx tsc --noEmit -> passed, no errors (TSC_OK). npx vitest run src/sw.test.ts src/deployed-files.test.ts src/lib/sw-cleanup.test.ts src/route-weight.test.ts -> Test Files 4 passed (4), Tests 64 passed (64). With the HEAD (unfixed) public/sw.js swapped in temporarily: npx vitest run src/sw.test.ts -> 1 failed | 31 passed (32), and the failing case is the new US-323 test. Pre-commit lint-staged (eslint --fix, prettier) ran clean. No migration was added, so verify:migrations does not apply.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-427",
+      "lane": "listings",
+      "round": 8,
+      "title": "On a phone, a visitor reading about a listing had to scroll back up to contact the agent or book a showing",
+      "description": "US-361. Phones now get a contact bar pinned to the bottom of the listing page (/:username/listing/:id) below 640px. It has \"Ask a question\" and \"Request a showing\" (\"Schedule a showing\" when the agent has Calendly). A Call button appears when the agent has a phone number and shows contact buttons. Both forms are the page's own and attach the listing, so the lead carries listing_id (and Calendly gets listingId). Sold homes only get \"Ask a question\". Taps are recorded as contact_tap / cta_click, except while the owner previews an unpublished page.",
+      "acceptanceCriteria": [
+        "A Showing/Contact action stays visible while scrolling on viewports under 640px (fixed bottom-0, sm:hidden)",
+        "The lead it creates carries listing_id (LeadFormModal receives listing {id,address}; CalendlyModal receives listingId)",
+        "Sold listings offer no showing action",
+        "Call follows settings.show_contact_buttons and uses a real tel: link",
+        "Page content is padded so the bar never covers the compliance footer",
+        "No taps counted in the owner's unpublished preview"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Before: in src/pages/public/ListingPage.tsx the only action above the fold was the header's \"Ask about this home\". The Showing CTA sits in ListingDetails' side column (src/components/profile/ListingDetails.tsx:461-469), and on a phone that column stacks below the gallery, facts and description.\n\nChanges:\n- New file src/components/profile/ListingContactBar.tsx. It is a fixed bottom region labelled \"Contact about this home\", phone widths only (sm:hidden), and pads for env(safe-area-inset-bottom). Buttons are at least 48px tall. Colours come from the profile theme variables (--theme-background, --theme-text, and the --primary that PROFILE_MAIN_STYLE sets), not the dashboard tokens, so dark or tinted themes match. Elevation is a single top hairline with no shadow, per the craft floor. Taps are fire-and-forget calls to trackContactTap with 'contact', 'schedule' or 'phone'.\n- src/pages/public/ListingPage.tsx renders the bar and reuses the existing requestShowing, which opens Calendly or the lead form. The lead modal already passes listing={id,address} (US-096). The bar gets no showing action when status is 'sold', and the phone only when settings.show_contact_buttons !== false. profileId is undefined in preview, so preview taps are not counted. The container gets pb-24 sm:pb-8, the same as FullProfilePage:428.\n- I did not reuse StickyActionBar. It is a profile-wide FAB plus a desktop panel shown from xl, and it carries no listing context. A listing-specific bar is simpler and puts the action on screen without needing a second tap to expand.\n- Button labels (\"Ask a question\", \"Request a showing\") deliberately differ from the existing names \"Ask about this home\" and \"Request a Showing\", so existing role queries in unit and e2e tests do not become ambiguous. tests/e2e/listing-deep-link.spec.ts only queries \"Share property\".\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx vitest run src/pages/public/ListingPage.test.tsx src/components/profile: 13 files, 84 tests passed.\nnpx vitest run src/pages/public: 5 files, 37 tests passed.\n7 new cases in ListingPage.test.tsx \"the phone contact bar (US-361)\": the bar is phone-only and fixed; Request a showing opens the lead form with listing {id:'l1'} and tracks 'schedule'; Ask a question attaches the listing and tracks 'contact'; Calendly gets listingId; a sold home has no showing action; Call uses tel: and is hidden when show_contact_buttons is false; preview taps go untracked.\nThe pre-commit hook ran eslint --fix and prettier and both passed. No migration, so verify:migrations does not apply. Not run in a real browser, because the sandbox has none.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-437",
+      "lane": "listings",
+      "round": 8,
+      "title": "US-361 follow-up: the bar on a real phone in Playwright",
+      "description": "Add a mobile-viewport (390x844) case to tests/e2e/listing-deep-link.spec.ts that scrolls to the footer, checks the contact bar is still in view, and checks it does not cover the compliance footer. Extend the a11y run for 'public profile listing page' to the mobile viewport so axe covers the bar's contrast against the theme background.",
+      "acceptanceCriteria": [
+        "Mobile e2e case passes in CI",
+        "axe baseline for the listing page stays at 0 on the mobile viewport"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Pairs with US-360 (listing-page specs never run in CI). (follow-up from US-427)"
+    },
+    {
+      "id": "US-428",
+      "lane": "leads",
+      "round": 8,
+      "title": "Lead statuses now come from one list, and the database rejects any value outside it",
+      "description": "US-278 slice (story US-428). Following the owner decision of 2026-11-07, lead statuses now come from one list: new, contacted, qualified, nurturing, converted, closed, lost. The list lives in src/lib/leadStatus.ts, the UI reads it everywhere, and a CHECK constraint enforces it in the database. Existing rows are cleaned up first. The dead legacy lead types and unused constants are deleted. leads.notes is not dropped, because it is still written (see nextSlices).",
+      "acceptanceCriteria": [
+        "A migration adds CHECK on leads.status after normalising existing rows; leadStatus.ts and the UI share one exported list (done)",
+        "The legacy types and any dead importers are deleted (done)",
+        "verify:migrations passes (done); verify:schema could not be run in this sandbox (see verification)",
+        "Drop leads.notes: deferred. It is still written by execute-workflow, so dropping it is not safe yet (nextSlices)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Before this change, four places disagreed on what a lead status could be:\n- The modal and bulk pickers offered new/contacted/qualified/converted/lost (LeadDetailModal.tsx:162, Leads.tsx:785).\n- leadStatus.ts:21-24 also honoured closed and nurturing.\n- constants.ts:94 offered spam, but nothing used that list.\n- The workflow update_lead step wrote whatever string its config held (types/workflow.ts:235, execute-workflow/index.ts:80).\n- The column was text with no CHECK, so an unknown status showed as a raw string and was skipped by every filter and KPI.\n\nWhat changed:\n- **One list in src/lib/leadStatus.ts:** `LEAD_STATUSES`, a `LeadStatus` type, `LEAD_STATUS_VALUES`, `isLeadStatus` and `leadStatusLabel`. `CLOSED_STATUSES` (converted/closed/lost) and `CONTACTED_STATUSES` are now exported.\n- **Everything that shows or picks a status reads that list:**\n  - the LeadDetailModal picker; its dot colours are a `Record<LeadStatus>`, so a new status cannot ship without one\n  - the Leads.tsx bulk-status Select and getStatusBadge, which now cover nurturing, closed and lost\n  - dashboard/LeadsTable.tsx colours and labels\n  - the options for the workflow builder's update_lead step (types/workflow.ts)\n- **Migration supabase/migrations/20261107000428_lead_status_vocabulary.sql:**\n  - Cleans up existing rows: folds case and whitespace, maps spam to lost, and works out NULL or unknown values from the lead's own dates (closed_at gives closed; contacted_at or first_responded_at gives contacted; otherwise new).\n  - Switches off the on_lead_status_change and update_leads_updated_at triggers during that cleanup, so agents don't get \"Status changed\" timeline rows they never made.\n  - Sets status NOT NULL (the default stays 'new') and adds `leads_status_check`. types.ts is updated to match: the Row type's status is `string`, and Insert/Update take `status?: string`.\n- **execute-workflow:** new supabase/functions/_shared/lead-status.ts (edge functions can't import from src/). The update_lead step now rejects an unknown status with a readable error instead of a bare constraint violation.\n- **Deleted:** LegacyLead, LeadFormType, LeadStatus (the old one), LeadPriority, ContactMethod, LeadSubmitData, LeadUpdateData and the Buyer/Seller/HomeValuation*Data types from src/types/lead.ts. Also the unused LEAD_STATUSES, LEAD_FORM_TYPES and CONTACT_METHODS in src/lib/constants.ts. I grepped first: nothing imported any of them.\n- **Tests:** src/lib/leadStatus.test.ts gains 8 tests. They check that the migration's CHECK list and its cleanup lists match LEAD_STATUSES exactly, that the edge copy is identical, that the workflow builder offers the same list, and that every status is classified. scripts/verify-schema.mjs gains a runtime check: all 7 statuses are accepted, the default is 'new', and spam, 'Contacted' and NULL are refused.\n\nWhy leads.notes was not dropped: the story says it is never written, but execute-workflow/index.ts (update_lead, `if (notes) updates.notes = notes`) writes it. verify-schema.mjs:2585 also references it. No UI reads it, so a workflow's \"Add Note\" goes nowhere an agent can see.\n\nVERIFIED: - `npx tsc --noEmit`: passes, before the commit and again after lint-staged's prettier/eslint reformat.\n- `npm run verify:migrations`: \"[migrations] OK — 72 migration files structurally valid.\"\n- `npx vitest run src/lib/leadStatus.test.ts src/lib/leadColumns.test.ts src/lib/leadNextStep.test.ts src/components/leads src/pages/dashboard/Leads.test.tsx src/components/dashboard supabase/functions/execute-workflow supabase/functions/_shared src/components/workflow`: 35 files, 328 tests passed.\n- Full `npx vitest run`: 240 files passed; 2231 tests passed, 1 skipped.\n- After the commit, src/lib/leadStatus.test.ts: 20 passed.\n- `node --check scripts/verify-schema.mjs`: syntax OK.\n- `npm run verify:schema` was **not run**. It needs a real Postgres, and this sandbox refused to start one: initdb won't run as root, and su/runuser to the postgres user was blocked by the worktree isolation guard. CI's schema job (.github/workflows/verify-backend.yml) will apply the migration and run the new runtime check.\n- The two triggers the migration disables and re-enables exist in the baseline and no later migration drops them. All the status values verify-schema inserts are in the new list.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000428_lead_status_vocabulary.sql (cleans up existing leads.status rows, then sets NOT NULL and adds leads_status_check) | Redeploy the execute-workflow edge function (new _shared/lead-status.ts import and status check)"
+    },
+    {
+      "id": "US-438",
+      "lane": "leads",
+      "round": 8,
+      "title": "US-278 slice 2: a workflow's 'Add Note' lands on the lead timeline, then leads.notes is dropped",
+      "description": "execute-workflow's update_lead step writes node.config.notes into leads.notes (supabase/functions/execute-workflow/index.ts, `if (notes) updates.notes = notes`), and nothing in the UI reads that column, so an agent never sees the note. Write it as a lead_activities 'note' row (attributed to the workflow owner, which fits US-349's agent-authored types), migrate any existing non-empty leads.notes into timeline notes, then drop the column.",
+      "acceptanceCriteria": [
+        "update_lead with notes inserts a timeline note row for the lead (owner checked by assertLeadOwnedBy) instead of writing leads.notes",
+        "A migration copies existing non-empty leads.notes into lead_activities notes, then drops leads.notes",
+        "LEAD_COLUMNS, LEAD_COLUMN_SET, the 20261101000016 grant test, types.ts and verify-schema.mjs:2585 are updated",
+        "verify:migrations and verify:schema pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-428)"
+    },
+    {
+      "id": "US-439",
+      "lane": "leads",
+      "round": 8,
+      "title": "US-278 slice 3: status filter and KPI chips cover nurturing and closed",
+      "description": "Leads.tsx has quick-filter chips for new, contacted and converted only (Leads.tsx ~595-640), and the per-status counts at ~212 ignore nurturing and closed. ConversionFunnel and lead_stats by_status should be checked against the full list too.",
+      "acceptanceCriteria": [
+        "Agents can filter /dashboard/leads by every status in LEAD_STATUSES",
+        "Counts and the conversion funnel treat closed as won and nurturing as in progress, with tests"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-428)"
+    },
+    {
+      "id": "US-429",
+      "lane": "profile",
+      "round": 8,
+      "title": "Public profile: page-builder Stats and Testimonial blocks no longer make 4 extra requests per visit (US-316)",
+      "description": "On /:username, the page builder's Stats and Testimonial blocks used to send their own 4 requests through useAgentPageFacts: profiles.years_experience, two head counts on listings, and testimonials. The data was already in the public-profile payload. The public-profile query now seeds ['agent-page-facts', agentId] from that payload, so for a visitor the blocks render with no extra requests.",
+      "acceptanceCriteria": [
+        "A visitor to a profile with stats and testimonial blocks causes no extra listings, testimonials or profiles request. Test: usePublicProfile.pageFacts.test.tsx checks that calls == ['rpc:get_public_profile_page'].",
+        "The editor preview still fetches on its own. Test: 'the editor preview, with nothing seeded, fetches on its own'.",
+        "Seeding also works on the table-read fallback path (database without get_public_profile_page).",
+        "The owner viewing their own page is not seeded, because the owner policy can return sample listings and the facts query excludes them. The blocks fetch as before in that case."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Story: US-316 (an open profile-lane story), implemented under the reserved id US-429.\n\nEvidence of the problem:\n- src/components/pageBuilder/blocks/StatsBlock.tsx:45 and TestimonialBlock.tsx:27 each call useAgentPageFacts.\n- The old src/hooks/useAgentPageFacts.ts ran 4 parallel reads per agent.\n- FullProfilePage passes profile.id to CustomBlocksSection, which passes it to BlockRenderer.\n- usePublicProfile already holds years_experience, every listing with its status, and the published testimonials.\n\nWhat changed:\n- src/lib/publicProfileSideQueries.ts has a new agentPageFactsQueryOptions(userId). Its queryFn is the same 4 reads, now returning the raw AgentFactRows. It also has a new pure function, agentFactRowsFromPublicPage(page, viewerId):\n  - counts status==='sold' and status==='active'\n  - copies years_experience and the testimonial fields\n  - returns null when the viewer is the profile owner\n  - The module imports only the AgentFactRows type from agentPageFacts, so the entry graph stays light.\n- src/hooks/useAgentPageFacts.ts is now useQuery({...agentPageFactsQueryOptions, enabled, select: buildAgentPageFacts}). The data it returns to the blocks has the same shape as before.\n- src/hooks/usePublicProfile.ts: a new seedPageFacts() runs after both the RPC path and the table-read fallback, only when customPage is non-null. It calls setQueryData under the facts key.\n\nWhy seeding is equivalent for visitors:\n- 20261107000308 restricts visitor (anon, authenticated) SELECT on listings and testimonials to NOT is_sample, published pages only.\n- The facts query's statuses (active, sold) are a subset of the payload's status list.\n- Both reads take published testimonials in sort_order.\n\nWhy the owner's view is not seeded: the owner reads through 'Users can view their own listings', which returns sample rows, and the payload has no is_sample column. Seeding there would count samples that the facts query excludes. No migration was needed.\n\nTests: new file src/hooks/usePublicProfile.pageFacts.test.tsx with 6 tests:\n- visitor on the RPC path\n- table-read fallback\n- no custom page means nothing is seeded\n- owner view fetches\n- editor preview fetches\n- the pure function\n\nNot done: no separate render-level test of FullProfilePage with blocks. The blocks' existing tests still mock useAgentPageFacts, and those tests pass.\n\nVERIFIED: - `npx tsc --noEmit`: passes. Run before the commit and again after the lint-staged prettier/eslint pass.\n- `npx vitest run src/hooks/usePublicProfile src/components/pageBuilder src/lib/agentPageFacts.test.ts src/components/profile`: 22 files, 135 tests passed.\n- Full suite `npx vitest run`: 241 files passed; 2229 tests passed, 1 skipped.\n- No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-430",
+      "lane": "uiux",
+      "round": 8,
+      "title": "A team member or admin can't leave a team they joined",
+      "description": "This implements US-419 (the open uiux slice). Members and admins can now leave a team after confirming, and their seat is freed. The owner is refused, both in the UI and on the server.",
+      "acceptanceCriteria": [
+        "A member or admin can leave after confirming (AlertDialog with Stay / Leave team), and their team_members row is deleted, which frees the seat",
+        "An owner can't leave: TeamPage shows the owner no leave control, and the teams function answers 409 OWNER_CANNOT_LEAVE",
+        "A failed attempt shows a destructive toast ('Couldn’t leave <team>' with the server's message), and the team stays on screen",
+        "After leaving, my-team is re-read, so the page shows the user's next accepted team or the create prompt"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The problem was that the teams function's 'remove' action requires is_team_admin (supabase/functions/teams/index.ts, remove branch), so a plain member could not remove their own row, and TeamPage had no control for leaving.\n\nWhat changed:\n- supabase/functions/teams/index.ts: new `action: 'leave'` with `{ teamId }`. It reads teams.owner_id. If the caller is not the owner, it deletes from team_members where team_id = teamId, user_id = caller and role != 'owner', and selects id to count the rows removed. A pending invite has user_id null, so it can never match. The answer comes from a pure helper.\n- supabase/functions/teams/invites.ts: `leaveTeamRefusal({teamExists, isOwner, rowsRemoved})` returns 409 OWNER_CANNOT_LEAVE for the owner, 404 NOT_FOUND for a missing team or no accepted row, and null on success.\n- src/pages/dashboard/TeamPage.tsx: a `leaveTeam` mutation. On success it removes the team-members query, invalidates ['my-team', user.id] and toasts 'You left <team>'. On error it shows a destructive toast. There is a 'Leave team' card, shown only when myTeam.role !== 'owner', with an outline destructive button and a LogOut icon, plus a confirmation AlertDialog. The card uses theme tokens only and has no border-left or gradient.\n\nTests:\n- TeamPage.test.tsx: a member confirms, then cancels with Stay, then leaves. The test checks the invoke body, the success toast and that the page falls back to the create prompt. It also checks that an admin sees the control, that a failure gives a destructive toast with the team still shown, and that the owner gets no leave button.\n- invites.test.ts: covers leaveTeamRefusal.\n\nThe lint-staged prettier/eslint hook reformatted the files at commit; the tests were re-run afterwards and pass.\n\nVERIFIED: npx tsc --noEmit gave exit 0 with no output. npx vitest run supabase/functions/teams src/pages/dashboard/TeamPage.test.tsx gave 2 files passed and 28 tests passed, both before and after the lint-staged reformat at commit. No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the teams edge function (functions.agentbio.net / Coolify edge-functions-server) so the new 'leave' action is live. Until then, the Leave button on TeamPage gets 'Unknown action' and shows a destructive toast."
+    },
+    {
+      "id": "US-440",
+      "lane": "uiux",
+      "round": 8,
+      "title": "Clear lead routing rules that point at a member who left or was removed",
+      "description": "lead_routing_rules.assigned_to references auth.users (types.ts lead_routing_rules relationships). Neither 'remove' nor 'leave' clears or deactivates rules assigned to the departing user, so a rule can keep naming someone who is no longer on the team.",
+      "acceptanceCriteria": [
+        "Leaving or removal deactivates or unassigns that user's rules in the team",
+        "LeadRoutingRules shows a rule with no current assignee as unassigned"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-430)"
+    },
+    {
+      "id": "US-431",
+      "lane": "performance",
+      "round": 8,
+      "title": "Clients, Open houses, Links and Testimonials downloaded the form stack (23 KB gzip) before showing anything",
+      "description": "Slice of US-422. Four dashboard routes statically imported a dialog built on react-hook-form and zod. That put form-vendor (23.4 KB gzip) and the dialog UIs on the route for an agent who only came to look. Each dialog now uses the US-412 pattern (useMountOnFirstOpen + LazyModal): it loads the first time it opens, and its chunk is warmed when the agent hovers or focuses the button that opens it. Navigating to these pages now costs 52-69% less JS. Also fixed a dead button: the Testimonials empty state's \"Add Your First Testimonial\" had no onClick. It now opens the add form.",
+      "acceptanceCriteria": [
+        "Clients, OpenHouses, Links and Testimonials have no value imports of react-hook-form, zod, @hookform/resolvers/zod, their form dialogs or UpgradeModal (source guard in each *.lazyDialogs.test.tsx)",
+        "Each page renders its first view without loading any dialog module, and each dialog still opens (add/edit/detail/schedule/request/upgrade)",
+        "When the plan is full, the upgrade prompt opens instead of the form",
+        "Gzipped route closure beyond entry + DashboardLayout: Clients 54.4->20.3 KB, Open houses 58.5->27.9 KB, Links 54.1->25.5 KB, Testimonials 41.4->13.0 KB",
+        "The Testimonials empty-state Add button opens the add form",
+        "tsc passes; check-bundle-size passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "**What changed**\n- src/pages/dashboard/Clients.tsx: ContactFormDialog, ContactDetail and UpgradeModal are now React.lazy, each wrapped in LazyModal.\n  - ContactDetail matters too: it statically imports ContactFormDialog, so the form stack would have stayed on the route through it.\n  - The add form's chunk warms on hover/focus of either Add button. ContactDetail's chunk warms on hover/focus of a contact row.\n  - The ?client= deep link still works: a spinner shows, then the detail.\n- src/pages/dashboard/OpenHouses.tsx: OpenHouseFormDialog, OpenHouseVisitorsDialog and UpgradeModal are lazy. The form warms from the \"Schedule open house\" buttons.\n- src/pages/dashboard/Links.tsx: AddLinkModal, EditLinkModal and UpgradeModal are lazy. The add form warms from the Add buttons, the edit form from each row's edit button. LinkFormData stays a type import.\n- src/pages/dashboard/Testimonials.tsx: AddTestimonialModal, EditTestimonialModal, RequestTestimonialModal and UpgradeModal are lazy. EditTestimonialFormData is now an `import type`.\n  - Bug fixed: the empty-state \"Add Your First Testimonial\" button (about line 352 before) had no onClick. It now calls handleAddClick.\n- Behaviour is unchanged once a dialog has opened: useMountOnFirstOpen keeps it mounted afterwards, the same way it was always mounted before, so dialogs that reset on open still do.\n\n**Measurement**\n- Method: `vite build --manifest`, then a script that walks each route chunk's static import closure and sums the gzipped size of everything not already loaded by the entry, or by the entry plus DashboardLayout.\n- Before → after, beyond entry + layout (what navigating to the page costs):\n  - Clients: 54.4 → 20.3 KB\n  - Open houses: 58.5 → 27.9 KB\n  - Links: 54.1 → 25.5 KB\n  - Testimonials: 41.4 → 13.0 KB\n- Beyond the entry alone:\n  - Clients: 91.6 → 56.2 KB\n  - Open houses: 95.2 → 64.6 KB\n  - Links: 91.9 → 62.4 KB\n  - Testimonials: 79.0 → 49.5 KB\n- form-vendor is now on none of the four routes.\n\n**Tests**\n- One `*.lazyDialogs.test.tsx` per page. src/test/lazyDialogs.ts holds the shared source guard (`expectNoValueImports`) and a `clickWarmed` helper.\n- Why `clickWarmed` exists: vitest gives one of two concurrent dynamic imports of a vi.mock'ed module (made from a source file) the real module. user.click fires the onFocus warm-up and the lazy import back to back, which triggers this. I reproduced it in a scratch test. The helper hovers and focuses first, waits for `vi.dynamicImportSettled()`, then clicks. Browsers do not have this problem.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run src/pages/dashboard src/hooks/useMountOnFirstOpen.test.ts src/components/clients src/components/openHouses src/components/modals src/route-weight.test.ts src/profile-bundle.test.ts`: 24 files, 160 tests passed.\n  - This includes the 4 new files (20 tests), plus Clients.test.tsx and Listings.lazyDialogs.test.tsx.\n- `npx vite build --manifest`: exit 0. Closure measurement as in notes.\n- `node scripts/check-bundle-size.mjs`: \"OK — 268 chunks within budget (1 documented exception(s))\".\n- `npx eslint` on the changed files: 0 errors and 8 warnings. All 8 are on lines this change did not touch (unused `error` catch variables, unescaped quotes).\n- No migration, so verify:migrations does not apply.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-441",
+      "lane": "performance",
+      "round": 8,
+      "title": "Links route: sanitizeUrl pulls in DOMPurify (10.8 KB gzip) without using it",
+      "description": "src/pages/dashboard/Links.tsx imports sanitizeUrl from src/utils/sanitize.ts. That module imports DOMPurify at the top (line 6), but sanitizeUrl does not use DOMPurify. As a result purify.es (10.8 KB gzip) is on the Links route and on every other importer of sanitizeUrl. Move sanitizeUrl, or the DOMPurify-using helpers, into separate modules so a URL check does not load the HTML sanitizer.",
+      "acceptanceCriteria": [
+        "purify.es is not in the Links route closure",
+        "Every sanitizeUrl caller behaves the same (existing sanitize tests pass)",
+        "Route closure measured before and after"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-431)"
+    },
+    {
+      "id": "US-442",
+      "lane": "performance",
+      "round": 8,
+      "title": "Leads route (56.0 KB beyond layout): defer the heavy panels",
+      "description": "Leads is now the heaviest agent dashboard route. Measured contributors: Leads chunk 16.5 KB, useLeadStats 6.8 KB, date-vendor 6.3 KB, useContacts 2.0 KB, leadFormSchema 1.8 KB, exportUtils 1.6 KB, useLeadActivities 1.5 KB. Check which of these are only needed after an action (export, a lead detail or convert dialog) and load them when that action happens.",
+      "acceptanceCriteria": [
+        "Leads route closure beyond entry + layout reduced, with before/after numbers",
+        "Leads.test.tsx still passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-431)"
+    },
+    {
+      "id": "US-443",
+      "lane": "performance",
+      "round": 8,
+      "title": "Settings route (52.8 KB beyond layout)",
+      "description": "Settings is the next heaviest route after Leads. Measure its closure and apply load-on-open to any tabs or dialogs that are closed on first render.",
+      "acceptanceCriteria": ["Before/after closure numbers", "Settings.test.tsx passes"],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-431)"
+    },
+    {
+      "id": "US-432",
+      "lane": "security",
+      "round": 8,
+      "title": "There were two API-key validators with different rules for when a key counts as revoked; now there is one",
+      "description": "US-432 (completes US-385). The two API-key validators are merged. supabase/functions/_shared/api-auth.ts now holds every rule. webhook-auth.ts only passes requests through to it, and it no longer falls back to a JWT when a presented API key is bad. Both modules can now be run under vitest, with 20 tests covering both ways in.",
+      "acceptanceCriteria": [
+        "webhook-auth.validateApiKey and flexibleAuth delegate to api-auth.authenticateApiKey and no longer query api_keys themselves",
+        "A key is refused when revoked_at is set, when is_active=false, when it has expired, or when its expiry cannot be parsed (fails closed), through both Authorization: Bearer and x-api-key",
+        "The anon key that supabase-js sends in the apikey header is never treated as an attempted API key",
+        "flexibleAuth does not fall back to the JWT path when the presented API key is revoked or unknown",
+        "vitest runs the real modules under the Node harness (supabase/functions/_shared/api-auth.test.ts, 20 tests)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Before: _shared/api-auth.ts:34-65 authenticateApiKey read only `Authorization: Bearer ab_...` and checked revoked_at and expires_at. _shared/webhook-auth.ts:19-73 validateApiKey ran its own lookup. It read x-api-key/apikey, had no prefix check, checked is_active (revoked_at was added only in US-377), used console.error, and imported createClient from esm.sh at runtime, so vitest could not load it. flexibleAuth caught a failed API-key check and fell through to the JWT path.\n\nAfter: api-auth.ts exports four pieces, and each rule lives in exactly one of them:\n- extractApiKey: a bearer token that starts with ab_, then any x-api-key value (an explicit attempt, so a malformed one is refused), then an apikey header only if it starts with ab_ (supabase-js puts the anon key in apikey on every browser call).\n- isApiKeyUsable: refuses revoked_at, is_active===false, expired keys, and expiry dates that cannot be parsed.\n- resolveApiKey: checks the prefix, looks the key up by its SHA-256 hash, then touches last_used_at without waiting.\n- authenticateApiKey.\n\nwebhook-auth.ts now only passes through. validateApiKey returns null when no key was presented and a 401 HttpError when a key was presented but cannot be used. If a key is present, flexibleAuth decides on that key alone. It falls back to the JWT only when no key was presented. All imports from esm.sh are now `import type`.\n\nNeither validator is imported by any endpoint today; only the api-keys function imports hashApiKey and API_KEY_PREFIX. So nothing live changes. This is the cleanup US-385 asked for before API-key auth is wired to an endpoint.\n\ndocs/setup/MAKE_COM_INTEGRATION.md told operators to INSERT a plaintext `mk_` key into key_hash. That could never authenticate, because the stored value has to be the hash, and it put plaintext secrets in the table. It now points to /dashboard/api-keys and ab_ keys.\n\nVERIFIED: Results after the lint-staged prettier and eslint pass that ran at commit:\n- `npx tsc --noEmit` exited 0.\n- `npx vitest run supabase/functions/_shared/api-auth.test.ts`: 1 file, 20 tests passed.\n- `npx vitest run supabase/functions/_shared src/pages/dashboard/ApiKeysPage.test.tsx` (before the commit hook): 26 files, 280 tests passed.\n- No migration was added, so verify:migrations was not needed.\n- `deno check` was not run because deno is not installed in the sandbox.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-444",
+      "lane": "security",
+      "round": 8,
+      "title": "Wire API-key auth into the endpoints the Make.com doc promises, or correct the doc",
+      "description": "docs/setup/MAKE_COM_INTEGRATION.md:70-110 says generate-article accepts `x-api-key`. supabase/functions/generate-article/index.ts never imports webhook-auth or api-auth (the only x-api-key at :306 is the outbound Claude call). Either use requireFlexibleAuth with a service-role client and check permissions.write, or remove the claim.",
+      "acceptanceCriteria": [
+        "generate-article accepts a valid ab_ key and refuses revoked or read-only keys, with tests",
+        "Or the doc no longer claims API-key access"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs an owner decision on which endpoints should be programmable. (follow-up from US-432)"
+    },
+    {
+      "id": "US-433",
+      "lane": "enterprise",
+      "round": 8,
+      "title": "Agents can set a time zone, and the morning email now arrives at their own 7am instead of 13:00 UTC",
+      "description": "First slice of the owner's 2026-11-07 time zone decision, which also delivers US-343. It adds a `profiles.timezone` column (an IANA name, validated in the database and private to the owner) and a Time zone card in Settings. The card preselects the browser's zone and offers \"Use this time zone\" until one is saved. The browser's zone is also written the first time an agent saves any notification setting. The digest now sends each agent who has a zone at DIGEST_LOCAL_HOUR (default 7) on their own clock. The edition is dated by their local calendar day, the Monday weekly edition uses their local weekday, and \"due today\" runs to the end of their local day. Agents with no zone keep the UTC edition, unchanged. US-318 (chaser quiet hours) can now use the same column and is left for the next round.",
+      "acceptanceCriteria": [
+        "profiles.timezone exists. A trigger refuses any name Postgres does not know (pg_timezone_names), plus the posix/ and right/ trees, with check_violation, DETAIL invalid_timezone. The value is trimmed and '' becomes NULL",
+        "timezone gets no anon/authenticated SELECT grant. The owner reads it through get_own_profile and writes it under the existing own-profile UPDATE policy",
+        "Settings has a Time zone control. It defaults to the browser's zone, says the zone is not saved yet, and saves on choice",
+        "The first notification-settings save writes the browser's zone if none is stored. If that write is refused, the save is retried without the zone so the agent's change is not lost",
+        "An agent in America/Los_Angeles gets the digest at 15:00Z (07:00 PST), one in Europe/London at 07:00Z, and one with no zone at 13:00Z, each exactly once a day",
+        "A missed run is caught up exactly once per local day",
+        "A Sydney edition is dated and treated as weekly by Sydney's calendar, and its due-today cutoff is the end of the Sydney day",
+        "digest_runs has a marker per (local date, zone). '' is the UTC edition, so existing rows keep their meaning",
+        "Until the migration is applied, the store falls back to the old behaviour (missing column, 42703 or PGRST204) instead of failing the task"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed, with file evidence:\n- Migration `supabase/migrations/20261107000433_profile_timezone.sql`:\n  - Adds `profiles.timezone` and the `validate_profile_timezone()` BEFORE INSERT/UPDATE OF timezone trigger. The function is not SECURITY DEFINER, pins search_path, and has EXECUTE revoked from PUBLIC/anon/authenticated.\n  - Restates `get_own_profile()` with its grants.\n  - Adds `digest_runs.slot text NOT NULL DEFAULT ''` and changes the primary key to (digest_date, slot), guarded so it runs only once.\n- `src/integrations/supabase/types.ts`: profiles.timezone and digest_runs.slot added in alphabetical order; the fixture is updated in `src/test/fixtures/profile.ts`.\n- New `supabase/functions/_shared/timeZone.ts`: Intl-only helpers (isValidTimeZone, localDateIn, zonedTimeToUtc with a two-pass DST settle, addDays).\n- `supabase/functions/scheduled-maintenance/digests.ts`:\n  - `digestSchedule` takes a timeZone. The UTC path returns exactly what it did before, and the old tests pass unchanged.\n  - `digestKindFor` accepts the edition's local date.\n  - New `editionWindows` and `editionSlot`.\n  - `runDigests` groups agents by edition (local day and zone), checks each edition's marker once per run, sends per edition, and writes a marker only for an edition that had no errors. It adds `notDue` and `settled` counts and an optional `scheduleFor`.\n- `digest-store.ts`: selects timezone; `hasCompletedRun` and `markRunCompleted` take a slot; both fall back if the column is missing.\n- `index.ts`: wires in `scheduleFor` with `DIGEST_LOCAL_HOUR`. It no longer returns early with 'outside the digest window'.\n- Client:\n  - New `src/lib/timeZone.ts` and `src/hooks/useAgentTimeZone.ts` (its own query key).\n  - New `src/components/settings/TimeZoneSetting.tsx`, mounted after LeadNotificationPreferences in `src/pages/dashboard/Settings.tsx`.\n  - `src/hooks/useNotificationPreferences.ts` adds the first-save default, which only applies once the stored value is known to be empty (the query succeeded).\n- `supabase/functions/.env.example` documents DIGEST_LOCAL_HOUR (the env-example test requires it).\n\nTrade-off: one existing test was renamed and its assertions changed. Before, a completed day meant later runs read no profiles (US-354). Now every hourly run pages through profile ids, zones and preferences (500 per page, small columns), because some zone's edition is due in most hours. Leads, tasks, key dates, digest_log and weekly counts are still read only for agents whose edition is due and not yet settled.\n\nHow it was checked:\n- Applied the prelude and all 73 migrations to a fresh local Postgres 16 and ran verify-schema: all checks passed.\n- Probed the trigger by hand in that database:\n  - a padded name is trimmed and '' becomes NULL;\n  - 'Mars/Base' and 'posix/Europe/London' are refused;\n  - anon and authenticated have no SELECT on timezone; authenticated has UPDATE;\n  - two digest_runs rows for the same date with different slots both insert.\n\nVERIFIED: - `npx tsc --noEmit`: passed (run again after the pre-commit prettier/eslint pass).\n- `npx vitest run supabase/functions/scheduled-maintenance supabase/functions/_shared/timeZone.test.ts src/lib/timeZone.test.ts src/hooks/useNotificationPreferences.test.ts src/components/settings/TimeZoneSetting.test.tsx src/pages/dashboard/Settings.test.tsx src/env-example.test.ts src/hooks/useProfile.test.ts`: 9 files, 105 tests passed.\n- Full `npx vitest run` before the .env.example fix: 243 of 244 files passed. The one failure was env-example asking for DIGEST_LOCAL_HOUR; after adding it, that file passes 7 of 7.\n- `npm run verify:migrations`: OK, 72 migration files structurally valid.\n- `node scripts/verify-schema.mjs` against a local Postgres 16 with the prelude and every migration applied: \"All schema checks passed.\"\n- `npx impeccable detect src/components/settings/TimeZoneSetting.tsx`: no findings. This was a regex-only scan; element rules did not run.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000433_profile_timezone.sql. It adds profiles.timezone with its validation trigger and adds digest_runs.slot with a new primary key | Redeploy the scheduled-maintenance edge function (Coolify functions.agentbio.net) | Optional: set DIGEST_LOCAL_HOUR on the functions server (default 7). DIGEST_HOUR_UTC still applies to agents with no zone"
+    },
+    {
+      "id": "US-445",
+      "lane": "enterprise",
+      "round": 8,
+      "title": "Let the agent choose the morning email's hour",
+      "description": "The digest goes out at DIGEST_LOCAL_HOUR (one global value) for every agent with a zone. US-343 says 'their own configured local hour'. Add notification_preferences.digest_hour (a whole hour, 5 to 10), a control next to the Morning email select, and pass it to digestSchedule per agent. The edition key would then need to include the hour.",
+      "acceptanceCriteria": [
+        "An agent who picks 6am gets the digest at 06:00 local",
+        "The default stays at 7am, and the catch-up rules are unchanged"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-433)"
+    },
+    {
+      "id": "US-446",
+      "lane": "enterprise",
+      "round": 8,
+      "title": "Ask for the time zone during onboarding and reflect it in other local-date features",
+      "description": "Agents who never open Settings or save a notification setting stay on UTC. Offer the detected zone in onboarding. Then audit other features that compute 'today' (localDate.ts task due dates, the open-house form) and use the stored zone where the server decides.",
+      "acceptanceCriteria": [
+        "New signups have profiles.timezone set after onboarding",
+        "No server-side job computes an agent's 'today' in UTC when a zone is stored"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-433)"
+    },
+    {
+      "id": "US-434",
+      "lane": "marketing",
+      "round": 8,
+      "title": "Free-tool marketing emails had no working unsubscribe and ignored opt-outs",
+      "description": "US-425, done as US-434. The listing generator drip's footer linked ${SITE_URL}/unsubscribe. App.tsx has no such route, so the link fell through to /:slug and showed the profile 404. The Instagram bio analyzer drip had no unsubscribe link at all. None of the four drip senders sent a List-Unsubscribe header or checked for an opt-out before sending. For marketing email this is a CAN-SPAM/GDPR gap, and the privacy policy promises the opposite (src/pages/legal/PrivacyPolicy.tsx:300). Opt-outs now work end to end, and every drip send honours them.",
+      "acceptanceCriteria": [
+        "Every listing and bio drip email (the first email and the scheduled ones) carries an Unsubscribe link to /unsubscribe?l=&c=&t=, plus List-Unsubscribe and List-Unsubscribe-Post (RFC 8058 one-click) headers",
+        "/unsubscribe exists, unsubscribes only when the person clicks (not on page load), and shows a clear state for an invalid link or a failure",
+        "The email-unsubscribe edge function checks an HMAC token over list and capture id, then records the address in email_suppressions by keyed hash only, never in plaintext, and ends that capture's sequence",
+        "All four senders check isSuppressed before sending; a suppressed address gets nothing and its sequence is ended. The opt-out is per address, so it covers both tools",
+        "Senders refuse to send marketing email when no signing key is configured",
+        "'unsubscribe' is reserved as a username and as a profile path segment"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- Migration supabase/migrations/20261108000434_email_suppressions.sql: a new table, email_suppressions (email_hash PK, source in listing|bio, method in link|one_click, created_at). RLS is on, ALL is revoked from PUBLIC/anon/authenticated, and the only policy is TO service_role. Hand-added to src/integrations/supabase/types.ts.\n- supabase/functions/_shared/marketing-unsubscribe.ts: the token is an HMAC-SHA256 under a domain-separated key ('marketing-unsubscribe:v1:' + PII_ENCRYPTION_KEY, falling back to ENCRYPTION_KEY) and is compared in constant time. Also here: parseUnsubscribeRequest (reads the query string for the one-click POST or a JSON body from the page), unsubscribeLinks, unsubscribeHeaders, the footer helpers, and isSuppressed. isSuppressed reuses emailLookupHash, the same hash as leads.email_hash, so US-135 can match the list against leads and contacts later. It throws on a database error, so a sender that cannot check does not send.\n- supabase/functions/email-unsubscribe/index.ts: POST only. It returns 400 for bad parameters, 403 for a bad token and 503 when the key is missing. The page path is rate-limited per IP; the one-click path is not, because mail-provider servers post on behalf of many people and the token already blocks forgery. It upserts the suppression, ignoring duplicates, and sets the capture's email_sequence_completed. A capture that no longer exists still gets 200.\n- _shared/email.ts: EmailOptions.headers is passed through to Resend.\n- The four senders (send-listing-generator-email, send-scheduled-listing-emails, send-bio-analyzer-email, send-scheduled-bio-emails) now require the key, check suppression, add the footer link and the headers, and end the sequence for a suppressed address. The dead link with no parameters is gone.\n- src/pages/public/Unsubscribe.tsx plus a lazy route in src/App.tsx, added before the /:slug catch-all. 'unsubscribe' is added to src/lib/usernameValidation.ts RESERVED_USERNAMES and to functions/_lib/social-meta.ts RESERVED_SEGMENTS. tests/a11y/accessibility.spec.ts covers /unsubscribe, because the route-coverage test requires it.\n\nTests: supabase/functions/_shared/marketing-unsubscribe.test.ts has 18 tests. They cover forgery and cross-capture/list/key rejection, link and header shape, query and body parsing, the key fallback, isSuppressed (hash-only lookup, and throws on error), and a source scan that all four senders check suppression, link the unsubscribe, set the headers, and no longer carry the bare /unsubscribe link. src/pages/public/Unsubscribe.test.tsx has 4 tests: no call on load, the posted payload, the invalid states, and retry.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpm run verify:migrations: \"[migrations] OK — 72 migration files structurally valid.\"\nnpx vitest run supabase/functions/_shared/marketing-unsubscribe.test.ts src/pages/public/Unsubscribe.test.tsx: 2 files, 22 tests passed, re-run after the pre-commit prettier pass.\nnpx vitest run src/*.test.* functions supabase/functions src/pages/public src/lib/usernameValidation: 66 files passed, 735 tests passed, 1 skipped. The first run failed in browser-suites.test.ts because /unsubscribe was not in the a11y spec; adding it fixed that.\nnpx impeccable detect src/pages/public/Unsubscribe.tsx: no findings, regex rules only.\nNot run: npm run verify:schema, which needs a real Postgres; it runs in CI.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration 20261108000434_email_suppressions.sql | Redeploy the edge functions: the new email-unsubscribe, plus send-listing-generator-email, send-scheduled-listing-emails, send-bio-analyzer-email and send-scheduled-bio-emails. functions.agentbio.net serves every directory, so the new function is picked up automatically | Check that PII_ENCRYPTION_KEY (or ENCRYPTION_KEY) is set on the functions runtime. Without it the drips now refuse to send rather than go out with no working unsubscribe. submit-lead already depends on it"
+    },
+    {
+      "id": "US-447",
+      "lane": "marketing",
+      "round": 8,
+      "title": "Free-tool drips: craft-floor email HTML and a postal address in the footer",
+      "description": "The listing and bio email HTML still has the purple-to-pink gradient header and 4px coloured border-left callouts (send-listing-generator-email getWelcomeEmailHTML, send-scheduled-listing-emails emails 1/3, send-bio-analyzer-email .score-badge). CAN-SPAM also requires the sender's physical postal address in the footer, and none of them has one.",
+      "acceptanceCriteria": [
+        "No gradient headers or thick coloured border-left callouts in the drip HTML",
+        "The footer carries the business postal address from one config value, once the owner supplies it"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "The postal address needs the owner to supply it. (follow-up from US-434)"
+    },
+    {
+      "id": "US-448",
+      "lane": "marketing",
+      "round": 8,
+      "title": "Bounce and complaint handling feeds email_suppressions",
+      "description": "A Resend webhook (signed) for email.bounced and email.complained should insert into email_suppressions with a new method value, so hard bounces and spam complaints stop future sends. This is part of US-135.",
+      "acceptanceCriteria": [
+        "Signature-verified webhook function",
+        "The method check constraint is extended",
+        "Tests for the signature check and the insert"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-434)"
+    },
+    {
+      "id": "US-449",
+      "lane": "marketing",
+      "round": 8,
+      "title": "Bio drip 7-day window drops email 7",
+      "description": "send-scheduled-bio-emails only selects captures where created_at >= now - 7 days, but email 7 is due on day 7, so it can fall outside the window and never send.",
+      "acceptanceCriteria": [
+        "The window covers the last due day (for example 8 days)",
+        "A test pins BIO_DRIP_DAY max < window"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-434)"
+    },
+    {
+      "id": "US-435",
+      "lane": "seo",
+      "round": 8,
+      "title": "Reserved single-segment URLs like /about and /legal answered 200 with the homepage instead of 404",
+      "description": "Implements US-426 (under the reserved id US-435). The profile Pages Function now answers dist/404.html with a 404 for reserved segments that App.tsx does not route, for crawlers and people alike: legal, about, contact, help, support, api, plus the bare prefixes auth, onboarding, assets and icons. Real routes (dashboard, admin, blog, tools, pricing), the /features and /for 301s, and dotted asset names still go to next() unchanged. A guard test now requires every reserved segment to be exactly one of three things: an App.tsx route, a 301 in _redirects, or this 404.",
+      "acceptanceCriteria": [
+        "GET /about, /legal, /contact, /help, /support or /api (any case, crawler or human) returns 404 with the dist/404.html body and x-agentbio-prerender: not-found, without calling next() or the database",
+        "Reserved segments that are real routes (/dashboard, /pricing, /blog) still fall through to next() with 200",
+        "Dotted reserved names (robots.txt) still get the asset",
+        "src/spa-routes.test.ts fails if a reserved segment is neither a route, a 301 rule, nor in RESERVED_NON_ROUTE_SEGMENTS, or if a non-route entry is actually served"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence: functions/_lib/profile-route.ts serveProfileRoute returned next() for any isReservedSegment(segment). Reserved-but-unrouted segments matched the `/:username /index.html 200` rule in public/_redirects and answered 200 with the prerendered homepage, which is a soft 404 (progress.txt ~2610-2618, and the _redirects comment at the /for rule). I checked each reserved segment against App.tsx path= entries. Bare /auth, /onboarding, /assets and /icons have no route either (only child paths exist, or they are directories), so they go in the same set. A grep found no links to any bare one.\n\nChanges:\n- functions/_lib/social-meta.ts: adds RESERVED_NON_ROUTE_SEGMENTS, isReservedNonRoute(), and RESERVED_SEGMENT_NAMES (exported for the guard test).\n- functions/_lib/profile-route.ts: for a reserved segment, returns notFoundResponse(context) when it is a non-route, otherwise next(). This sits before the crawler check, so people also get the real 404. The /:username/listing/:id route shares serveProfileRoute, so /about/listing/x is also a 404.\n- public/_redirects: replaced the stale comment that said these segments were left as soft 404s.\n- functions/_tests/username-route.test.ts: the app-route test now uses dashboard/pricing/blog and asserts 200 plus next(). New tests: 404 for the reserved non-routes under both crawler and human user agents (including 'About'), and robots.txt still reaches the asset.\n- src/spa-routes.test.ts: new 'reserved username segments' suite. I confirmed it fails when 'help' is removed from the non-route set (it reports 'not a route and not redirected: add to RESERVED_NON_ROUTE_SEGMENTS').\n\nAssumption, not checked on a deploy: Cloudflare Pages Functions run before _redirects, and next() still applies the /features and /for 301s. Both were already true for the existing behaviour.\n\nVERIFIED: npx tsc --noEmit: passed, before and after the lint-staged prettier/eslint commit hook ran.\nnpx vitest run functions src/spa-routes.test.ts src/routes.test.ts: 42 files passed, 498 tests passed, 1 skipped (dist/404.html is absent in the sandbox).\nNegative check: with 'help' removed from RESERVED_NON_ROUTE_SEGMENTS, src/spa-routes.test.ts fails 2 tests as intended; restored afterwards.\nNo migration was added.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-436",
+      "lane": "mobile",
+      "round": 8,
+      "title": "The installed app opened on the marketing homepage instead of the agent's dashboard",
+      "description": "The manifest is called \"AgentBio Admin\" and describes itself as \"Manage your real estate link-in-bio profile on the go\". The owner decided on 2026-11-07 that the installed PWA is the only phone app agents get. Even so, start_url was \"/\", which is the prerendered marketing homepage, and src/pages/public/Landing.tsx does not redirect signed-in visitors. So every time an agent tapped the home-screen icon they got the hero, the pricing pitch and a Get Started button, and had to look for Log In or type /dashboard to reach their leads. start_url is now /dashboard, and id is pinned to \"/\" so existing installs keep their identity. The commit also adds long-press shortcuts, removes the portrait lock and gives iOS a short home-screen label.",
+      "acceptanceCriteria": [
+        "public/manifest.json start_url is /dashboard. It is a RequireAuth route (src/App.tsx:354,371) and _redirects serves it the SPA shell (public/_redirects '/dashboard /index.html 200'), so a signed-out launch goes to /auth/login",
+        "manifest id is '/', so browsers that derived identity from the old start_url do not register a second app",
+        "Shortcuts (at most 4) go to /dashboard/leads, /dashboard/open-houses, /dashboard/listings and /dashboard/clients. Each is a real dashboard child route served by _redirects, and its icon exists",
+        "No orientation lock, so the open-house kiosk works in landscape on tablets",
+        "index.html carries apple-mobile-web-app-title equal to the manifest short_name",
+        "src/pwa-manifest.test.ts enforces all of the above against the real files"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What I audited: there are no mobile-lane stories with passes=false in prd.json. US-272..US-417 are all done. Push and FCM references are already gone from src/lib/sw-cleanup.ts, which also already uses logger rather than console. src/lib/sync-manager.ts and src/lib/offline-storage.ts have no importers (App.tsx:156-160 notes this, US-260), so their correctness does not affect users today. App.tsx:161-166 runs cleanupServiceWorkers on every mount; it allowlists /sw.js and the agentbio-sw- caches, so this costs a little time but loses no data. I judged that a lower priority than the launch target, which was wrong on every launch: public/manifest.json:5 had start_url \"/\" and :9 had orientation \"portrait\"; index.html had no apple-mobile-web-app-title.\n\nChanges: public/manifest.json (id, start_url, shortcuts, orientation removed), index.html (apple-mobile-web-app-title \"AgentBio\") and the new src/pwa-manifest.test.ts. Offline behaviour: public/sw.js networkFirstNavigation answers /dashboard from the cached page or falls back to /index.html (sw.js ~398-412), the same as any other dashboard route. Not verified on a real device; a launch from the home screen on Android and iOS after deploy will confirm it.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output. npx vitest run src/pwa-manifest.test.ts src/deployed-files.test.ts src/sw.test.ts src/spa-routes.test.ts src/routes.test.ts functions: 45 files passed, 547 tests passed, 1 skipped. After the pre-commit prettier pass, npx vitest run src/pwa-manifest.test.ts src/deployed-files.test.ts: 23 passed (pwa-manifest is 7 of them). No migration, so verify:migrations was not run.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages. manifest.json is revalidated on every load (_headers floor). Chrome on Android picks up the new start_url and shortcuts when it next checks the manifest, typically within a day. iOS home-screen icons added before this keep their saved URL until they are re-added."
+    },
+    {
+      "id": "US-450",
+      "lane": "mobile",
+      "round": 8,
+      "title": "A homebuyer who adds an agent's profile to the home screen gets the AgentBio dashboard login",
+      "description": "Every page, /:username included, links the one /manifest.json. A visitor who taps Add to Home Screen on an agent's profile gets an icon that opens /dashboard, which sends them to /auth/login. Before this change it opened the marketing homepage, which was also wrong. Give public profile pages their own manifest: a Pages Function at /:username/manifest.json with start_url /:username, the agent's name and avatar, and a scope limited to the profile. The profile route would swap the link rel=manifest for it.",
+      "acceptanceCriteria": [
+        "Installing from /:username opens /:username",
+        "Dashboard installs are unaffected (separate id)",
+        "Unpublished profiles get no per-profile manifest"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs functions/ work plus a manifest swap in the profile page head; check that the CSP manifest-src 'self' still allows it. (follow-up from US-436)"
     }
   ]
 }

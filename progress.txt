@@ -5562,3 +5562,88 @@ Other findings:
 - [mobile] public/sw.js:210 `p.includes('/auth/v1')` and `p.includes('/rest/v1')` are substring checks. A same-origin profile path cannot contain a slash, so these are harmless today, but they would match a nested page such as /blog/rest/v1-guide. Low priority.
 
 Owner decisions 2026-11-07: agents get a time zone setting (unblocks US-318, US-343); lead statuses include nurturing and closed (unblocks US-278).
+
+---
+
+## Continuous improvement loop — round 8 — 2026-11-08 (US-427 to US-436 done)
+
+Ten lanes, all approved with no fix-ups. Closed US-316, US-343, US-361, US-385, US-419, US-425, US-426; first slice of US-278; slice of US-422.
+Owner decisions applied: agent time zone (profiles.timezone, local-morning digest), lead statuses incl. nurturing/closed (CHECK constraint).
+Final: tsc clean (app + node config), 2350 unit tests pass (from 2223), verify:migrations OK (74 files), vite build OK, eslint 644 warnings (CI ratchet 645 -> 644).
+
+- US-427 [listings] On a phone, a visitor reading about a listing had to scroll back up to contact the agent or book a showing
+- US-428 [leads] Lead statuses now come from one list, and the database rejects any value outside it
+- US-429 [profile] Public profile: page-builder Stats and Testimonial blocks no longer make 4 extra requests per visit (US-316)
+- US-430 [uiux] A team member or admin can't leave a team they joined
+- US-431 [performance] Clients, Open houses, Links and Testimonials downloaded the form stack (23 KB gzip) before showing anything
+- US-432 [security] There were two API-key validators with different rules for when a key counts as revoked; now there is one
+- US-433 [enterprise] Agents can set a time zone, and the morning email now arrives at their own 7am instead of 13:00 UTC
+- US-434 [marketing] Free-tool marketing emails had no working unsubscribe and ignored opt-outs
+- US-435 [seo] Reserved single-segment URLs like /about and /legal answered 200 with the homepage instead of 404
+- US-436 [mobile] The installed app opened on the marketing homepage instead of the agent's dashboard
+
+Owner actions:
+- US-428: Apply migration supabase/migrations/20261107000428_lead_status_vocabulary.sql (cleans up existing leads.status rows, then sets NOT NULL and adds leads_status_check)
+- US-428: Redeploy the execute-workflow edge function (new _shared/lead-status.ts import and status check)
+- US-430: Redeploy the teams edge function (functions.agentbio.net / Coolify edge-functions-server) so the new 'leave' action is live. Until then, the Leave button on TeamPage gets 'Unknown action' and shows a destructive toast.
+- US-433: Apply migration supabase/migrations/20261107000433_profile_timezone.sql. It adds profiles.timezone with its validation trigger and adds digest_runs.slot with a new primary key
+- US-433: Redeploy the scheduled-maintenance edge function (Coolify functions.agentbio.net)
+- US-433: Optional: set DIGEST_LOCAL_HOUR on the functions server (default 7). DIGEST_HOUR_UTC still applies to agents with no zone
+- US-434: Apply migration 20261108000434_email_suppressions.sql
+- US-434: Redeploy the edge functions: the new email-unsubscribe, plus send-listing-generator-email, send-scheduled-listing-emails, send-bio-analyzer-email and send-scheduled-bio-emails. functions.agentbio.net serves every directory, so the new function is picked up automatically
+- US-434: Check that PII_ENCRYPTION_KEY (or ENCRYPTION_KEY) is set on the functions runtime. Without it the drips now refuse to send rather than go out with no working unsubscribe. submit-lead already depends on it
+- US-436: Redeploy Cloudflare Pages. manifest.json is revalidated on every load (_headers floor). Chrome on Android picks up the new start_url and shortcuts when it next checks the manifest, typically within a day. iOS home-screen icons added before this keep their saved URL until they are re-added.
+
+Opened:
+- US-437 [listings] US-361 follow-up: the bar on a real phone in Playwright
+- US-438 [leads] US-278 slice 2: a workflow's 'Add Note' lands on the lead timeline, then leads.notes is dropped
+- US-439 [leads] US-278 slice 3: status filter and KPI chips cover nurturing and closed
+- US-440 [uiux] Clear lead routing rules that point at a member who left or was removed
+- US-441 [performance] Links route: sanitizeUrl pulls in DOMPurify (10.8 KB gzip) without using it
+- US-442 [performance] Leads route (56.0 KB beyond layout): defer the heavy panels
+- US-443 [performance] Settings route (52.8 KB beyond layout)
+- US-444 [security] Wire API-key auth into the endpoints the Make.com doc promises, or correct the doc
+- US-445 [enterprise] Let the agent choose the morning email's hour
+- US-446 [enterprise] Ask for the time zone during onboarding and reflect it in other local-date features
+- US-447 [marketing] Free-tool drips: craft-floor email HTML and a postal address in the footer
+- US-448 [marketing] Bounce and complaint handling feeds email_suppressions
+- US-449 [marketing] Bio drip 7-day window drops email 7
+- US-450 [mobile] A homebuyer who adds an agent's profile to the home screen gets the AgentBio dashboard login
+
+Other findings:
+- [listings] src/pages/public/ListingPage.tsx: the header's 'Ask about this home' and the bar's 'Ask a question' both show on phones. The header one could become hidden sm:inline-flex once e2e confirms nothing depends on it.
+- [listings] src/components/profile/StickyActionBar.tsx: still uses fixed colours (bg-purple-600 Email, bg-indigo-600 Home Value, bg-white panel with border plus shadow-2xl) that ignore the profile theme and break the craft floor's 'border or shadow' rule. This is profile/uiux lane polish.
+- [listings] US-276 (viewed listings on a lead) is still open on the listing side: submit-lead would need to store visitor_id. I left it alone because the leads lane is working on statuses this round.
+- [leads] US-418 (step-two enrichment never reaches the agent's email) still needs an owner decision on whether a second email per lead is acceptable; not started.
+- [leads] US-279 (Leads filter row wraps on phones) is still open. Note that the bulk-action Select already uses flex-wrap (Leads.tsx ~776), but the main filter row does not.
+- [leads] src/lib/constants.ts still exports a LISTING_STATUSES with draft/under_contract that duplicates src/lib/listingStatus.ts; nothing imports the constants version. It belongs to the listings/profile lane, so I left it.
+- [leads] src/components/analytics/ReportBuilder.tsx:167 counts statuses with `(d: any)`; it could use LEAD_STATUSES too.
+- [profile] Still open in the profile lane: US-363. src/components/pageBuilder/BlockSettings.tsx and BlockRenderer.tsx still cast configs with `as any`.
+- [profile] Still open in the profile lane: US-283. It covers three things: the custom_css decision, theme_color in manifest.json (#2563eb) vs index.html (#0ea5e9), and ProfileCompletionWidget counting the logo, service areas and publish state.
+- [profile] The agent time-zone setting from the owner's request belongs to the leads/enterprise lanes (US-318, US-343), not the profile lane. Nothing on the public page currently needs it.
+- [profile] src/lib/publicProfileSideQueries.ts agentPageFactsQueryOptions: an owner previewing their own page in the editor right after an anonymous visit in the same tab, within 5 minutes, sees the seeded facts. Those exclude samples, which matches what the facts query itself returns, so the figures are the same.
+- [uiux] src/components/settings/LeadRoutingRules.tsx:189-202 (already recorded in round 7): the rule Switch has no accessible name, the delete control has no confirmation, and red-600 is hard-coded. It is still open; it sits next to TeamPage but is a Settings component, so this round left it alone.
+- [uiux] supabase/functions/teams/index.ts 'create' inserts the owner's team_members row without checking the error. If that insert fails, the team exists with no owner row, so is_team_admin may still pass on owner_id but the roster shows no owner.
+- [uiux] supabase/functions/teams/index.ts updateRole still lets any admin demote other admins, as recorded in round 7. With 'leave', an admin can also exit freely; the owner always remains.
+- [performance] src/utils/sanitize.ts:6 imports DOMPurify at module top, while sanitizeUrl (used by src/pages/dashboard/Links.tsx:~380) does not need it. That costs 10.8 KB gzip on the Links route.
+- [performance] src/components/profile/LazyModal.tsx: the error fallback hard-codes bg-white/text-gray-900/bg-blue-600, so it ignores the dashboard dark theme. It now wraps dialogs on six dashboard routes, so this matters more. Small uiux fix.
+- [performance] src/pages/dashboard/OpenHouses.tsx: the Edit action is a DropdownMenuItem in a child card component and is not warmed on intent. The first Edit tap shows the LazyModal spinner briefly. It could be warmed when the card menu opens.
+- [performance] Vitest quirk worth knowing for future lazy-dialog tests: two concurrent dynamic imports of a vi.mock'ed module from a source file can resolve to the real module. Use clickWarmed in src/test/lazyDialogs.ts for buttons that warm their chunk on focus.
+- [security] supabase/functions/generate-article/index.ts does not accept an API key, but docs/setup/MAKE_COM_INTEGRATION.md tells Make.com users to call it with x-api-key. Those scenarios get a 401 or 403.
+- [security] supabase/functions/api-keys/index.ts:97 inserts body.permissions and body.expiresAt as given, with no shape or date validation. A client can store arbitrary JSON as permissions. resolveApiKey does fall back to read-only when permissions is not an object, and an expires_at that cannot be parsed now fails closed.
+- [security] Open security stories US-289 (URL scheme CHECK constraints) and US-290 (Profile URL validation) are still sliceable for the next round.
+- [enterprise] CLAUDE.md's profiles column list (Database Schema > profiles) and its private-column list do not mention timezone. I did not edit CLAUDE.md; whoever integrates this may want to add timezone as a private column read through get_own_profile.
+- [enterprise] US-404, US-424, US-405 and US-386 (data export follow-ups; listed for the lane in the task) were not started this round. US-424 is small and self-contained: supabase/functions/gdpr-export/index.ts:141-166 marks a queued request completed with no file on a direct GET. It is a good candidate for next round.
+- [enterprise] US-386: the round-7 progress note already says nothing loops over agents calling getAgentContact (the digest uses getAgentContacts). The story can probably be closed as no_change_needed.
+- [enterprise] The full vitest run prints 'Failed to fetch dynamically imported module' TypeErrors from some suite. They did not fail any test, and I did not trace where they come from.
+- [marketing] src/lib/instagram-bio-analyzer/email-templates.ts still has an {{unsubscribe_url}} placeholder (prd US-135 notes, line ~440). It looks unused by any sender; it should be deleted or wired to unsubscribeLinks.
+- [marketing] send-welcome-email (to agents) has no unsubscribe either. It is closer to transactional, but if it carries promotional content it needs the same treatment.
+- [marketing] src/pages/legal/PrivacyPolicy.tsx:184-196 and :300 describe email practices (suppression, bounce handling) that are only partly true even after this change. Worth reconciling when US-135 lands.
+- [marketing] Lane findings still open and untouched: duplicate id=demo-profiles, raw theme key badge on homepage, the Press.tsx calendar claim, US-296/297/319/369.
+- [seo] src/lib/sample-data-service.ts:473 seeds a sample link 'Contact Me' with url '/contact', a relative link that points at a URL that is not a page (now a hard 404, before this a soft 404). The sample link should point to the agent's own contact section or an absolute placeholder like the other sample links (https://your-website.com/...).
+- [seo] US-370 (unused src/components/seo/PageSEO.tsx and SchemaMarkup.tsx) and US-371 (remaining hand-built Organization/WebSite @ids) are still open and fit one session each.
+- [mobile] public/manifest.json icons all declare purpose 'any maskable' together. Chrome warns about this, because the same artwork gets cropped as maskable and padded as any. Exporting separate maskable icons with a safe-zone margin needs new artwork.
+- [mobile] Theme colour mismatch: index.html:82 has theme-color #0ea5e9 and manifest theme_color is #2563eb, so the status bar colour changes between the browser tab and the installed app.
+- [mobile] src/App.tsx:161-166 calls cleanupServiceWorkers() on every mount without awaiting or catching it. If it finds a legacy controller, nothing reloads the page. Gate it to run once per sw.js VERSION, or move it into register-sw.ts.
+- [mobile] src/lib/sync-manager.ts and src/lib/offline-storage.ts (plus src/hooks/useOfflineStorage.ts) have no importers. They are dead code that CLAUDE.md still lists as PWA features. Delete them or wire them up; that is the owner's call.
+- [mobile] src/lib/register-sw.ts still shows a 'A new version is available' toast on 'waiting', which sw.js skipWaiting makes practically unreachable. The owner decided silent updates stay, so the toast and its updateRequested path could be removed.
