@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SectionLoadError } from './SectionLoadError';
 
 type Period = '7d' | '30d' | '90d' | 'all';
 
@@ -31,7 +32,10 @@ interface LeadStatusRow {
   status: string;
 }
 
-interface ViewsCountChain extends PromiseLike<{ count: number | null }> {
+interface ViewsCountChain extends PromiseLike<{
+  count: number | null;
+  error: { message: string } | null;
+}> {
   gte: (c: string, v: string) => ViewsCountChain;
 }
 
@@ -47,7 +51,7 @@ export function ConversionFunnel() {
   const { user } = useAuthStore();
   const [period, setPeriod] = useState<Period>('30d');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['conversion-funnel', user?.id, period],
     enabled: !!user?.id,
     queryFn: async () => {
@@ -65,18 +69,16 @@ export function ConversionFunnel() {
           };
         };
       };
-      let visitors = 0;
-      try {
-        let q: ViewsCountChain = viewsClient
-          .from('analytics_views')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user!.id);
-        if (since) q = q.gte('viewed_at', since);
-        const { count } = await q;
-        visitors = count ?? 0;
-      } catch {
-        visitors = 0;
-      }
+      // US-590: a failed count used to become 0 visitors, which the funnel
+      // drew as fact. It now fails the query, and the card says so.
+      let q: ViewsCountChain = viewsClient
+        .from('analytics_views')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user!.id);
+      if (since) q = q.gte('viewed_at', since);
+      const { count, error: viewsError } = await q;
+      if (viewsError) throw new Error(viewsError.message);
+      const visitors = count ?? 0;
 
       // Lead statuses (leads is typed; status select is fine).
       let leadQuery = supabase.from('leads').select('status').eq('user_id', user!.id);
@@ -138,6 +140,12 @@ export function ConversionFunnel() {
       <CardContent>
         {isLoading ? (
           <div className="py-8 text-center text-sm text-muted-foreground">Loading funnel…</div>
+        ) : isError ? (
+          <SectionLoadError
+            message="Your funnel did not load."
+            onRetry={() => void refetch()}
+            retryLabel="Retry loading the conversion funnel"
+          />
         ) : (
           <div className="space-y-2">
             {stages.map((stage, i) => {

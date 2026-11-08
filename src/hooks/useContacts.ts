@@ -437,6 +437,7 @@ export function useKeyDates(contactId?: string) {
     keyDates: query.data ?? [],
     isLoading: query.isLoading,
     error: query.error,
+    refetch: query.refetch,
     addKeyDate,
     updateKeyDate,
     deleteKeyDate,

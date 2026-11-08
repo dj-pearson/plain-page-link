@@ -23,13 +23,14 @@ import { DueFollowUps } from '@/components/dashboard/DueFollowUps';
 import { ComingUp } from '@/components/dashboard/ComingUp';
 import { PlanUsageCard } from '@/components/dashboard/PlanUsageCard';
 import { TimeZonePrompt } from '@/components/dashboard/TimeZonePrompt';
+import { SectionLoadError } from '@/components/dashboard/SectionLoadError';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { topByClicks } from '@/lib/linkOrder';
 import { CHECKOUT_RETURN_PATH, CHECKOUT_STATUS_PARAM } from '@/lib/checkoutReturn';
 
 export default function Overview() {
   const { stats, recentLeads, isLoading, isError, refetch } = useAnalytics();
-  const { links } = useLinks();
+  const { links, isError: linksFailed, refetch: refetchLinks } = useLinks();
   const { profile } = useProfile();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -127,7 +128,8 @@ export default function Overview() {
           <StatCard
             icon={<MousePointerClick className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />}
             label="Link Clicks"
-            value={totalLinkClicks.toLocaleString()}
+            // US-590: a failed links query is not zero clicks.
+            value={linksFailed ? '—' : totalLinkClicks.toLocaleString()}
           />
           <StatCard
             icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />}
@@ -233,7 +235,15 @@ export default function Overview() {
             <CardTitle className="text-base sm:text-lg">Top Links</CardTitle>
           </CardHeader>
           <CardContent>
-            {links.length > 0 ? (
+            {/* US-590: a failed query offered "Add your first link" to an
+                agent who already has links. */}
+            {linksFailed ? (
+              <SectionLoadError
+                message="Your links did not load."
+                onRetry={() => void refetchLinks()}
+                retryLabel="Retry loading links"
+              />
+            ) : links.length > 0 ? (
               <div className="space-y-2 sm:space-y-3">
                 {topByClicks(links, 5).map((link) => (
                   <div

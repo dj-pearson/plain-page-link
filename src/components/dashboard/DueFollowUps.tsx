@@ -18,10 +18,33 @@ import { taskDueAt } from '@/lib/localDate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { SectionLoadError } from './SectionLoadError';
 
 export function DueFollowUps() {
-  const { data: tasks = [], isLoading } = useDueLeadTasks();
+  const { data: tasks = [], isLoading, isError, refetch } = useDueLeadTasks();
   const { completeTask } = useLeadActivities(undefined);
+
+  // US-590: a failed query is not "nothing due". Rendering nothing here told
+  // an agent with overdue follow-ups that they had none.
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <CalendarClock className="h-4 w-4" aria-hidden="true" />
+            Due today
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SectionLoadError
+            message="Your follow-ups did not load."
+            onRetry={() => void refetch()}
+            retryLabel="Retry loading follow-ups"
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 
   // An empty block is noise on a dashboard. Nothing due, nothing rendered.
   if (isLoading || tasks.length === 0) return null;
