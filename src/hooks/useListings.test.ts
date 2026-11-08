@@ -385,6 +385,107 @@ describe('useListings', () => {
       await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
       expect(caught).toBeUndefined();
     });
+
+    describe('discardUnsavedPhotos (US-461)', () => {
+      it('removes unsaved uploads and their variants', async () => {
+        const { result } = await loaded();
+
+        await act(async () => {
+          await result.current.discardUnsavedPhotos([photo('new.jpg')]);
+        });
+
+        expect(removeMock).toHaveBeenCalledTimes(1);
+        expect(removeMock.mock.calls[0][0]).toEqual(variants('new.jpg'));
+      });
+
+      it('re-reads the listings and keeps anything a stored row refers to', async () => {
+        const { result } = await loaded();
+        // The cache does not know new.jpg was saved; the database does.
+        fromMock.mockImplementation(() =>
+          createQueryBuilder({
+            data: [{ photos: [photo('new.jpg')], image: null }],
+            error: null,
+          })
+        );
+
+        await act(async () => {
+          await result.current.discardUnsavedPhotos([photo('new.jpg'), photo('gone.jpg')]);
+        });
+
+        expect(fromMock).toHaveBeenLastCalledWith('listings');
+        expect(removeMock.mock.calls[0][0]).toEqual(variants('gone.jpg'));
+      });
+
+      it('removes nothing when the listings cannot be read', async () => {
+        const { result } = await loaded();
+        fromMock.mockImplementation(() =>
+          createQueryBuilder({ data: null, error: { message: 'network down' } })
+        );
+
+        await act(async () => {
+          await expect(
+            result.current.discardUnsavedPhotos([photo('new.jpg')])
+          ).resolves.toBeUndefined();
+        });
+        expect(removeMock).not.toHaveBeenCalled();
+      });
+
+      it('removes the photos of an add whose insert fails, and still rejects', async () => {
+        const { result } = await loaded();
+        // The insert fails; the follow-up read of stored listings finds none
+        // referring to the new photos.
+        fromMock.mockImplementationOnce(() =>
+          createQueryBuilder({ data: null, error: { message: 'plan_limit:active_listings' } })
+        );
+        fromMock.mockImplementationOnce(() => createQueryBuilder({ data: [], error: null }));
+
+        let caught: unknown;
+        await act(async () => {
+          await result.current.addListing
+            .mutateAsync({
+              address: '2 Second St',
+              city: 'Town',
+              price: '1',
+              photos: [photo('new.jpg')],
+              image: photo('new.jpg'),
+            })
+            .catch((e: unknown) => (caught = e));
+        });
+
+        expect(caught).toBeTruthy();
+        await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+        expect(removeMock.mock.calls[0][0]).toEqual(variants('new.jpg'));
+      });
+
+      it('leaves storage alone when the add succeeds', async () => {
+        const { result } = await loaded();
+        fromMock.mockImplementation(() => createQueryBuilder({ data: { id: 'l3' }, error: null }));
+
+        await act(async () => {
+          await result.current.addListing.mutateAsync({
+            address: '2 Second St',
+            city: 'Town',
+            price: '1',
+            photos: [photo('new.jpg')],
+            image: photo('new.jpg'),
+          });
+        });
+        expect(removeMock).not.toHaveBeenCalled();
+      });
+
+      it('never removes another folder or a hot-linked URL, and skips an empty list', async () => {
+        const { result } = await loaded();
+
+        await act(async () => {
+          await result.current.discardUnsavedPhotos([]);
+          await result.current.discardUnsavedPhotos([
+            `${BASE}/someone-else/l1/x.jpg`,
+            'https://images.example.com/house.jpg',
+          ]);
+        });
+        expect(removeMock).not.toHaveBeenCalled();
+      });
+    });
   });
 
   /**

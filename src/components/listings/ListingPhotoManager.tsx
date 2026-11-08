@@ -18,9 +18,20 @@ interface ListingPhotoManagerProps {
   photos: string[];
   onChange: (photos: string[]) => void;
   listingId?: string;
+  /**
+   * Told about every URL this component uploads, so the dialog can remove the
+   * ones that are never saved (US-461). Called even if the dialog has closed
+   * while the upload was in flight.
+   */
+  onUploaded?: (urls: string[]) => void;
 }
 
-export function ListingPhotoManager({ photos, onChange, listingId }: ListingPhotoManagerProps) {
+export function ListingPhotoManager({
+  photos,
+  onChange,
+  listingId,
+  onUploaded,
+}: ListingPhotoManagerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadListingImages, uploading, progress } = useListingImageUpload();
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +43,7 @@ export function ListingPhotoManager({ photos, onChange, listingId }: ListingPhot
       // Throws since US-107, so a rejected file leaves the existing photos
       // untouched rather than silently returning an empty list.
       const urls = await uploadListingImages(Array.from(files), listingId);
+      onUploaded?.(urls);
       onChange([...photos, ...urls]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Those photos could not be uploaded');

@@ -130,6 +130,7 @@ export default function Listings() {
     updateListing,
     deleteListing,
     reorderListings,
+    discardUnsavedPhotos,
   } = useListings();
   // Views per listing from the public profile (US-263). Absent until loaded,
   // and after a failure, so a card never claims "No views" it did not count.
@@ -407,7 +408,7 @@ export default function Listings() {
     await moveListing(id, neighbour.id);
   };
 
-  const handleEditListing = async (data: EditListingFormData) => {
+  const handleEditListing = async (data: EditListingFormData, uploaded: string[]) => {
     if (!editingListing) return;
     try {
       await updateListing.mutateAsync({
@@ -449,6 +450,12 @@ export default function Listings() {
         title: 'Listing updated!',
         description: 'Your property listing has been updated successfully.',
       });
+      // Photos uploaded in the dialog and removed again before saving never
+      // reached the row, and updateListing only diffs the row's own photos
+      // (US-461).
+      const saved = new Set(data.photos);
+      const dropped = uploaded.filter((url) => !saved.has(url));
+      if (dropped.length > 0) void discardUnsavedPhotos(dropped);
       setEditingListing(null);
     } catch {
       toast({
@@ -1118,6 +1125,7 @@ export default function Listings() {
             isOpen={!!editingListing}
             onClose={() => setEditingListing(null)}
             onSubmit={handleEditListing}
+            onDiscardUploads={(urls) => void discardUnsavedPhotos(urls)}
             listingId={editingListing.id}
             initialData={{
               address: editingListing.address,
