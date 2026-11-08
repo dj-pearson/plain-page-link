@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 import { APP_ICON_SIZES, appIconObjectName } from '@/lib/avatarAppIcon';
 import { renderAppIcons } from '@/lib/renderAppIcons';
+import { PROFILE_IMAGE_CACHE_CONTROL } from '@/lib/shrinkProfileImage';
 
 export async function storeAvatarAppIcons(
   bucket: 'avatars' | 'brokerage-logos',
@@ -30,7 +31,8 @@ export async function storeAvatarAppIcons(
       if (!icon) continue;
       const name = appIconObjectName(objectName, size);
       const { error } = await supabase.storage.from(bucket).upload(`${userId}/${name}`, icon, {
-        cacheControl: '3600',
+        // Named after a timestamped photo and never rewritten (US-591).
+        cacheControl: PROFILE_IMAGE_CACHE_CONTROL,
         contentType: 'image/png',
         upsert: true,
       });

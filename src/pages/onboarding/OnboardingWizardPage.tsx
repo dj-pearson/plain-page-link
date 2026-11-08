@@ -13,6 +13,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { buildOnboardingProfileUpdate, onboardingTimeZoneToSave } from '@/lib/onboardingProfile';
 import { agentTimeZoneKey } from '@/hooks/useAgentTimeZone';
 import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
+import {
+  AVATAR_SHRINK,
+  PROFILE_IMAGE_CACHE_CONTROL,
+  shrinkProfileImage,
+} from '@/lib/shrinkProfileImage';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
@@ -65,7 +70,10 @@ export default function OnboardingWizardPage() {
       // Upload profile photo if provided
       if (wizardData.profileBasics.photo) {
         try {
-          const fileExt = wizardData.profileBasics.photo.name.split('.').pop();
+          const original = wizardData.profileBasics.photo;
+          // US-591: stored downscaled, as a dashboard upload is.
+          const photo = await shrinkProfileImage(original, AVATAR_SHRINK);
+          const fileExt = photo.name.split('.').pop();
           // US-075: the first path segment must be the uploader's id — the
           // storage policies key on it. This used to be `avatars/<uid>-<ts>`,
           // whose first segment was the literal string 'avatars', which an
@@ -75,7 +83,10 @@ export default function OnboardingWizardPage() {
 
           const { error: uploadError } = await supabase.storage
             .from('avatars')
-            .upload(filePath, wizardData.profileBasics.photo);
+            .upload(filePath, photo, {
+              cacheControl: PROFILE_IMAGE_CACHE_CONTROL,
+              contentType: photo.type || undefined,
+            });
 
           if (uploadError) throw uploadError;
 
@@ -83,7 +94,7 @@ export default function OnboardingWizardPage() {
           // photo, stored before the profile points at it — the same as a
           // dashboard upload (US-481). Best effort and never throws: a
           // browser that cannot draw the photo keeps the photo.
-          await storeAvatarAppIcons('avatars', user.id, objectName, wizardData.profileBasics.photo);
+          await storeAvatarAppIcons('avatars', user.id, objectName, original);
 
           const {
             data: { publicUrl },

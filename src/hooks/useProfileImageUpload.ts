@@ -6,6 +6,11 @@ import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { validateUpload } from '@/lib/fileValidation';
 import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
+import {
+  PROFILE_IMAGE_CACHE_CONTROL,
+  shrinkProfileImage,
+  type ShrinkOptions,
+} from '@/lib/shrinkProfileImage';
 
 /** The profile columns that hold a single uploaded image. */
 export type ProfileImageColumn = 'avatar_url' | 'brokerage_logo';
@@ -28,6 +33,11 @@ export interface ProfileImageUploadConfig {
    * (US-481), which the agent's page manifest lists. The avatar only.
    */
   appIcons?: boolean;
+  /**
+   * Downscale and re-encode in the browser before storing (US-591), so the
+   * public page is not served a multi-megabyte original for a 128px box.
+   */
+  shrink?: ShrinkOptions;
 }
 
 /**
@@ -41,7 +51,7 @@ export interface ProfileImageUploadConfig {
  * page until the agent noticed.
  */
 export function useProfileImageUpload(config: ProfileImageUploadConfig) {
-  const { bucket, column, filePrefix, accept, maxBytes, label, appIcons = false } = config;
+  const { bucket, column, filePrefix, accept, maxBytes, label, appIcons = false, shrink } = config;
   const user = useAuthStore((s) => s.user);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -65,12 +75,16 @@ export function useProfileImageUpload(config: ProfileImageUploadConfig) {
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      // Validated as uploaded (magic number), then shrunk; the shrunk file is
+      // our own canvas output, so it needs no second check.
+      const stored = shrink ? await shrinkProfileImage(file, shrink) : file;
+      const fileExt = stored.name.split('.').pop();
       const objectName = `${filePrefix}-${Date.now()}.${fileExt}`;
       const path = `${user.id}/${objectName}`;
 
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
-        cacheControl: '3600',
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, stored, {
+        cacheControl: PROFILE_IMAGE_CACHE_CONTROL,
+        contentType: stored.type || undefined,
         upsert: true,
       });
       if (uploadError) throw uploadError;

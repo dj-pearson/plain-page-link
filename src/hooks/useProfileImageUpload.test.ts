@@ -47,6 +47,13 @@ vi.mock('@/stores/useAuthStore', () => ({
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }));
 vi.mock('@/lib/fileValidation', () => ({ validateUpload: validateMock }));
 vi.mock('@/lib/renderAppIcons', () => ({ renderAppIcons: renderIconsMock }));
+const { shrinkMock } = vi.hoisted(() => ({
+  shrinkMock: vi.fn(async (file: File) => file),
+}));
+vi.mock('@/lib/shrinkProfileImage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/shrinkProfileImage')>()),
+  shrinkProfileImage: shrinkMock,
+}));
 
 import { useBrokerageLogoUpload } from './useBrokerageLogoUpload';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -105,6 +112,8 @@ describe('useBrokerageLogoUpload', () => {
     const [, options] = validateMock.mock.calls[0];
     expect(options.maxBytes).toBe(2 * 1024 * 1024);
     expect(options.accept).not.toContain('image/svg+xml');
+    // Shrunk to 400px and never flattened to JPEG (US-591).
+    expect(shrinkMock).toHaveBeenCalledWith(expect.any(File), { maxSide: 400, opaque: false });
   });
 
   it('rejects a file that fails validation without touching storage or the profile', async () => {
@@ -266,6 +275,24 @@ describe('useAvatarUpload home-screen icons (US-481)', () => {
       .mockResolvedValueOnce({ error: { message: 'quota exceeded' } });
     expect(await uploadPhoto()).toBe(AVATAR_URL);
     expect(profilesMock.update).toHaveBeenCalledWith({ avatar_url: AVATAR_URL });
+  });
+
+  it('stores the downscaled photo, a year-cacheable object, and draws icons from the original (US-591)', async () => {
+    const original = new File([new Uint8Array(50_000)], 'me.jpg', { type: 'image/jpeg' });
+    const small = new File([new Uint8Array(4_000)], 'me.jpg', { type: 'image/jpeg' });
+    shrinkMock.mockResolvedValueOnce(small);
+    const { result } = renderHook(() => useAvatarUpload(), { wrapper });
+    await act(async () => {
+      await result.current.uploadAvatar(original);
+    });
+
+    expect(shrinkMock).toHaveBeenCalledWith(original, { maxSide: 800, opaque: true });
+    expect(storageMock.upload).toHaveBeenCalledWith(
+      'u1/avatar-1700000000000.jpg',
+      small,
+      expect.objectContaining({ cacheControl: '31536000', contentType: 'image/jpeg' })
+    );
+    expect(renderIconsMock).toHaveBeenCalledWith(original);
   });
 
   it('is not done for the brokerage logo', async () => {

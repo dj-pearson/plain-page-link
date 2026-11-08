@@ -68,8 +68,9 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
                 <img
                   src={profile.avatar_url}
                   // Avatars have no resized variants (optimize-image only runs
-                  // on listing photos), so this is still the uploaded file; the
-                  // dimensions at least reserve its box (US-243).
+                  // on listing photos); since US-591 the stored file itself is
+                  // downscaled to 800px at upload. The dimensions reserve its
+                  // box (US-243). Photos uploaded before then are unchanged.
                   width={128}
                   height={128}
                   decoding="async"
