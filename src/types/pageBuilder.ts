@@ -332,3 +332,21 @@ export interface BlockTemplate {
   category: 'content' | 'media' | 'engagement' | 'layout';
   defaultConfig: BlockConfig;
 }
+
+/**
+ * A block's config, tagged with the block's own type so a `switch` on
+ * `config.type` narrows it to the right member of the union (US-363).
+ *
+ * `block.type` is what has always decided how a block renders. Every config
+ * the builder writes also carries a matching `type`, but pages are stored as
+ * jsonb, so a row saved without it (or edited by hand) may lack it or
+ * disagree. Re-tagging from `block.type` keeps such a block rendering exactly
+ * as before, and is the one place the jsonb shape is asserted: the renderer
+ * and the settings panel no longer cast each config `as any`.
+ */
+export function blockConfigOf(block: Pick<PageBlock, 'type' | 'config'>): BlockConfig {
+  const raw: unknown = block.config;
+  const base: object = raw !== null && typeof raw === 'object' ? raw : {};
+  if ('type' in base && base.type === block.type) return base as BlockConfig;
+  return { ...base, type: block.type } as BlockConfig;
+}

@@ -3,7 +3,29 @@
  * Settings panel for configuring page builder blocks
  */
 
-import { PageBlock, BlockConfig } from '@/types/pageBuilder';
+import {
+  blockConfigOf,
+  type PageBlock,
+  type BlockConfig,
+  type BioBlockConfig,
+  type LinkBlockConfig,
+  type ListingsBlockConfig,
+  type ContactBlockConfig,
+  type SocialBlockConfig,
+  type VideoBlockConfig,
+  type TestimonialBlockConfig,
+  type Testimonial,
+  type SpacerBlockConfig,
+  type ImageBlockConfig,
+  type TextBlockConfig,
+  type HeroBlockConfig,
+  type StatsBlockConfig,
+  type StatItem,
+  type GalleryBlockConfig,
+  type GalleryImage,
+  type CTABlockConfig,
+  type DividerBlockConfig,
+} from '@/types/pageBuilder';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,40 +50,60 @@ interface BlockSettingsProps {
   onUpdate: (config: Partial<BlockConfig>) => void;
 }
 
-export function BlockSettings({ block, onUpdate }: BlockSettingsProps) {
-  const config = block.config;
+/** Props of one block type's settings form: its own config, its own patch. */
+interface SettingsProps<C extends BlockConfig> {
+  config: C;
+  onUpdate: (updates: Partial<C>) => void;
+}
 
-  switch (block.type) {
+/**
+ * A Select's onValueChange hands back a plain string. Accept it only when it
+ * is one of the options the config allows, so a stray value can never be
+ * written into a union-typed field.
+ */
+function pick<T extends string>(options: readonly T[], apply: (value: T) => void) {
+  return (value: string) => {
+    const match = options.find((option) => option === value);
+    if (match !== undefined) apply(match);
+  };
+}
+
+export function BlockSettings({ block, onUpdate }: BlockSettingsProps) {
+  // Narrowed on the config's own tag, so each form gets its own config type
+  // without a cast (US-363).
+  const config = blockConfigOf(block);
+
+  switch (config.type) {
     case 'bio':
-      return <BioSettings config={config as any} onUpdate={onUpdate} />;
+      return <BioSettings config={config} onUpdate={onUpdate} />;
     case 'link':
-      return <LinkSettings config={config as any} onUpdate={onUpdate} />;
+      return <LinkSettings config={config} onUpdate={onUpdate} />;
     case 'listings':
-      return <ListingsSettings config={config as any} onUpdate={onUpdate} />;
+      return <ListingsSettings config={config} onUpdate={onUpdate} />;
     case 'contact':
-      return <ContactSettings config={config as any} onUpdate={onUpdate} />;
+      return <ContactSettings config={config} onUpdate={onUpdate} />;
     case 'social':
-      return <SocialSettings config={config as any} onUpdate={onUpdate} />;
+      return <SocialSettings config={config} onUpdate={onUpdate} />;
     case 'video':
-      return <VideoSettings config={config as any} onUpdate={onUpdate} />;
+      return <VideoSettings config={config} onUpdate={onUpdate} />;
     case 'testimonial':
-      return <TestimonialSettings config={config as any} onUpdate={onUpdate} />;
+      return <TestimonialSettings config={config} onUpdate={onUpdate} />;
     case 'spacer':
-      return <SpacerSettings config={config as any} onUpdate={onUpdate} />;
+      return <SpacerSettings config={config} onUpdate={onUpdate} />;
     case 'image':
-      return <ImageSettings config={config as any} onUpdate={onUpdate} />;
+      return <ImageSettings config={config} onUpdate={onUpdate} />;
     case 'text':
-      return <TextSettings config={config as any} onUpdate={onUpdate} />;
+      return <TextSettings config={config} onUpdate={onUpdate} />;
     case 'hero':
-      return <HeroSettings config={config as any} onUpdate={onUpdate} />;
+      return <HeroSettings config={config} onUpdate={onUpdate} />;
     case 'stats':
-      return <StatsSettings config={config as any} onUpdate={onUpdate} />;
+      return <StatsSettings config={config} onUpdate={onUpdate} />;
     case 'gallery':
-      return <GallerySettings config={config as any} onUpdate={onUpdate} />;
+      return <GallerySettings config={config} onUpdate={onUpdate} />;
     case 'cta':
-      return <CTASettings config={config as any} onUpdate={onUpdate} />;
+      return <CTASettings config={config} onUpdate={onUpdate} />;
     case 'divider':
-      return <DividerSettings config={config as any} onUpdate={onUpdate} />;
+      return <DividerSettings config={config} onUpdate={onUpdate} />;
     default:
       return (
         <div className="text-sm text-muted-foreground">
@@ -72,7 +114,7 @@ export function BlockSettings({ block, onUpdate }: BlockSettingsProps) {
 }
 
 // Bio Block Settings
-function BioSettings({ config, onUpdate }: any) {
+function BioSettings({ config, onUpdate }: SettingsProps<BioBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -134,7 +176,7 @@ function BioSettings({ config, onUpdate }: any) {
 }
 
 // Link Block Settings
-function LinkSettings({ config, onUpdate }: any) {
+function LinkSettings({ config, onUpdate }: SettingsProps<LinkBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -162,7 +204,12 @@ function LinkSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="link-style">Style</Label>
-        <Select value={config.style} onValueChange={(value) => onUpdate({ style: value })}>
+        <Select
+          value={config.style}
+          onValueChange={pick(['button', 'card', 'minimal'] as const, (style) =>
+            onUpdate({ style })
+          )}
+        >
           <SelectTrigger id="link-style">
             <SelectValue />
           </SelectTrigger>
@@ -186,7 +233,7 @@ function LinkSettings({ config, onUpdate }: any) {
 }
 
 // Listings Block Settings
-function ListingsSettings({ config, onUpdate }: any) {
+function ListingsSettings({ config, onUpdate }: SettingsProps<ListingsBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -200,7 +247,12 @@ function ListingsSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="listings-layout">Layout</Label>
-        <Select value={config.layout} onValueChange={(value) => onUpdate({ layout: value })}>
+        <Select
+          value={config.layout}
+          onValueChange={pick(['grid', 'list', 'carousel'] as const, (layout) =>
+            onUpdate({ layout })
+          )}
+        >
           <SelectTrigger id="listings-layout">
             <SelectValue />
           </SelectTrigger>
@@ -213,7 +265,12 @@ function ListingsSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="listings-filter">Show</Label>
-        <Select value={config.filter} onValueChange={(value) => onUpdate({ filter: value })}>
+        <Select
+          value={config.filter}
+          onValueChange={pick(['all', 'active', 'featured'] as const, (filter) =>
+            onUpdate({ filter })
+          )}
+        >
           <SelectTrigger id="listings-filter">
             <SelectValue />
           </SelectTrigger>
@@ -256,7 +313,7 @@ function ListingsSettings({ config, onUpdate }: any) {
 }
 
 // Contact Block Settings
-function ContactSettings({ config, onUpdate }: any) {
+function ContactSettings({ config, onUpdate }: SettingsProps<ContactBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -297,7 +354,7 @@ function ContactSettings({ config, onUpdate }: any) {
 }
 
 // Social Block Settings
-function SocialSettings({ config, onUpdate }: any) {
+function SocialSettings({ config, onUpdate }: SettingsProps<SocialBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -311,7 +368,12 @@ function SocialSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="social-layout">Layout</Label>
-        <Select value={config.layout} onValueChange={(value) => onUpdate({ layout: value })}>
+        <Select
+          value={config.layout}
+          onValueChange={pick(['horizontal', 'vertical', 'grid'] as const, (layout) =>
+            onUpdate({ layout })
+          )}
+        >
           <SelectTrigger id="social-layout">
             <SelectValue />
           </SelectTrigger>
@@ -324,7 +386,12 @@ function SocialSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="social-size">Icon Size</Label>
-        <Select value={config.iconSize} onValueChange={(value) => onUpdate({ iconSize: value })}>
+        <Select
+          value={config.iconSize}
+          onValueChange={pick(['small', 'medium', 'large'] as const, (iconSize) =>
+            onUpdate({ iconSize })
+          )}
+        >
           <SelectTrigger id="social-size">
             <SelectValue />
           </SelectTrigger>
@@ -345,7 +412,7 @@ function SocialSettings({ config, onUpdate }: any) {
 }
 
 // Video Block Settings
-function VideoSettings({ config, onUpdate }: any) {
+function VideoSettings({ config, onUpdate }: SettingsProps<VideoBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -391,7 +458,7 @@ function VideoSettings({ config, onUpdate }: any) {
 }
 
 // Testimonial Block Settings
-function TestimonialSettings({ config, onUpdate }: any) {
+function TestimonialSettings({ config, onUpdate }: SettingsProps<TestimonialBlockConfig>) {
   const addTestimonial = () => {
     // Empty, not a sample review: an entry left unfilled is skipped on the
     // page instead of publishing invented praise (US-305).
@@ -406,12 +473,16 @@ function TestimonialSettings({ config, onUpdate }: any) {
   };
 
   const removeTestimonial = (id: string) => {
-    onUpdate({ testimonials: config.testimonials.filter((t: any) => t.id !== id) });
+    onUpdate({ testimonials: (config.testimonials ?? []).filter((t) => t.id !== id) });
   };
 
-  const updateTestimonial = (id: string, field: string, value: any) => {
+  const updateTestimonial = <K extends keyof Testimonial>(
+    id: string,
+    field: K,
+    value: Testimonial[K]
+  ) => {
     onUpdate({
-      testimonials: config.testimonials.map((t: any) =>
+      testimonials: (config.testimonials ?? []).map((t) =>
         t.id === id ? { ...t, [field]: value } : t
       ),
     });
@@ -430,7 +501,12 @@ function TestimonialSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="testimonial-layout">Layout</Label>
-        <Select value={config.layout} onValueChange={(value) => onUpdate({ layout: value })}>
+        <Select
+          value={config.layout}
+          onValueChange={pick(['slider', 'grid', 'stacked'] as const, (layout) =>
+            onUpdate({ layout })
+          )}
+        >
           <SelectTrigger id="testimonial-layout">
             <SelectValue />
           </SelectTrigger>
@@ -446,7 +522,7 @@ function TestimonialSettings({ config, onUpdate }: any) {
         <Label htmlFor="testimonial-source">Show</Label>
         <Select
           value={config.source === 'profile' ? 'profile' : 'manual'}
-          onValueChange={(value) => onUpdate({ source: value })}
+          onValueChange={pick(['profile', 'manual'] as const, (source) => onUpdate({ source }))}
         >
           <SelectTrigger id="testimonial-source">
             <SelectValue />
@@ -474,7 +550,7 @@ function TestimonialSettings({ config, onUpdate }: any) {
             </Button>
           </div>
 
-          {(config.testimonials || []).map((t: any) => (
+          {(config.testimonials || []).map((t) => (
             <div key={t.id} className="p-3 border rounded-lg space-y-2 bg-gray-50">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-500">
@@ -535,7 +611,7 @@ function TestimonialSettings({ config, onUpdate }: any) {
 }
 
 // Spacer Block Settings
-function SpacerSettings({ config, onUpdate }: any) {
+function SpacerSettings({ config, onUpdate }: SettingsProps<SpacerBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -559,7 +635,7 @@ function SpacerSettings({ config, onUpdate }: any) {
 }
 
 // Image Block Settings
-function ImageSettings({ config, onUpdate }: any) {
+function ImageSettings({ config, onUpdate }: SettingsProps<ImageBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -602,7 +678,12 @@ function ImageSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="image-size">Size</Label>
-        <Select value={config.size} onValueChange={(value) => onUpdate({ size: value })}>
+        <Select
+          value={config.size}
+          onValueChange={pick(['small', 'medium', 'large', 'full'] as const, (size) =>
+            onUpdate({ size })
+          )}
+        >
           <SelectTrigger id="image-size">
             <SelectValue />
           </SelectTrigger>
@@ -619,7 +700,7 @@ function ImageSettings({ config, onUpdate }: any) {
 }
 
 // Text Block Settings
-function TextSettings({ config, onUpdate }: any) {
+function TextSettings({ config, onUpdate }: SettingsProps<TextBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -634,7 +715,10 @@ function TextSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="text-align">Text Alignment</Label>
-        <Select value={config.align} onValueChange={(value) => onUpdate({ align: value })}>
+        <Select
+          value={config.align}
+          onValueChange={pick(['left', 'center', 'right'] as const, (align) => onUpdate({ align }))}
+        >
           <SelectTrigger id="text-align">
             <SelectValue />
           </SelectTrigger>
@@ -647,7 +731,12 @@ function TextSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="text-size">Font Size</Label>
-        <Select value={config.fontSize} onValueChange={(value) => onUpdate({ fontSize: value })}>
+        <Select
+          value={config.fontSize}
+          onValueChange={pick(['small', 'medium', 'large'] as const, (fontSize) =>
+            onUpdate({ fontSize })
+          )}
+        >
           <SelectTrigger id="text-size">
             <SelectValue />
           </SelectTrigger>
@@ -663,7 +752,7 @@ function TextSettings({ config, onUpdate }: any) {
 }
 
 // Hero Block Settings
-function HeroSettings({ config, onUpdate }: any) {
+function HeroSettings({ config, onUpdate }: SettingsProps<HeroBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -699,7 +788,9 @@ function HeroSettings({ config, onUpdate }: any) {
         <Label htmlFor="hero-overlay">Overlay</Label>
         <Select
           value={config.backgroundOverlay || 'gradient'}
-          onValueChange={(value) => onUpdate({ backgroundOverlay: value })}
+          onValueChange={pick(['none', 'light', 'dark', 'gradient'] as const, (backgroundOverlay) =>
+            onUpdate({ backgroundOverlay })
+          )}
         >
           <SelectTrigger id="hero-overlay">
             <SelectValue />
@@ -714,7 +805,12 @@ function HeroSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="hero-layout">Layout</Label>
-        <Select value={config.layout} onValueChange={(value) => onUpdate({ layout: value })}>
+        <Select
+          value={config.layout}
+          onValueChange={pick(['centered', 'left', 'split'] as const, (layout) =>
+            onUpdate({ layout })
+          )}
+        >
           <SelectTrigger id="hero-layout">
             <SelectValue />
           </SelectTrigger>
@@ -727,7 +823,12 @@ function HeroSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="hero-height">Height</Label>
-        <Select value={config.height} onValueChange={(value) => onUpdate({ height: value })}>
+        <Select
+          value={config.height}
+          onValueChange={pick(['small', 'medium', 'large'] as const, (height) =>
+            onUpdate({ height })
+          )}
+        >
           <SelectTrigger id="hero-height">
             <SelectValue />
           </SelectTrigger>
@@ -766,7 +867,7 @@ function HeroSettings({ config, onUpdate }: any) {
 }
 
 // Stats Block Settings
-function StatsSettings({ config, onUpdate }: any) {
+function StatsSettings({ config, onUpdate }: SettingsProps<StatsBlockConfig>) {
   const addStat = () => {
     // Empty, not "0 / New Stat": an unfilled entry is skipped on the page.
     const newStat = {
@@ -797,12 +898,12 @@ function StatsSettings({ config, onUpdate }: any) {
   };
 
   const removeStat = (id: string) => {
-    onUpdate({ stats: config.stats.filter((s: any) => s.id !== id) });
+    onUpdate({ stats: (config.stats ?? []).filter((s) => s.id !== id) });
   };
 
-  const updateStat = (id: string, field: string, value: any) => {
+  const updateStat = <K extends keyof StatItem>(id: string, field: K, value: StatItem[K]) => {
     onUpdate({
-      stats: config.stats.map((s: any) => (s.id === id ? { ...s, [field]: value } : s)),
+      stats: (config.stats ?? []).map((s) => (s.id === id ? { ...s, [field]: value } : s)),
     });
   };
 
@@ -819,7 +920,10 @@ function StatsSettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="stats-layout">Layout</Label>
-        <Select value={config.layout} onValueChange={(value) => onUpdate({ layout: value })}>
+        <Select
+          value={config.layout}
+          onValueChange={pick(['row', 'grid', 'cards'] as const, (layout) => onUpdate({ layout }))}
+        >
           <SelectTrigger id="stats-layout">
             <SelectValue />
           </SelectTrigger>
@@ -857,7 +961,7 @@ function StatsSettings({ config, onUpdate }: any) {
           </Select>
         </div>
 
-        {(config.stats || []).map((s: any) => {
+        {(config.stats || []).map((s) => {
           const live = AGENT_STAT_SOURCES.find((m) => m.source === s.source);
           const fabricated = !live && isTemplateFabricatedStat(s);
           return (
@@ -939,7 +1043,10 @@ function StatsSettings({ config, onUpdate }: any) {
 }
 
 // Gallery Block Settings
-function GallerySettings({ config, onUpdate }: any) {
+const GALLERY_COLUMNS = { '2': 2, '3': 3, '4': 4 } as const;
+const GALLERY_COLUMN_OPTIONS = ['2', '3', '4'] as const;
+
+function GallerySettings({ config, onUpdate }: SettingsProps<GalleryBlockConfig>) {
   const addImage = () => {
     const newImage = {
       id: `img_${Date.now()}`,
@@ -951,12 +1058,12 @@ function GallerySettings({ config, onUpdate }: any) {
   };
 
   const removeImage = (id: string) => {
-    onUpdate({ images: config.images.filter((i: any) => i.id !== id) });
+    onUpdate({ images: (config.images ?? []).filter((i) => i.id !== id) });
   };
 
-  const updateImage = (id: string, field: string, value: string) => {
+  const updateImage = (id: string, field: Exclude<keyof GalleryImage, 'id'>, value: string) => {
     onUpdate({
-      images: config.images.map((i: any) => (i.id === id ? { ...i, [field]: value } : i)),
+      images: (config.images ?? []).map((i) => (i.id === id ? { ...i, [field]: value } : i)),
     });
   };
 
@@ -973,7 +1080,12 @@ function GallerySettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="gallery-layout">Layout</Label>
-        <Select value={config.layout} onValueChange={(value) => onUpdate({ layout: value })}>
+        <Select
+          value={config.layout}
+          onValueChange={pick(['grid', 'masonry', 'carousel'] as const, (layout) =>
+            onUpdate({ layout })
+          )}
+        >
           <SelectTrigger id="gallery-layout">
             <SelectValue />
           </SelectTrigger>
@@ -988,7 +1100,9 @@ function GallerySettings({ config, onUpdate }: any) {
         <Label htmlFor="gallery-columns">Columns</Label>
         <Select
           value={String(config.columns || 3)}
-          onValueChange={(value) => onUpdate({ columns: parseInt(value) })}
+          onValueChange={pick(GALLERY_COLUMN_OPTIONS, (value) =>
+            onUpdate({ columns: GALLERY_COLUMNS[value] })
+          )}
         >
           <SelectTrigger id="gallery-columns">
             <SelectValue />
@@ -1009,7 +1123,7 @@ function GallerySettings({ config, onUpdate }: any) {
           </Button>
         </div>
 
-        {(config.images || []).map((img: any) => (
+        {(config.images || []).map((img) => (
           <div key={img.id} className="p-3 border rounded-lg space-y-2 bg-gray-50">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-gray-500 uppercase">Image</span>
@@ -1046,7 +1160,7 @@ function GallerySettings({ config, onUpdate }: any) {
 }
 
 // CTA Block Settings
-function CTASettings({ config, onUpdate }: any) {
+function CTASettings({ config, onUpdate }: SettingsProps<CTABlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -1093,7 +1207,12 @@ function CTASettings({ config, onUpdate }: any) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="cta-variant">Style</Label>
-        <Select value={config.variant} onValueChange={(value) => onUpdate({ variant: value })}>
+        <Select
+          value={config.variant}
+          onValueChange={pick(['solid', 'outline', 'gradient'] as const, (variant) =>
+            onUpdate({ variant })
+          )}
+        >
           <SelectTrigger id="cta-variant">
             <SelectValue />
           </SelectTrigger>
@@ -1117,12 +1236,17 @@ function CTASettings({ config, onUpdate }: any) {
 }
 
 // Divider Block Settings
-function DividerSettings({ config, onUpdate }: any) {
+function DividerSettings({ config, onUpdate }: SettingsProps<DividerBlockConfig>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="divider-style">Style</Label>
-        <Select value={config.style} onValueChange={(value) => onUpdate({ style: value })}>
+        <Select
+          value={config.style}
+          onValueChange={pick(['line', 'dashed', 'dotted', 'gradient', 'wave'] as const, (style) =>
+            onUpdate({ style })
+          )}
+        >
           <SelectTrigger id="divider-style">
             <SelectValue />
           </SelectTrigger>
