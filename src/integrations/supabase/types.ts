@@ -1253,18 +1253,21 @@ export type Database = {
           digest_date: string;
           profiles: number;
           sent: number;
+          slot: string;
         };
         Insert: {
           completed_at?: string;
           digest_date: string;
           profiles?: number;
           sent?: number;
+          slot?: string;
         };
         Update: {
           completed_at?: string;
           digest_date?: string;
           profiles?: number;
           sent?: number;
+          slot?: string;
         };
         Relationships: [];
       };
@@ -3844,6 +3847,7 @@ export type Database = {
           specialties: Json | null;
           theme: string | null;
           tiktok_url: string | null;
+          timezone: string | null;
           title: string | null;
           updated_at: string | null;
           username: string;
@@ -3890,6 +3894,7 @@ export type Database = {
           specialties?: Json | null;
           theme?: string | null;
           tiktok_url?: string | null;
+          timezone?: string | null;
           title?: string | null;
           updated_at?: string | null;
           username: string;
@@ -3936,6 +3941,7 @@ export type Database = {
           specialties?: Json | null;
           theme?: string | null;
           tiktok_url?: string | null;
+          timezone?: string | null;
           title?: string | null;
           updated_at?: string | null;
           username?: string;

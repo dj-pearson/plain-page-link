@@ -14,18 +14,31 @@ export function isMissingTable(error: { code?: string | null }): boolean {
   return error.code === '42P01' || error.code === 'PGRST205';
 }
 
+/** Postgres 42703 (undefined_column) or PostgREST's PGRST204 (column not in the schema cache). */
+export function isMissingColumn(error: { code?: string | null }): boolean {
+  return error.code === '42703' || error.code === 'PGRST204';
+}
+
 export function supabaseDigestStore(supabase: SupabaseClient): DigestStore {
+  // Until migration 20261107000433 is applied there is no profiles.timezone
+  // and no digest_runs.slot: everyone gets the UTC edition, as before, rather
+  // than the task failing.
+  let hasTimezone = true;
+  let hasSlot = true;
+
   return {
     async listProfiles(afterId, limit) {
-      let query = supabase
-        .from('profiles')
-        .select('id, full_name, notification_preferences')
-        .order('id', { ascending: true })
-        .limit(limit);
-      if (afterId) query = query.gt('id', afterId);
-      const { data, error } = await query;
+      const read = (columns: string) => {
+        let query = supabase.from('profiles').select(columns).order('id', { ascending: true }).limit(limit);
+        if (afterId) query = query.gt('id', afterId);
+        return query;
+      };
+      let result = hasTimezone ? await read('id, full_name, notification_preferences, timezone') : null;
+      if (result?.error && isMissingColumn(result.error)) hasTimezone = false;
+      if (!hasTimezone) result = await read('id, full_name, notification_preferences');
+      const { data, error } = result!;
       if (error) throw new Error(`reading profiles: ${error.message}`);
-      return data ?? [];
+      return (data ?? []) as unknown as Awaited<ReturnType<DigestStore['listProfiles']>>;
     },
 
     async listClaimed(userIds, day) {
@@ -138,12 +151,19 @@ export function supabaseDigestStore(supabase: SupabaseClient): DigestStore {
       if (error) throw new Error(error.message);
     },
 
-    async hasCompletedRun(day) {
-      const { data, error } = await supabase
-        .from('digest_runs')
-        .select('digest_date')
-        .eq('digest_date', day)
-        .maybeSingle();
+    async hasCompletedRun(day, slot) {
+      const read = (withSlot: boolean) => {
+        const query = supabase.from('digest_runs').select('digest_date').eq('digest_date', day);
+        return (withSlot ? query.eq('slot', slot) : query).maybeSingle();
+      };
+      let result = hasSlot ? await read(true) : null;
+      if (result?.error && isMissingColumn(result.error)) hasSlot = false;
+      if (!hasSlot) {
+        // Only the UTC edition existed before the slot column.
+        if (slot !== '') return false;
+        result = await read(false);
+      }
+      const { data, error } = result!;
       // Before migration 20261107000354 is applied there is no marker table:
       // behave as before (a full pass every run) rather than fail the task.
       if (error && isMissingTable(error)) return false;
@@ -151,13 +171,14 @@ export function supabaseDigestStore(supabase: SupabaseClient): DigestStore {
       return data !== null;
     },
 
-    async markRunCompleted(day, totals) {
-      const { error } = await supabase
-        .from('digest_runs')
-        .upsert(
-          { digest_date: day, profiles: totals.profiles, sent: totals.sent },
-          { onConflict: 'digest_date', ignoreDuplicates: true }
-        );
+    async markRunCompleted(day, slot, totals) {
+      if (!hasSlot && slot !== '') return;
+      const row = { digest_date: day, profiles: totals.profiles, sent: totals.sent };
+      const { error } = hasSlot
+        ? await supabase
+            .from('digest_runs')
+            .upsert({ ...row, slot }, { onConflict: 'digest_date,slot', ignoreDuplicates: true })
+        : await supabase.from('digest_runs').upsert(row, { onConflict: 'digest_date', ignoreDuplicates: true });
       if (error && isMissingTable(error)) return;
       if (error) throw new Error(error.message);
     },

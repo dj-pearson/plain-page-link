@@ -64,6 +64,7 @@ vi.mock('@/components/settings/SessionManagement', () => ({ SessionManagement: (
 vi.mock('@/components/settings/LeadNotificationPreferences', () => ({
   LeadNotificationPreferences: () => null,
 }));
+vi.mock('@/components/settings/TimeZoneSetting', () => ({ TimeZoneSetting: () => null }));
 vi.mock('@/components/auth/mfa/NativeMFASettings', () => ({ NativeMFASettings: () => null }));
 vi.mock('@/components/settings/AuditLogViewer', () => ({ AuditLogViewer: () => null }));
 vi.mock('@/components/settings/GDPRSettings', () => ({ GDPRSettings: () => null }));

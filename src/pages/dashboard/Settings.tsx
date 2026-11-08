@@ -31,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ProfileDisplaySettings } from '@/components/settings/ProfileDisplaySettings';
 import { SessionManagement } from '@/components/settings/SessionManagement';
 import { LeadNotificationPreferences } from '@/components/settings/LeadNotificationPreferences';
+import { TimeZoneSetting } from '@/components/settings/TimeZoneSetting';
 import { NativeMFASettings } from '@/components/auth/mfa/NativeMFASettings';
 import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
 import { GDPRSettings } from '@/components/settings/GDPRSettings';
@@ -707,6 +708,9 @@ export default function Settings() {
 
       {/* Lead Notification Preferences */}
       <LeadNotificationPreferences />
+
+      {/* Time zone (US-433): when the morning email arrives */}
+      <TimeZoneSetting />
 
       {/* Two-Factor Authentication */}
       <NativeMFASettings />
