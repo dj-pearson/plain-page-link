@@ -12,6 +12,9 @@
  * RLS already lets accepted members read both tables ("Team members read
  * team", "Members read roster"); before this the page asked only for teams
  * the user owned, so an accepted member was offered "Create your team".
+ *
+ * US-430 (US-419): members and admins can leave, after confirming, through
+ * the teams function's 'leave' action. The owner is not offered it.
  */
 
 import { useState } from 'react';
@@ -19,6 +22,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   Loader2,
+  LogOut,
   RefreshCw,
   UserPlus,
   Trash2,
@@ -118,6 +122,7 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<AssignableRole>('member');
   const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
   // US-328: a failed load used to fall through to "Create your team", which
   // invited an owner to make a second team. Errors are now thrown and shown.
@@ -273,6 +278,28 @@ export default function TeamPage() {
     onError: (e, { member }) =>
       toast({
         title: `Couldn’t change ${memberLabel(member)}’s role`,
+        description: e instanceof Error ? e.message : 'Please try again.',
+        variant: 'destructive',
+      }),
+  });
+
+  // US-430 (US-419): 'remove' is admin-only, so a member had no way out.
+  // 'leave' deletes only the caller's own non-owner row; the owner is refused.
+  const leaveTeam = useMutation({
+    mutationFn: async (teamToLeave: Team) => {
+      const { error } = await edgeFunctions.invoke('teams', {
+        body: { action: 'leave', teamId: teamToLeave.id },
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: (_data, teamLeft) => {
+      queryClient.removeQueries({ queryKey: ['team-members', teamLeft.id] });
+      queryClient.invalidateQueries({ queryKey: ['my-team', user?.id] });
+      toast({ title: `You left ${teamLeft.name}` });
+    },
+    onError: (e, teamToLeave) =>
+      toast({
+        title: `Couldn’t leave ${teamToLeave.name}`,
         description: e instanceof Error ? e.message : 'Please try again.',
         variant: 'destructive',
       }),
@@ -491,6 +518,60 @@ export default function TeamPage() {
       {/* Lead routing rules */}
       {/* Routing rules are written under is_team_admin RLS; members cannot edit them. */}
       {canManage && <LeadRoutingRules teamId={team.id} members={memberList} />}
+
+      {/* Leave — members and admins only. The owner's team, seats and billing
+          hang off teams.owner_id, so the teams function refuses an owner. */}
+      {myTeam.role !== 'owner' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Leave team</CardTitle>
+            <CardDescription>
+              You’ll lose access to {team.name} and your seat is freed. You can rejoin only if
+              someone invites you again.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={leaveTeam.isPending}
+              aria-busy={leaveTeam.isPending || undefined}
+              onClick={() => setLeaveOpen(true)}
+            >
+              {leaveTeam.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              )}
+              Leave {team.name}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave {team.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You lose access to the team’s roster and routing, and your seat is freed. To come
+              back, the owner or an admin has to invite you again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                leaveTeam.mutate(team);
+                setLeaveOpen(false);
+              }}
+            >
+              Leave team
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!removeTarget}
