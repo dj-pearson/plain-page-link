@@ -9,7 +9,9 @@ import {
 } from '@/components/onboarding/OnboardingWizard';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
-import { buildOnboardingProfileUpdate } from '@/lib/onboardingProfile';
+import { useQueryClient } from '@tanstack/react-query';
+import { buildOnboardingProfileUpdate, onboardingTimeZoneToSave } from '@/lib/onboardingProfile';
+import { agentTimeZoneKey } from '@/hooks/useAgentTimeZone';
 import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -24,6 +26,7 @@ export default function OnboardingWizardPage() {
   const navigate = useNavigate();
   const { user, profile, updateProfile } = useAuthStore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -115,6 +118,33 @@ export default function OnboardingWizardPage() {
       // ProtectedRoute's first-run gate immediately sent the agent who had just
       // finished the wizard straight back into it (US-108).
       await updateProfile(profileUpdates);
+
+      // 1b. The time zone (US-446), in its own update so a zone the database
+      // does not recognise costs only the zone, never the profile. Settings
+      // can set it later; the morning email follows UTC until then.
+      const timeZone = onboardingTimeZoneToSave(
+        wizardData.profileBasics.timeZone,
+        profile?.timezone
+      );
+      if (timeZone) {
+        const { error: zoneError } = await supabase
+          .from('profiles')
+          .update({ timezone: timeZone })
+          .eq('id', user.id);
+        if (zoneError) {
+          logger.warn('Onboarding could not save the time zone', {
+            code: zoneError.code,
+            message: zoneError.message,
+          });
+          toast({
+            title: 'Your time zone was not saved',
+            description: 'Everything else is saved. You can choose it later in Settings.',
+            variant: 'destructive',
+          });
+        } else {
+          queryClient.setQueryData(agentTimeZoneKey(user.id), timeZone);
+        }
+      }
 
       // 2. Create first listing if provided.
       //

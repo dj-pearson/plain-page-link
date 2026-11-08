@@ -16,6 +16,8 @@ const upload = vi.fn();
 const invoke = vi.fn();
 const toast = vi.fn();
 const renderAppIcons = vi.fn();
+const profileUpdate = vi.fn();
+const profileUpdateEq = vi.fn();
 
 vi.mock('@/stores/useAuthStore', () => ({
   useAuthStore: () => ({
@@ -49,7 +51,15 @@ vi.mock('@/integrations/supabase/client', () => ({
         getPublicUrl: (path: string) => ({ data: { publicUrl: `https://cdn.test/${path}` } }),
       }),
     },
-    from: () => ({ insert: (...args: unknown[]) => listingInsert(...args) }),
+    from: (table: string) =>
+      table === 'profiles'
+        ? {
+            update: (values: unknown) => {
+              profileUpdate(values);
+              return { eq: (...args: unknown[]) => profileUpdateEq(...args) };
+            },
+          }
+        : { insert: (...args: unknown[]) => listingInsert(...args) },
   },
 }));
 
@@ -86,6 +96,8 @@ describe('OnboardingWizardPage', () => {
     invoke.mockReset().mockResolvedValue({});
     toast.mockReset();
     renderAppIcons.mockReset().mockRejectedValue(new Error('This browser cannot draw images'));
+    profileUpdate.mockReset();
+    profileUpdateEq.mockReset().mockResolvedValue({ error: null });
     window.history.pushState({}, '', '/onboarding/wizard');
   });
 
@@ -244,6 +256,53 @@ describe('OnboardingWizardPage', () => {
     expect(updateProfile.mock.calls[0][0].avatar_url).toMatch(/avatar-\d+\.png$/);
     expect(toast).not.toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Profile photo upload failed' })
+    );
+  });
+
+  // US-446: agents who never opened Settings stayed on the UTC edition of the
+  // morning email. Onboarding offers the zone and writes it on its own.
+  it('saves the time zone chosen in onboarding in its own update', async () => {
+    updateProfile.mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+    renderWithProviders(<OnboardingWizardPage />);
+    await user.click(screen.getByRole('button', { name: /Luxury/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByPlaceholderText('Sarah Johnson'), 'Sarah Johnson');
+    await user.type(screen.getByPlaceholderText('Luxury Home Specialist'), 'Realtor');
+    await user.selectOptions(screen.getByLabelText('Time zone'), 'America/Chicago');
+
+    await user.click(screen.getByRole('button', { name: 'Skip Setup' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
+
+    // Never part of the main profile update: a zone the database refuses must
+    // not cost the agent onboarding_completed_at (US-108).
+    expect(updateProfile.mock.calls[0][0]).not.toHaveProperty('timezone');
+    expect(profileUpdate).toHaveBeenCalledWith({ timezone: 'America/Chicago' });
+    expect(profileUpdateEq).toHaveBeenCalledWith('id', 'user-1');
+    expect(updateProfile.mock.invocationCallOrder[0]).toBeLessThan(
+      profileUpdate.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('finishes onboarding and says so when the database refuses the time zone', async () => {
+    updateProfile.mockResolvedValueOnce(undefined);
+    profileUpdateEq.mockResolvedValueOnce({
+      error: { code: '23514', message: 'That is not a time zone we recognise.' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<OnboardingWizardPage />);
+    await user.click(screen.getByRole('button', { name: /Luxury/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByPlaceholderText('Sarah Johnson'), 'Sarah Johnson');
+    await user.type(screen.getByPlaceholderText('Luxury Home Specialist'), 'Realtor');
+    await user.selectOptions(screen.getByLabelText('Time zone'), 'Europe/London');
+
+    await user.click(screen.getByRole('button', { name: 'Skip Setup' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
+
+    expect(updateProfile.mock.calls[0][0]).toHaveProperty('onboarding_completed_at');
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Your time zone was not saved' })
     );
   });
 });

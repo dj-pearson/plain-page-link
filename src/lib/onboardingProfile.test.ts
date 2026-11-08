@@ -10,7 +10,11 @@
  * example, "Austin, TX".
  */
 import { describe, it, expect } from 'vitest';
-import { buildOnboardingProfileUpdate, parseOnboardingLocation } from './onboardingProfile';
+import {
+  buildOnboardingProfileUpdate,
+  onboardingTimeZoneToSave,
+  parseOnboardingLocation,
+} from './onboardingProfile';
 import type { TablesUpdate } from '@/integrations/supabase/types';
 
 /**
@@ -90,5 +94,27 @@ describe('buildOnboardingProfileUpdate', () => {
 
   it('stores the chosen template id in theme', () => {
     expect(buildOnboardingProfileUpdate({ templateChoice: 'ocean' }).theme).toBe('ocean');
+  });
+});
+
+describe('onboardingTimeZoneToSave (US-446)', () => {
+  it('writes the zone the agent left selected', () => {
+    expect(onboardingTimeZoneToSave('America/Chicago', null)).toBe('America/Chicago');
+    expect(onboardingTimeZoneToSave('Europe/London', 'America/Chicago')).toBe('Europe/London');
+  });
+
+  it('writes nothing when no zone was chosen, or it is already stored', () => {
+    expect(onboardingTimeZoneToSave('', null)).toBeNull();
+    expect(onboardingTimeZoneToSave(undefined, null)).toBeNull();
+    expect(onboardingTimeZoneToSave('America/Chicago', 'America/Chicago')).toBeNull();
+  });
+
+  it('writes nothing this browser cannot use as a zone', () => {
+    expect(onboardingTimeZoneToSave('Mars/Olympus_Mons', null)).toBeNull();
+    expect(onboardingTimeZoneToSave('posix/America/Chicago', null)).toBeNull();
+  });
+
+  it('is never part of the main profile update', () => {
+    expect(buildOnboardingProfileUpdate({ fullName: 'Sarah' })).not.toHaveProperty('timezone');
   });
 });

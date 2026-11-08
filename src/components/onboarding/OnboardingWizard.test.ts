@@ -15,6 +15,7 @@ import {
   ONBOARDING_TEMPLATES,
   buildFirstListingInsert,
   firstListingState,
+  initialOnboardingTimeZone,
   type FirstListing,
 } from './OnboardingWizard';
 import { DEFAULT_THEMES, getCurrentTheme } from '@/lib/themes';
@@ -112,5 +113,20 @@ describe('first listing', () => {
       is_featured: true,
       photos: ['https://cdn.test/p.png'],
     });
+  });
+});
+
+describe('initialOnboardingTimeZone (US-446)', () => {
+  it('starts on the zone already saved', () => {
+    expect(initialOnboardingTimeZone('Europe/London', 'America/Chicago')).toBe('Europe/London');
+  });
+
+  it("otherwise offers this device's zone", () => {
+    expect(initialOnboardingTimeZone(null, 'America/Chicago')).toBe('America/Chicago');
+    expect(initialOnboardingTimeZone('not/a_zone', 'America/Chicago')).toBe('America/Chicago');
+  });
+
+  it('chooses nothing when neither is known', () => {
+    expect(initialOnboardingTimeZone(undefined, null)).toBe('');
   });
 });
