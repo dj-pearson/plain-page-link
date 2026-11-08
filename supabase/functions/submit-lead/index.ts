@@ -4,7 +4,7 @@ import { sendEmail, createLeadAutoReply } from '../_shared/email.ts'
 import { reportError } from '../_shared/report.ts'
 import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts'
 import { encryptSecret } from '../_shared/encryption.ts'
-import { readSpamSignals, botReason, emailLookupHash } from '../_shared/spam-guard.ts'
+import { readSpamSignals, botReason, leadLookupHashes } from '../_shared/spam-guard.ts'
 import {
   buildEnrichment,
   generateEnrichToken,
@@ -251,15 +251,17 @@ serve(async (req) => {
     // the agent's allowance a second time. US-513: the fold keeps both
     // messages (it used to overwrite the first), fills in a listing only when
     // the lead had none, and puts anything new on the lead's timeline.
+    // US-522: a phone-only enquiry (US-228) folds by phone_hash the same way;
+    // an enquiry that gives an email folds by email only.
     const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY')
-    const emailHash = hashSecret && leadData.email ? await emailLookupHash(leadData.email, hashSecret) : null
-    if (emailHash) {
+    const lookup = await leadLookupHashes({ email: leadData.email, phone: leadData.phone }, hashSecret)
+    if (lookup.fold) {
       const { data: earlier, error: earlierError } = await supabase
         .from('leads')
         .select('id, form_data, message, listing_id')
         .eq('user_id', leadData.user_id)
         .eq('lead_type', leadData.lead_type)
-        .eq('email_hash', emailHash)
+        .eq(lookup.fold.column, lookup.fold.value)
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
@@ -321,7 +323,8 @@ serve(async (req) => {
         ...storedLead,
         encrypted_email: encryptedEmail,
         encrypted_phone: encryptedPhone,
-        email_hash: emailHash,
+        email_hash: lookup.email_hash,
+        phone_hash: lookup.phone_hash,
       })
       .select()
       .single()
