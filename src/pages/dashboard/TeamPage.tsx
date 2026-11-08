@@ -351,7 +351,7 @@ export default function TeamPage() {
         <Card>
           <CardHeader>
             <CardTitle>Create your team</CardTitle>
-            <CardDescription>You'll be the owner and can invite agents.</CardDescription>
+            <CardDescription>You&apos;ll be the owner and can invite agents.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 sm:flex-row">
             <Input
@@ -407,8 +407,8 @@ export default function TeamPage() {
           <CardHeader>
             <CardTitle>Invite a member</CardTitle>
             <CardDescription>
-              They'll join your team once they accept. Admins can also invite and remove members and
-              change roles.
+              They&apos;ll join your team once they accept. Admins can also invite and remove
+              members and change roles.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 sm:flex-row">

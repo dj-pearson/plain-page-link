@@ -298,9 +298,9 @@ export function GDPRSettings() {
             <AlertDialogDescription asChild>
               <div className="space-y-4">
                 <p>
-                  This will schedule your account for permanent deletion. You'll have 30 days to
-                  cancel this request if you change your mind. Your subscription will not renew, and
-                  it is cancelled when the account is deleted.
+                  This will schedule your account for permanent deletion. You&apos;ll have 30 days
+                  to cancel this request if you change your mind. Your subscription will not renew,
+                  and it is cancelled when the account is deleted.
                 </p>
                 <div>
                   <Label htmlFor="reason" className="text-sm font-medium">

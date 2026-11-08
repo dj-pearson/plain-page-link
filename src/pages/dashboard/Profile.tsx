@@ -163,6 +163,9 @@ function UrlInput({ field, value, onChange, placeholder, error }: UrlInputProps)
     <>
       <input
         id={`profile-${field}`}
+        // The visible <label htmlFor> lives in the caller; naming it here too
+        // keeps the static field-name check (US-261) able to see it.
+        aria-labelledby={`profile-${field}-label`}
         type="text"
         inputMode="url"
         autoComplete="url"
@@ -893,6 +896,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-website_url"
+                  id="profile-website_url-label"
                 >
                   Website URL
                 </label>
@@ -908,6 +912,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-calendly_url"
+                  id="profile-calendly_url-label"
                 >
                   Calendly Booking URL
                 </label>
@@ -919,7 +924,7 @@ export default function Profile() {
                   error={urlErrors.calendly_url}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add your Calendly link to enable "Book a Showing" on your listings
+                  Add your Calendly link to enable &ldquo;Book a Showing&rdquo; on your listings
                 </p>
               </div>
             </div>
@@ -1024,6 +1029,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-facebook_url"
+                  id="profile-facebook_url-label"
                 >
                   Facebook URL
                 </label>
@@ -1039,6 +1045,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-instagram_url"
+                  id="profile-instagram_url-label"
                 >
                   Instagram URL
                 </label>
@@ -1054,6 +1061,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-linkedin_url"
+                  id="profile-linkedin_url-label"
                 >
                   LinkedIn URL
                 </label>
@@ -1069,6 +1077,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-tiktok_url"
+                  id="profile-tiktok_url-label"
                 >
                   TikTok URL
                 </label>
@@ -1084,6 +1093,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-youtube_url"
+                  id="profile-youtube_url-label"
                 >
                   YouTube URL
                 </label>
@@ -1099,6 +1109,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-zillow_url"
+                  id="profile-zillow_url-label"
                 >
                   Zillow Profile URL
                 </label>
@@ -1114,6 +1125,7 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-realtor_com_url"
+                  id="profile-realtor_com_url-label"
                 >
                   Realtor.com Profile URL
                 </label>

@@ -25,7 +25,7 @@ const STOCK_HUES = /\b(?:hover:)?bg-(?:purple|indigo|blue|green|orange|violet)-\
 
 function renderAll() {
   return render(
-    <StickyActionBar profile={profile} onScheduleShowing={() => {}} onGetHomeValue={() => {}} />
+    <StickyActionBar profile={profile} onScheduleShowing={vi.fn()} onGetHomeValue={vi.fn()} />
   );
 }
 
