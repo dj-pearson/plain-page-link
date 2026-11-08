@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logger } from '@/lib/logger';
+import type { ClientAuditAction } from '@/lib/audit';
 import type { Database } from '@/integrations/supabase/types';
 
 type AuditLogRow = Database['public']['Tables']['audit_logs']['Row'];
@@ -48,13 +49,16 @@ interface AuditLogsResponse {
   error?: string;
 }
 
+/**
+ * What the browser may report. The audit-log function accepts only
+ * CLIENT_AUDIT_ACTIONS and decides the risk level itself (US-657).
+ */
 interface LogEventParams {
-  action: string;
+  action: ClientAuditAction;
   status: 'success' | 'failure' | 'blocked';
   resourceType?: string;
   resourceId?: string;
   details?: Record<string, unknown>;
-  riskLevel?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 interface UseAuditLogOptions {
