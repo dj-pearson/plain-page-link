@@ -506,7 +506,18 @@ export function useContactInteractions(contactId: string | null | undefined) {
         .eq('user_id', user.id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contact-interactions'] }),
+    onSuccess: () => {
+      // Deleting the latest touch rolls last_contacted_at (and so
+      // next_touch_at) back to the latest remaining one (US-610), so the
+      // contact, the Clients list and the "due" lists are stale too.
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['contact-interactions'] });
+    },
+    onError: (error) =>
+      errorHandler.captureException(error as Error, {
+        action: 'delete_interaction',
+        component: 'useContactInteractions',
+      }),
   });
 
   return {
