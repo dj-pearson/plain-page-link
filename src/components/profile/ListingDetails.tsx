@@ -43,7 +43,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
 import { currentListingShareUrl } from '@/lib/listingShare';
-import { sanitizeExternalUrl } from '@/utils/sanitize';
+import { sanitizeExternalUrl } from '@/utils/sanitizeUrl';
 import { listingStatusBadgeClass } from '@/lib/listingStatus';
 
 interface ListingDetailsProps {

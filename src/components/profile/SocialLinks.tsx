@@ -1,7 +1,7 @@
 import { Instagram, Facebook, Linkedin, Music, Youtube, Home, Building, Globe } from 'lucide-react';
 import { trackSocialClick } from '@/lib/analyticsEvents';
 import type { PublicProfile } from '@/types/profile';
-import { sanitizeExternalUrl } from '@/utils/sanitize';
+import { sanitizeExternalUrl } from '@/utils/sanitizeUrl';
 
 interface SocialLinksProps {
   profile: PublicProfile;

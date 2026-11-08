@@ -25,7 +25,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
-import { sanitizeUrl } from '@/utils/sanitize';
+import { sanitizeUrl } from '@/utils/sanitizeUrl';
 
 /**
  * The subset of a `links` row usePublicProfile selects.
