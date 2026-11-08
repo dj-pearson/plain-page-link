@@ -19,6 +19,7 @@ import {
   PRICING_PLANS,
   firstUnlimitedListingsPlan,
   listingAllowanceSummary,
+  linkAllowanceSummary,
   type PricingTier,
 } from './pricing-plans';
 
@@ -132,5 +133,31 @@ describe('listing allowance copy (US-355)', () => {
     expect(professional?.limits.listings).toBeGreaterThan(0);
     expect(listingAllowanceSummary()).toContain(`${professional?.limits.listings} on Professional`);
     expect(firstUnlimitedListingsPlan()?.id).toBe('team');
+  });
+});
+
+describe('link allowance copy (US-501)', () => {
+  const plan = (id: string, price: number, links: number): PricingTier => ({
+    ...PRICING_PLANS[0],
+    id,
+    name: id[0].toUpperCase() + id.slice(1),
+    price_monthly: price,
+    limits: { ...PRICING_PLANS[0].limits, links },
+  });
+
+  it('states every capped plan and the first unlimited one, cheapest first', () => {
+    expect(
+      linkAllowanceSummary([plan('team', 99, -1), plan('free', 0, 5), plan('pro', 49, 15)])
+    ).toBe('5 on Free, 15 on Pro, unlimited from Team');
+  });
+
+  it('never says unlimited when no plan is', () => {
+    expect(linkAllowanceSummary([plan('free', 0, 5)])).toBe('5 on Free');
+  });
+
+  it('matches the real plans: Free is capped', () => {
+    const free = PRICING_PLANS.find((p) => p.price_monthly === 0);
+    expect(free?.limits.links).toBeGreaterThan(0);
+    expect(linkAllowanceSummary().startsWith(`${free?.limits.links} on ${free?.name}`)).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
 import { PRICING_PLANS } from '@/config/pricing-plans';
+import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
 
 /**
  * The AgentBio cell of the comparison table, from the plans we actually sell.
@@ -21,6 +22,9 @@ const AGENTBIO_PRICE_CELL = (() => {
   const from = `from $${paid[0].price_monthly}`;
   return hasFree ? `Free, or ${from}` : from;
 })();
+
+/** What the competitor columns say for price: nothing we would have to keep current. */
+const COMPETITOR_PRICE_CELL = 'See their site';
 
 const FAQ_ENTRIES: FaqEntry[] = [
   {
@@ -297,10 +301,14 @@ export default function ForRealEstateAgents() {
                       beacons: false,
                     },
                     {
+                      // The competitor cells were "$24" and "$10", unsourced
+                      // and undated (US-319). Their prices change and vary by
+                      // region, so we name the tiers and send the reader to
+                      // their sites, as /vs/linktree and /vs/beacons do.
                       feature: 'Price (monthly)',
                       agentbio: AGENTBIO_PRICE_CELL,
-                      linktree: '$24',
-                      beacons: '$10',
+                      linktree: COMPETITOR_PRICE_CELL,
+                      beacons: COMPETITOR_PRICE_CELL,
                     },
                   ].map((row, i) => (
                     <tr key={i} className="border-b border-glass-border/50">
@@ -342,6 +350,28 @@ export default function ForRealEstateAgents() {
                   ))}
                 </tbody>
               </table>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Linktree&rsquo;s and Beacons&rsquo; plans checked against{' '}
+                <a
+                  href={COMPETITORS.linktree.homepage}
+                  className="underline underline-offset-2"
+                  rel="nofollow noopener"
+                  target="_blank"
+                >
+                  linktr.ee
+                </a>{' '}
+                and{' '}
+                <a
+                  href={COMPETITORS.beacons.homepage}
+                  className="underline underline-offset-2"
+                  rel="nofollow noopener"
+                  target="_blank"
+                >
+                  beacons.ai
+                </a>{' '}
+                on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices, which change and vary
+                by region.
+              </p>
             </div>
           </div>
         </section>

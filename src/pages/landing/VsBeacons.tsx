@@ -8,6 +8,42 @@ import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+import { PRICING_PLANS, linkAllowanceSummary } from '@/config/pricing-plans';
+import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
+
+/*
+ * Every AgentBio figure on this page comes from PRICING_PLANS, and nothing
+ * here quotes a Beacons price (US-501, following US-156 on /vs/linktree and
+ * /vs/later). The page used to compare our Professional price with a bare
+ * Beacons figure, rate the ROI "High" against "Low" and say agents "report"
+ * a number of qualified leads a month, with nothing behind any of them, and it
+ * gave AgentBio unlimited links although Free and Starter are capped.
+ */
+const PAID_PLANS = PRICING_PLANS.filter((p) => p.price_monthly > 0).sort(
+  (a, b) => a.price_monthly - b.price_monthly
+);
+const FREE_PLAN = PRICING_PLANS.find((p) => p.price_monthly === 0);
+
+/** e.g. "Starter $29, Professional $49" */
+const AGENTBIO_PLANS_CELL = PAID_PLANS.slice(0, 2)
+  .map((p) => `${p.name} $${p.price_monthly}`)
+  .join(', ');
+
+/** e.g. "3 listings, 5 links" */
+const AGENTBIO_FREE_CELL = FREE_PLAN
+  ? `${FREE_PLAN.limits.listings} listings, ${FREE_PLAN.limits.links} links`
+  : 'No free plan';
+
+/** e.g. "5 on Free, 15 on Starter, unlimited from Professional" */
+const AGENTBIO_LINKS_CELL = linkAllowanceSummary();
+
+const PRICE_FAQ_ANSWER = `AgentBio has ${
+  FREE_PLAN ? `a free plan (${AGENTBIO_FREE_CELL}) and ` : ''
+}paid plans from ${PAID_PLANS.slice(0, 2)
+  .map((p) => `${p.name} at $${p.price_monthly}`)
+  .join(
+    ' to '
+  )} a month. We do not quote Beacons' prices, because they change and a copy on our site would soon be wrong; compare their plans on beacons.ai with ours. The more useful question is which features you will use: AgentBio's plans pay for listings, lead forms and showing booking, Beacons' for creator tools like a store and a media kit.`;
 
 const FAQ_ENTRIES: FaqEntry[] = [
   {
@@ -124,6 +160,19 @@ export default function VsBeacons() {
               <p className="text-xl glass-body max-w-3xl mx-auto">
                 See why real estate agents need specialized tools, not general creator platforms
               </p>
+              <p className="mt-4 text-sm text-muted-foreground max-w-3xl mx-auto">
+                Beacons&rsquo; plans checked against{' '}
+                <a
+                  href={COMPETITORS.beacons.homepage}
+                  className="underline underline-offset-2"
+                  rel="nofollow noopener"
+                  target="_blank"
+                >
+                  beacons.ai
+                </a>{' '}
+                on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices, which change; check
+                theirs against ours rather than taking a number from us.
+              </p>
             </header>
 
             <div className="max-w-5xl mx-auto overflow-x-auto">
@@ -179,13 +228,13 @@ export default function VsBeacons() {
                     feature="Showing Appointment Booking"
                     agentbio={true}
                     beacons={false}
-                    description="Calendly/Google Calendar integration for property showings"
+                    description="Your Calendly booking page, opened from your profile for showings"
                   />
                   <ComparisonRow
                     feature="Testimonials Display"
-                    agentbio="5-Star Ratings"
+                    agentbio="Star ratings"
                     beacons={false}
-                    description="Client reviews with verified badges and success stories"
+                    description="Client reviews with star ratings, submitted from your own review page"
                   />
                   <ComparisonRow
                     feature="Property Analytics"
@@ -204,10 +253,10 @@ export default function VsBeacons() {
                     </td>
                   </tr>
                   <ComparisonRow
-                    feature="Unlimited Links"
-                    agentbio={true}
+                    feature="Link Buttons"
+                    agentbio={AGENTBIO_LINKS_CELL}
                     beacons={true}
-                    description="Add as many links as needed"
+                    description="Links to your other pages and profiles"
                   />
                   <ComparisonRow
                     feature="Custom Branding"
@@ -273,21 +322,15 @@ export default function VsBeacons() {
                   </tr>
                   <ComparisonRow
                     feature="Free Plan"
-                    agentbio="3 Listings, 5 Links"
-                    beacons="Limited Features"
-                    description="Basic functionality to get started"
+                    agentbio={AGENTBIO_FREE_CELL}
+                    beacons={COMPETITORS.beacons.tiers.includes('Free')}
+                    description="Get started without paying"
                   />
                   <ComparisonRow
-                    feature="Professional Plan"
-                    agentbio="$49/month"
-                    beacons="$10/month"
-                    description="Full-featured paid tier"
-                  />
-                  <ComparisonRow
-                    feature="ROI for Real Estate"
-                    agentbio="High"
-                    beacons="Low"
-                    description="Pays for itself with 1 extra lead/month"
+                    feature="Paid Plans"
+                    agentbio={AGENTBIO_PLANS_CELL}
+                    beacons={COMPETITORS.beacons.tiers.filter((t) => t !== 'Free').join(', ')}
+                    description="Monthly prices for AgentBio; check beacons.ai for theirs"
                   />
                 </tbody>
               </table>
@@ -354,8 +397,8 @@ export default function VsBeacons() {
                       including home value expectations and reason for selling.
                     </p>
                     <p className="glass-body leading-relaxed">
-                      <strong>Showing appointment booking:</strong> Integrated calendar lets buyers
-                      book showing times directly. No more phone tag or missed opportunities.
+                      <strong>Showing appointment booking:</strong> Add your Calendly link and
+                      buyers book showing times from your page, without the phone tag.
                     </p>
                     <p className="glass-body leading-relaxed">
                       <strong>Disclosures on your page:</strong> The Equal Housing Opportunity logo
@@ -458,7 +501,7 @@ export default function VsBeacons() {
                 <MigrationStep
                   number={1}
                   title="Create Your Free AgentBio Account"
-                  description="Sign up at agentbio.net with your email. Choose your unique username (yourname.agentbio.net)."
+                  description="Sign up at agentbio.net with your email. Choose your unique username (agentbio.net/yourname)."
                 />
                 <MigrationStep
                   number={2}
@@ -473,12 +516,12 @@ export default function VsBeacons() {
                 <MigrationStep
                   number={4}
                   title="Set Up Lead Capture Forms"
-                  description="Configure buyer inquiry form, seller lead form, and home valuation tool."
+                  description="Turn on the buyer inquiry, seller and home valuation request forms."
                 />
                 <MigrationStep
                   number={5}
                   title="Connect Your Calendar"
-                  description="Integrate Calendly or Google Calendar for showing appointment booking."
+                  description="Paste your Calendly link so buyers can book showings from your page."
                 />
                 <MigrationStep
                   number={6}
@@ -518,7 +561,7 @@ export default function VsBeacons() {
               />
               <FAQItem
                 question="Is AgentBio more expensive than Beacons?"
-                answer="AgentBio's professional plan is $49/month vs Beacons' $10/month. However, AgentBio pays for itself with a single extra lead per month. Real estate agents report 15-25 qualified leads per month from AgentBio, making the ROI significantly higher despite the higher price."
+                answer={PRICE_FAQ_ANSWER}
               />
               <FAQItem
                 question="What happens to my Beacons analytics when I switch?"

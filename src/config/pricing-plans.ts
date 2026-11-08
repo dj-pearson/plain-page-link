@@ -405,6 +405,22 @@ export function listingAllowanceSummary(plans: PricingTier[] = PRICING_PLANS): s
   return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
 
+/**
+ * How many link buttons each plan allows, short enough for a comparison-table
+ * cell (US-501). /vs/beacons and /vs/later ticked "Unlimited Links" for
+ * AgentBio, but Free and Starter are capped.
+ *
+ * e.g. "5 on Free, 15 on Starter, unlimited from Professional"
+ */
+export function linkAllowanceSummary(plans: PricingTier[] = PRICING_PLANS): string {
+  const ordered = [...plans].sort((a, b) => a.price_monthly - b.price_monthly);
+  const unlimitedIndex = ordered.findIndex((plan) => plan.limits.links === -1);
+  const capped = unlimitedIndex === -1 ? ordered : ordered.slice(0, unlimitedIndex);
+  const parts = capped.map((plan) => `${plan.limits.links} on ${plan.name}`);
+  if (unlimitedIndex !== -1) parts.push(`unlimited from ${ordered[unlimitedIndex].name}`);
+  return parts.join(', ');
+}
+
 /** The cheapest plan whose listing allowance is unlimited, if any. */
 export function firstUnlimitedListingsPlan(
   plans: PricingTier[] = PRICING_PLANS

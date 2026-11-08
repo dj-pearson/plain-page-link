@@ -175,9 +175,10 @@ export default function VsLinktree() {
                     },
                     {
                       feature: 'Calendar Booking',
-                      agentbio: 'Full Integration',
+                      agentbio: 'Calendly on your page',
                       linktree: 'External link only',
-                      description: 'Integrated Calendly/Google Calendar for showing appointments',
+                      description:
+                        'Your Calendly booking page opens from your profile for showings',
                     },
                     {
                       feature: 'Testimonials Display',
