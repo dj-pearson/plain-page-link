@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { encryptPIIBatch, decryptLeadContacts } from '@/lib/pii';
 import { LEAD_COLUMNS } from '@/lib/leadColumns';
 import { normalizeStatusFilter, statusFilterValues } from '@/lib/leadStatus';
+import { normalizeAssigneeFilter, type AssigneeFilter } from '@/lib/leadAssignee';
 import type { Lead, LeadReadRow } from '@/types/lead';
 
 /**
@@ -43,6 +44,11 @@ export interface LeadFilters {
   search?: string;
   /** Only leads a teammate's routing assigned to me (US-226). */
   assignedToMe?: boolean;
+  /**
+   * Who holds the lead (US-515): 'unassigned' or one teammate's user id, the
+   * owner's view of how their team's leads are split. Anything else is ignored.
+   */
+  assignee?: string | null;
 }
 
 /**
@@ -59,6 +65,7 @@ function leadsQuery(
     leadType?: string;
     search?: string;
     assignedToMe?: boolean;
+    assignee?: AssigneeFilter | null;
   }
 ) {
   // US-226: my leads AND the ones assigned to me. RLS always allowed the
@@ -70,6 +77,8 @@ function leadsQuery(
     .select(LEAD_COLUMNS)
     .or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
   if (filters.assignedToMe) query = query.eq('assigned_to', userId);
+  if (filters.assignee === 'unassigned') query = query.is('assigned_to', null);
+  else if (filters.assignee) query = query.eq('assigned_to', filters.assignee);
   // One status or a group of them (US-439: "In progress", "Won").
   const statuses = filters.statuses;
   if (statuses?.length === 1) query = query.eq('status', statuses[0]);
@@ -102,6 +111,7 @@ export async function fetchAllLeads(
     leadType: filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined,
     search: filters.search?.trim() || undefined,
     assignedToMe: filters.assignedToMe,
+    assignee: normalizeAssigneeFilter(filters.assignee),
   };
   const out: Lead[] = [];
   for (let from = 0; from < EXPORT_MAX_LEADS; from += EXPORT_BATCH) {
@@ -128,6 +138,7 @@ export function useLeads(filters: LeadFilters = {}) {
   const leadType = filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined;
   const search = filters.search?.trim() || undefined;
   const assignedToMe = filters.assignedToMe || undefined;
+  const assignee = normalizeAssigneeFilter(filters.assignee) ?? undefined;
 
   const {
     data,
@@ -139,7 +150,7 @@ export function useLeads(filters: LeadFilters = {}) {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['leads', user?.id, { status, leadType, search, assignedToMe }],
+    queryKey: ['leads', user?.id, { status, leadType, search, assignedToMe, assignee }],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       if (!user?.id) return [];
@@ -154,6 +165,7 @@ export function useLeads(filters: LeadFilters = {}) {
         leadType,
         search,
         assignedToMe,
+        assignee,
       }).range(from, from + LEADS_PAGE_SIZE - 1);
 
       if (error) throw error;
