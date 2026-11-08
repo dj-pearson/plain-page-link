@@ -517,3 +517,27 @@ html {
 .page-exit-active {
   @apply opacity-0 -translate-y-4 transition-all duration-300 ease-in;
 }
+
+/*
+ * US-637: iOS Safari, and the installed iOS app, zoom the whole page in when
+ * a form field under 16px takes focus, and leave it zoomed after the keyboard
+ * closes. Input was already 16px on phones, but Textarea, native <select>s and
+ * every field given `text-sm` were 14px, so a buyer tapping "Message" in the
+ * lead form on an agent's page found the dialog blown up and half off screen.
+ *
+ * On touch screens every typed-into field is at least 16px, whatever its
+ * classes say. `!important` because utilities (text-sm) come later in the
+ * stylesheet; outside any @layer so Tailwind does not hoist it above them.
+ * Mouse-and-keyboard screens keep the compact 14px sizes.
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+      [type='file']
+    ):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not(
+      [type='hidden']
+    ),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
