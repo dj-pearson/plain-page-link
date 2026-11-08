@@ -304,13 +304,14 @@ export default function VsLinktree() {
           </div>
         </section>
 
-        {/* Why Real Estate Agents Switch from Linktree to AgentBio */}
+        {/* Was "Why Real Estate Agents Switch from Linktree": nothing records
+            anyone switching (US-519). */}
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
                 <span className="glass-heading">
-                  Why Real Estate Agents Switch from Linktree to AgentBio
+                  What AgentBio Adds Over Linktree for Real Estate
                 </span>
               </h2>
             </header>
@@ -409,9 +410,7 @@ export default function VsLinktree() {
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">
-                  How to Migrate from Linktree to AgentBio in 10 Minutes
-                </span>
+                <span className="glass-heading">How to Migrate from Linktree to AgentBio</span>
               </h2>
             </header>
 
@@ -424,17 +423,17 @@ export default function VsLinktree() {
               <MigrationStep
                 number={2}
                 title="Add your profile info"
-                description="Upload photo, bio, contact details (5 minutes)"
+                description="Upload photo, bio and contact details"
               />
               <MigrationStep
                 number={3}
                 title="Add your best listings"
-                description="Upload property photos and details (5 minutes)"
+                description="Upload property photos and details"
               />
               <MigrationStep
                 number={4}
                 title="Set up lead forms"
-                description="Configure buyer and seller inquiry forms (2 minutes)"
+                description="Turn on the buyer and seller inquiry forms"
               />
               <MigrationStep
                 number={5}
@@ -461,7 +460,7 @@ export default function VsLinktree() {
               <span className="glass-accent">Try AgentBio Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
-              No credit card required • Migrate in 10 minutes • Cancel anytime
+              No credit card required • Cancel anytime
             </p>
           </div>
         </section>

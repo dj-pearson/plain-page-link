@@ -393,7 +393,7 @@ export default function ForRealEstateAgents() {
               <span className="glass-accent">Create Your Agent Bio Page Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
-              No credit card required • Setup in 5 minutes
+              No credit card required • Cancel anytime
             </p>
           </div>
         </section>

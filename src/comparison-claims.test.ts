@@ -52,6 +52,27 @@ const FALSE_CLAIMS: Array<{ pattern: RegExp; why: string }> = [
   { pattern: /trusted by [\d,]+\+?|top agents/i, why: 'no measured agent count or ranking' },
   { pattern: /agentbio\.io/i, why: 'the domain is agentbio.net' },
   { pattern: /yourname\.agentbio\.net/i, why: 'profiles live at agentbio.net/yourname' },
+  // US-519 (US-508)
+  {
+    pattern: /\d+(-\d+)?[- ]minutes?\b/i,
+    why: 'no setup or migration time has been measured',
+  },
+  {
+    pattern: /join agents|agents who switched|agents switch|most agents (find|switch)/i,
+    why: 'nothing records agents switching or what most agents think',
+  },
+  {
+    pattern: /real estate templates|pre-designed pages/i,
+    why: 'AgentBio has general visual themes, not real estate templates',
+  },
+  {
+    pattern: /agentbio="(Advanced|Basic|Limited)"/,
+    why: 'a ranking of AgentBio against a competitor that nobody measured',
+  },
+  {
+    pattern: /home value expectations/i,
+    why: 'the seller form asks property, timeline and reason, not an expected price',
+  },
 ];
 
 const read = (path: string) => visibleText(readFileSync(join(ROOT, path), 'utf8'));
@@ -79,6 +100,16 @@ describe('comparison pages', () => {
     for (const page of COMPARISON_PAGES) {
       expect(read(page), page).toMatch(/COMPETITORS_VERIFIED_LABEL/);
     }
+  });
+
+  it('/vs/later builds its head through SEOHead and its FAQ from one array (US-519)', () => {
+    // The last comparison page with a hand-written <Helmet>; its visible FAQ
+    // and FAQPage schema were two copies that had already drifted apart.
+    const source = readFileSync(join(ROOT, 'src/pages/landing/VsLater.tsx'), 'utf8');
+    expect(source).toMatch(/<SEOHead\b/);
+    expect(source).not.toMatch(/react-helmet-async/);
+    expect(source).toMatch(/faqPageSchema\(FAQ_ENTRIES\)/);
+    expect(source).toMatch(/<FaqSection entries=\{FAQ_ENTRIES\}/);
   });
 
   it('the plans the pages build their figures from exist', () => {
