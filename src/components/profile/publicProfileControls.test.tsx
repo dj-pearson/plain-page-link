@@ -12,6 +12,7 @@ import ListingGallery from './ListingGallery';
 import { TestimonialSection } from './TestimonialSection';
 import ListingDetails from './ListingDetails';
 import type { PublicProfileListing } from '@/types';
+import { LISTING_DETAIL_IMAGE_SIZES, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import type { PublicTestimonial } from '@/types/testimonial';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -163,5 +164,54 @@ describe('ListingDetails on a page (US-275)', () => {
       <ListingDetails listing={listing('1', { status: 'sold' })} onRequestShowing={vi.fn()} />
     );
     expect(screen.queryByRole('button', { name: /Showing/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('ListingDetails photo weight (US-613)', () => {
+  const STORE = 'https://db.example.com/storage/v1/object/public/listing-photos/u1/l1';
+  const stored = (n: number) => `${STORE}/p${n}.jpg`;
+
+  it('serves the large photo from the WebP variants, never the original, with high priority first', async () => {
+    const user = userEvent.setup();
+    render(<ListingDetails listing={listing('1', { photos: [stored(1), stored(2)] })} />);
+
+    const main = screen.getByRole('img', { name: '1 Maple Avenue - Photo 1' });
+    expect(main).toHaveAttribute('src', `${STORE}/p1-800.webp`);
+    expect(main.getAttribute('srcset')).toBe(
+      `${STORE}/p1-200.webp 200w, ${STORE}/p1-400.webp 400w, ${STORE}/p1-800.webp 800w`
+    );
+    expect(main).toHaveAttribute('sizes', LISTING_DETAIL_IMAGE_SIZES);
+    expect(main).toHaveAttribute('fetchpriority', 'high');
+
+    await user.click(screen.getByRole('button', { name: 'Next photo' }));
+    const second = await screen.findByRole('img', { name: '1 Maple Avenue - Photo 2' });
+    expect(second).toHaveAttribute('src', `${STORE}/p2-800.webp`);
+    expect(second).not.toHaveAttribute('fetchpriority');
+  });
+
+  it('falls back to the original when the variant is missing, then to the placeholder', () => {
+    render(<ListingDetails listing={listing('1', { photos: [stored(1)] })} />);
+    const main = screen.getByRole('img', { name: '1 Maple Avenue - Photo 1' });
+
+    main.dispatchEvent(new Event('error'));
+    expect(main).toHaveAttribute('src', stored(1));
+    expect(main).not.toHaveAttribute('srcset');
+
+    main.dispatchEvent(new Event('error'));
+    expect(main).toHaveAttribute('src', PLACEHOLDER_PROPERTY_IMAGE);
+  });
+
+  it('uses a hot-linked photo as it is, and the placeholder when there are no photos', () => {
+    const { unmount } = render(<ListingDetails listing={listing('1')} />);
+    const hotLinked = screen.getByRole('img', { name: '1 Maple Avenue - Photo 1' });
+    expect(hotLinked).toHaveAttribute('src', 'https://example.com/1.jpg');
+    expect(hotLinked).not.toHaveAttribute('srcset');
+    unmount();
+
+    render(<ListingDetails listing={listing('2', { photos: [] })} />);
+    expect(screen.getByRole('img', { name: '2 Maple Avenue - Photo 1' })).toHaveAttribute(
+      'src',
+      PLACEHOLDER_PROPERTY_IMAGE
+    );
   });
 });

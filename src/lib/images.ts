@@ -86,7 +86,9 @@ export function getImageUrl(
   const { bucket = LISTING_PHOTO_BUCKET, width }: GetImageUrlOptions =
     typeof bucketOrOptions === 'string' ? { bucket: bucketOrOptions } : bucketOrOptions;
 
-  if (!path) {
+  // The placeholder is a site asset, not a storage path: getImageUrls puts it
+  // in a photo list that has none, and it must not be resolved to a bucket.
+  if (!path || path === PLACEHOLDER_PROPERTY_IMAGE) {
     return PLACEHOLDER_PROPERTY_IMAGE;
   }
 
@@ -159,6 +161,13 @@ export function sizedImage(path: string | null | undefined, width: ImageVariantW
  * the preloaded candidate is the one the <img> then asks for.
  */
 export const FEATURED_LISTING_IMAGE_SIZES = '(min-width: 1024px) 1024px, 100vw';
+
+/**
+ * `sizes` for the photo on a listing's own page (ListingDetails, US-613): the
+ * full width of ListingPage's max-w-5xl column, so the same value as the
+ * featured carousel.
+ */
+export const LISTING_DETAIL_IMAGE_SIZES = FEATURED_LISTING_IMAGE_SIZES;
 
 /** `sizes` for ListingCard: the 1 / 2 / 3-column grids it is rendered in. */
 export const LISTING_CARD_IMAGE_SIZES = '(min-width: 1024px) 330px, (min-width: 640px) 50vw, 100vw';
