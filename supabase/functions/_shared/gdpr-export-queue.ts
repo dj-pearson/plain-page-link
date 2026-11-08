@@ -27,18 +27,21 @@
  * is a bearer credential and is only ever put in the email. Files are removed
  * once file_expires_at passes ({@link purgeExpiredExports}).
  *
+ * The document is written a page at a time (writeExportDocument, US-576), so
+ * a large account's export no longer holds every section's rows, a decrypted
+ * copy and the serialised string in memory together. The file is still
+ * uploaded in one request; streaming the upload is the next slice of US-405.
+ *
  * Free of Deno globals and esm.sh runtime imports so vitest can run it.
  */
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import {
-  buildExportDocument,
-  collectSections,
   ExportIncompleteError,
-  sectionCounts,
   supabaseExportReader,
-  type CollectedSections,
+  writeExportDocument,
   type Decrypt,
+  type ExportReader,
   type ExportSubject,
 } from './gdpr-export.ts';
 import { escapeHtml, type EmailOptions, type SendEmailResult } from './email.ts';
@@ -69,9 +72,11 @@ export interface ExportQueueStore {
   claim(request: QueuedExport, now: string): Promise<boolean>;
   /** The auth user, or null when the account no longer exists. */
   getSubject(userId: string): Promise<ExportSubject | null>;
-  collect(userId: string): Promise<CollectedSections>;
+  /** Reads the subject's sections; the export is written from it a page at a time (US-576). */
+  reader: ExportReader;
   decrypt: Decrypt;
-  upload(path: string, json: string): Promise<void>;
+  /** Stores the document, given as its text in order. */
+  upload(path: string, chunks: string[]): Promise<void>;
   signedUrl(path: string, expiresInSeconds: number): Promise<string>;
   complete(id: string, path: string, expiresAt: string, now: string): Promise<void>;
   /** Back to 'pending' for the next run, with the reason it did not finish. */
@@ -151,15 +156,16 @@ async function buildAndDeliver(
   store: ExportQueueStore,
   request: QueuedExport,
   opts: ExportQueueOptions
-): Promise<Record<string, number>> {
+): Promise<{ counts: Record<string, number>; truncated: string[] }> {
   const subject = await store.getSubject(request.userId);
   if (!subject) throw new PermanentExportError('The account no longer exists.');
   if (!subject.email) throw new PermanentExportError('The account has no email address to send the link to.');
 
-  const collected = await store.collect(request.userId);
-  const document = await buildExportDocument(subject, collected, store.decrypt, opts.now);
+  // Written a page at a time, so the largest accounts do not hold every
+  // section's rows, a decrypted copy and the serialised string at once.
+  const written = await writeExportDocument(store.reader, subject, store.decrypt, opts.now);
   const path = exportObjectPath(request);
-  await store.upload(path, JSON.stringify(document, null, 2));
+  await store.upload(path, written.chunks);
 
   const link = await store.signedUrl(path, EXPORT_LINK_TTL_SECONDS);
   const expiresAt = new Date(opts.now.getTime() + EXPORT_LINK_TTL_SECONDS * 1000);
@@ -168,7 +174,7 @@ async function buildAndDeliver(
   if (!sent.ok) throw new Error(`email not sent: ${sent.error ?? 'unknown error'}`);
 
   await store.complete(request.id, path, expiresAt.toISOString(), opts.now.toISOString());
-  return sectionCounts(collected);
+  return { counts: written.counts, truncated: written.truncated };
 }
 
 /** Builds, stores and emails queued exports. Never throws; failures are in the report. */
@@ -201,10 +207,15 @@ export async function processExportQueue(
     }
 
     try {
-      const counts = await buildAndDeliver(store, request, opts);
+      const { counts, truncated } = await buildAndDeliver(store, request, opts);
       report.completed += 1;
       await store
-        .audit(request.userId, 'success', { request_id: request.id, queued: true, records_exported: counts })
+        .audit(request.userId, 'success', {
+          request_id: request.id,
+          queued: true,
+          records_exported: counts,
+          truncated,
+        })
         .catch((error) => report.errors.push(`${request.id}: audit: ${errorText(error)}`));
     } catch (error) {
       const reason =
@@ -419,10 +430,10 @@ export function supabaseExportQueueStore(
       }
       return data.user ?? null;
     },
-    collect: (userId) => collectSections(supabaseExportReader(supabase), userId),
+    reader: supabaseExportReader(supabase),
     decrypt: deps.decrypt,
-    async upload(path, json) {
-      const { error } = await bucket().upload(path, new Blob([json], { type: 'application/json' }), {
+    async upload(path, chunks) {
+      const { error } = await bucket().upload(path, new Blob(chunks, { type: 'application/json' }), {
         contentType: 'application/json',
         upsert: true,
       });

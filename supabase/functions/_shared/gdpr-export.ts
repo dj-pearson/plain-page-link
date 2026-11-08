@@ -124,6 +124,31 @@ export class ExportIncompleteError extends Error {
   }
 }
 
+/**
+ * Hands each page of one section to `onPage` as it is read, until a short
+ * page, and keeps none of them. Throws on the first page that fails.
+ */
+export async function forEachPage(
+  reader: ExportReader,
+  spec: SectionSpec,
+  userId: string,
+  onPage: (rows: Row[]) => void | Promise<void>,
+  pageSize = PAGE_SIZE,
+  maxRows = MAX_ROWS_PER_SECTION
+): Promise<{ count: number; truncated: boolean }> {
+  let count = 0;
+  for (let from = 0; from < maxRows; from += pageSize) {
+    const to = Math.min(from + pageSize, maxRows) - 1;
+    const { data, error } = await reader.page(spec, userId, from, to);
+    if (error) throw new Error(error.message || 'query failed');
+    const page = data ?? [];
+    count += page.length;
+    if (page.length > 0) await onPage(page);
+    if (page.length < to - from + 1) return { count, truncated: false };
+  }
+  return { count, truncated: true };
+}
+
 /** Every row of one section, page by page, until a short page. */
 export async function readAllRows(
   reader: ExportReader,
@@ -133,15 +158,8 @@ export async function readAllRows(
   maxRows = MAX_ROWS_PER_SECTION
 ): Promise<{ rows: Row[]; truncated: boolean }> {
   const rows: Row[] = [];
-  for (let from = 0; from < maxRows; from += pageSize) {
-    const to = Math.min(from + pageSize, maxRows) - 1;
-    const { data, error } = await reader.page(spec, userId, from, to);
-    if (error) throw new Error(error.message || 'query failed');
-    const page = data ?? [];
-    rows.push(...page);
-    if (page.length < to - from + 1) return { rows, truncated: false };
-  }
-  return { rows, truncated: true };
+  const { truncated } = await forEachPage(reader, spec, userId, (page) => void rows.push(...page), pageSize, maxRows);
+  return { rows, truncated };
 }
 
 /**
@@ -231,6 +249,29 @@ export interface ExportSubject {
 /** decryptSecret, injected so this module stays free of Deno globals. */
 export type Decrypt = (value: string | null) => Promise<string | null | undefined>;
 
+/** Lead and contact rows with encrypted_email / encrypted_phone swapped for the plaintext. */
+export function decryptPiiRows(list: Row[], decrypt: Decrypt): Promise<Row[]> {
+  return Promise.all(
+    list.map(async (row) => {
+      const { encrypted_phone, encrypted_email, ...rest } = row;
+      const [email, phone] = await Promise.all([
+        decrypt((encrypted_email as string | null) ?? null),
+        decrypt((encrypted_phone as string | null) ?? null),
+      ]);
+      return { ...rest, email: email ?? null, phone: phone ?? null };
+    })
+  );
+}
+
+function exportUser(subject: ExportSubject) {
+  return {
+    id: subject.id,
+    email: subject.email || '',
+    createdAt: subject.created_at || '',
+    lastSignIn: subject.last_sign_in_at || null,
+  };
+}
+
 /**
  * The export document. Lead and contact PII is decrypted for the subject's own
  * copy: encrypted_* are the only store since US-086, so an export that handed
@@ -243,27 +284,14 @@ export async function buildExportDocument(
   now: Date = new Date()
 ): Promise<Record<string, unknown>> {
   const { rows, singles } = collected;
-  const decryptPii = (list: Row[] = []) =>
-    Promise.all(
-      list.map(async (row) => {
-        const { encrypted_phone, encrypted_email, ...rest } = row;
-        const [email, phone] = await Promise.all([
-          decrypt((encrypted_email as string | null) ?? null),
-          decrypt((encrypted_phone as string | null) ?? null),
-        ]);
-        return { ...rest, email: email ?? null, phone: phone ?? null };
-      })
-    );
-  const [leads, contacts] = await Promise.all([decryptPii(rows.leads), decryptPii(rows.contacts)]);
+  const [leads, contacts] = await Promise.all([
+    decryptPiiRows(rows.leads ?? [], decrypt),
+    decryptPiiRows(rows.contacts ?? [], decrypt),
+  ]);
 
   return {
     exportedAt: now.toISOString(),
-    user: {
-      id: subject.id,
-      email: subject.email || '',
-      createdAt: subject.created_at || '',
-      lastSignIn: subject.last_sign_in_at || null,
-    },
+    user: exportUser(subject),
     profile: singles.profile ?? null,
     settings: singles.settings ?? null,
     listings: rows.listings ?? [],
@@ -306,4 +334,211 @@ export async function buildExportDocument(
       truncated: collected.truncated,
     },
   };
+}
+
+/*
+ * Writing the export a page at a time (US-576, US-405 slice 1).
+ *
+ * buildExportDocument needs every section in memory at once: up to 100,000
+ * rows in each of 27 sections, then a decrypted copy of leads and contacts,
+ * then JSON.stringify of the whole document into one string. The queued job
+ * held all three together, so the largest accounts were the ones whose export
+ * could exhaust the function's memory.
+ *
+ * writeExportDocument produces the same bytes as
+ * JSON.stringify(buildExportDocument(...), null, 2) (the tests hold the two
+ * together), but reads one page of one section at a time, decrypts and
+ * serialises that page, and lets the rows go. Peak memory is the serialised
+ * file plus a single page, not every section's row objects plus their copies.
+ *
+ * Sections are read one after another rather than concurrently: this runs in
+ * the hourly job with nobody waiting on it, and concurrent reads would hold a
+ * page of every section at once again.
+ */
+
+type LayoutNode =
+  | { section: string }
+  | { computed: 'exportedAt' | 'user' | 'meta' }
+  | { group: readonly (readonly [string, LayoutNode])[] };
+
+const section = (key: string): LayoutNode => ({ section: key });
+
+/** The export document's shape, in buildExportDocument's key order. */
+const DOCUMENT_LAYOUT: LayoutNode = {
+  group: [
+    ['exportedAt', { computed: 'exportedAt' }],
+    ['user', { computed: 'user' }],
+    ['profile', section('profile')],
+    ['settings', section('settings')],
+    ['listings', section('listings')],
+    ['openHouses', section('openHouses')],
+    ['leads', section('leads')],
+    ['leadActivities', section('leadActivities')],
+    ['contacts', section('contacts')],
+    ['contactKeyDates', section('contactKeyDates')],
+    ['contactInteractions', section('contactInteractions')],
+    ['testimonials', section('testimonials')],
+    ['links', section('links')],
+    ['customPages', section('customPages')],
+    ['blogPosts', section('blogPosts')],
+    ['workflows', section('workflows')],
+    ['notifications', section('notifications')],
+    ['billing', { group: [['subscriptions', section('subscriptions')], ['invoices', section('invoices')]] }],
+    ['teams', { group: [['memberships', section('teamMemberships')], ['roles', section('roles')]] }],
+    ['analytics', { group: [['profileViews', section('profileViews')], ['events', section('analyticsEvents')]] }],
+    [
+      'security',
+      {
+        group: [
+          ['sessions', section('sessions')],
+          ['loginAttempts', section('loginAttempts')],
+          ['mfaSettings', section('mfaSettings')],
+          ['apiKeys', section('apiKeys')],
+          ['auditLogs', section('auditLogs')],
+        ],
+      },
+    ],
+    ['gdprRequests', section('gdprRequests')],
+    ['meta', { computed: 'meta' }],
+  ],
+};
+
+/** Section keys the written document contains, in the order it writes them. */
+export function layoutSectionKeys(node: LayoutNode = DOCUMENT_LAYOUT): string[] {
+  if ('section' in node) return [node.section];
+  if ('group' in node) return node.group.flatMap(([, child]) => layoutSectionKeys(child));
+  return [];
+}
+
+/** How a section's rows are changed on their way into the export. */
+const ROW_TRANSFORMS: Record<string, (rows: Row[], decrypt: Decrypt) => Row[] | Promise<Row[]>> = {
+  leads: decryptPiiRows,
+  contacts: decryptPiiRows,
+  loginAttempts: (rows) => rows.map(maskLoginAttempt),
+};
+
+/** JSON.stringify(value, null, 2) for a value nested at `indent`. */
+function pretty(value: unknown, indent: string): string {
+  // Newlines in JSON.stringify output are only ever structural: a newline
+  // inside a string value is escaped.
+  return JSON.stringify(value, null, 2).replace(/\n/g, `\n${indent}`);
+}
+
+export interface WrittenExport {
+  /** The document's text, in order; join them, or hand them to a Blob, for the file. */
+  chunks: string[];
+  /** Row counts per section, as {@link sectionCounts} reports them. */
+  counts: Record<string, number>;
+  /** Sections that reached the per-section ceiling. */
+  truncated: string[];
+}
+
+/**
+ * The export document as text, read and written one page at a time. Throws
+ * {@link ExportIncompleteError}, naming every section that could not be read,
+ * rather than returning a document missing one.
+ */
+export async function writeExportDocument(
+  reader: ExportReader,
+  subject: ExportSubject,
+  decrypt: Decrypt,
+  now: Date = new Date(),
+  pageSize = PAGE_SIZE,
+  maxRows = MAX_ROWS_PER_SECTION
+): Promise<WrittenExport> {
+  const specs = new Map(SECTIONS.map((spec) => [spec.key, spec]));
+  const chunks: string[] = [];
+  const rowCounts: Record<string, number> = {};
+  const singleCounts: Record<string, number> = {};
+  const truncated: string[] = [];
+  const failed: { section: string; message: string }[] = [];
+  const out = (text: string) => void chunks.push(text);
+  const recordFailure = (key: string, err: unknown) =>
+    failed.push({ section: key, message: err instanceof Error ? err.message : String(err) });
+
+  // sectionCounts' order: list sections, then single-row ones.
+  const counts = () => {
+    const ordered: Record<string, number> = {};
+    for (const spec of SECTIONS) if (!spec.single && spec.key in rowCounts) ordered[spec.key] = rowCounts[spec.key];
+    for (const spec of SECTIONS) if (spec.single && spec.key in singleCounts) ordered[spec.key] = singleCounts[spec.key];
+    return ordered;
+  };
+
+  const writeSection = async (key: string, indent: string) => {
+    const spec = specs.get(key);
+    if (!spec) throw new Error(`export layout names unknown section ${key}`);
+    if (spec.single) {
+      try {
+        const { data, error } = await reader.one(spec, subject.id);
+        if (error) throw new Error(error.message || 'query failed');
+        singleCounts[key] = data ? 1 : 0;
+        out(pretty(data ?? null, indent));
+      } catch (err) {
+        recordFailure(key, err);
+        out('null');
+      }
+      return;
+    }
+
+    const inner = `${indent}  `;
+    const transform = ROW_TRANSFORMS[key];
+    let written = 0;
+    out('[');
+    try {
+      const result = await forEachPage(
+        reader,
+        spec,
+        subject.id,
+        async (page) => {
+          const rows = transform ? await transform(page, decrypt) : page;
+          let text = '';
+          for (const row of rows) {
+            text += `${written > 0 ? ',' : ''}\n${inner}${pretty(row, inner)}`;
+            written += 1;
+          }
+          out(text);
+        },
+        pageSize,
+        maxRows
+      );
+      rowCounts[key] = result.count;
+      if (result.truncated) truncated.push(key);
+    } catch (err) {
+      recordFailure(key, err);
+    }
+    out(written > 0 ? `\n${indent}]` : ']');
+  };
+
+  const writeNode = async (node: LayoutNode, indent: string): Promise<void> => {
+    if ('section' in node) return writeSection(node.section, indent);
+    if ('computed' in node) {
+      const value =
+        node.computed === 'exportedAt'
+          ? now.toISOString()
+          : node.computed === 'user'
+            ? exportUser(subject)
+            : { counts: counts(), truncated: [...truncated].sort() };
+      out(pretty(value, indent));
+      return;
+    }
+    const inner = `${indent}  `;
+    out('{');
+    let first = true;
+    for (const [name, child] of node.group) {
+      out(`${first ? '' : ','}\n${inner}${JSON.stringify(name)}: `);
+      first = false;
+      await writeNode(child, inner);
+    }
+    out(`\n${indent}}`);
+  };
+
+  await writeNode(DOCUMENT_LAYOUT, '');
+
+  if (failed.length > 0) {
+    // Reported in SECTIONS order, as collectSections does.
+    const order = SECTIONS.map((s) => s.key);
+    failed.sort((a, b) => order.indexOf(a.section) - order.indexOf(b.section));
+    throw new ExportIncompleteError(failed);
+  }
+  return { chunks, counts: counts(), truncated: [...truncated].sort() };
 }
