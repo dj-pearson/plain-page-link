@@ -60,7 +60,7 @@ describe('/:username/manifest.json', () => {
     expect(url.pathname).toBe('/rest/v1/profiles');
     expect(url.searchParams.get('is_published')).toBe('is.true');
     expect(url.searchParams.get('username')).toBe('eq.hidden-agent');
-    expect(url.searchParams.get('select')).toBe('username,full_name');
+    expect(url.searchParams.get('select')).toBe('username,full_name,avatar_url');
   });
 
   it('answers reserved, non-canonical and missing usernames with 404 without a query', async () => {
@@ -110,5 +110,78 @@ describe('/:username/manifest.json', () => {
     for (const icon of icons) {
       expect(existsSync(join(ROOT, 'public', icon.src)), icon.src).toBe(true);
     }
+  });
+
+  describe("the agent's photo as the home-screen icon (US-481)", () => {
+    const AVATAR = 'https://api.example.test/storage/v1/object/public/avatars/u1/avatar-17.jpg';
+    const ICON_192 =
+      'https://api.example.test/storage/v1/object/public/avatars/u1/avatar-17-app-icon-192.png';
+    const ICON_512 =
+      'https://api.example.test/storage/v1/object/public/avatars/u1/avatar-17-app-icon-512.png';
+    type Icon = { src: string; sizes: string };
+    const iconsOf = async (response: Response) =>
+      ((await response.json()) as { icons: Icon[] }).icons;
+
+    const routes = (heads: Record<string, number | Error>) =>
+      fetchMock.mockImplementation(async (input, init) => {
+        if (init?.method === 'HEAD') {
+          const answer = heads[input] ?? 404;
+          if (answer instanceof Error) throw answer;
+          return new Response(null, { status: answer });
+        }
+        return json([{ username: 'jane', full_name: 'Jane Doe', avatar_url: AVATAR }]);
+      });
+
+    it('lists the photo first at every size, with the logo behind it at the same sizes', async () => {
+      routes({ [ICON_192]: 200, [ICON_512]: 200 });
+      const icons = await iconsOf(await run('jane'));
+
+      expect(icons.map((i) => i.src)).toEqual([
+        ICON_192,
+        ICON_512,
+        '/icons/icon-192.png',
+        '/icons/icon-512.png',
+      ]);
+      expect(icons.map((i) => i.sizes)).toEqual(['192x192', '512x512', '192x192', '512x512']);
+      const heads = fetchMock.mock.calls.filter(([, init]) => init?.method === 'HEAD');
+      expect(heads.map(([u]) => u).sort()).toEqual([ICON_192, ICON_512]);
+    });
+
+    it('keeps the platform icons when either size is missing or the check fails', async () => {
+      const cases: Record<string, number | Error>[] = [
+        { [ICON_192]: 200 },
+        { [ICON_512]: 200 },
+        { [ICON_192]: 200, [ICON_512]: new Error('timeout') },
+        { [ICON_192]: 500, [ICON_512]: 200 },
+      ];
+      for (const heads of cases) {
+        fetchMock.mockReset();
+        routes(heads);
+        const response = await run('jane');
+        expect(response.status).toBe(200);
+        expect((await iconsOf(response)).every((i) => i.src.startsWith('/icons/'))).toBe(true);
+      }
+    });
+
+    it('never asks another host about an avatar that is not in our storage', async () => {
+      fetchMock.mockResolvedValue(
+        json([
+          {
+            username: 'jane',
+            full_name: null,
+            avatar_url: 'https://elsewhere.test/storage/v1/object/public/avatars/u1/a.jpg',
+          },
+        ])
+      );
+      const icons = await iconsOf(await run('jane'));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(icons.every((i) => i.src.startsWith('/icons/'))).toBe(true);
+    });
+
+    it('asks nothing more when the agent has no photo', async () => {
+      fetchMock.mockResolvedValue(json([{ username: 'jane', full_name: null, avatar_url: null }]));
+      await run('jane');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -11,27 +11,29 @@ import { renderHook, act } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createTestQueryClient } from '@/test/test-utils';
 
-const { storageMock, fromBucket, profilesMock, validateMock, toastMock } = vi.hoisted(() => {
-  const storageMock = {
-    upload: vi.fn(),
-    getPublicUrl: vi.fn(),
-    list: vi.fn(),
-    remove: vi.fn(),
-  };
-  const profilesMock = {
-    update: vi.fn(),
-    eq: vi.fn(),
-    select: vi.fn(),
-    single: vi.fn(),
-  };
-  return {
-    storageMock,
-    fromBucket: vi.fn(() => storageMock),
-    profilesMock,
-    validateMock: vi.fn(),
-    toastMock: vi.fn(),
-  };
-});
+const { storageMock, fromBucket, profilesMock, validateMock, toastMock, renderIconsMock } =
+  vi.hoisted(() => {
+    const storageMock = {
+      upload: vi.fn(),
+      getPublicUrl: vi.fn(),
+      list: vi.fn(),
+      remove: vi.fn(),
+    };
+    const profilesMock = {
+      update: vi.fn(),
+      eq: vi.fn(),
+      select: vi.fn(),
+      single: vi.fn(),
+    };
+    return {
+      storageMock,
+      fromBucket: vi.fn(() => storageMock),
+      profilesMock,
+      validateMock: vi.fn(),
+      toastMock: vi.fn(),
+      renderIconsMock: vi.fn(),
+    };
+  });
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -44,6 +46,7 @@ vi.mock('@/stores/useAuthStore', () => ({
 }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }));
 vi.mock('@/lib/fileValidation', () => ({ validateUpload: validateMock }));
+vi.mock('@/lib/renderAppIcons', () => ({ renderAppIcons: renderIconsMock }));
 
 import { useBrokerageLogoUpload } from './useBrokerageLogoUpload';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -176,5 +179,100 @@ describe('useAvatarUpload on the shared path', () => {
     expect(fromBucket).toHaveBeenCalledWith('avatars');
     expect(fromBucket).not.toHaveBeenCalledWith('brokerage-logos');
     expect(profilesMock.update).toHaveBeenCalledWith({ avatar_url: LOGO_URL });
+  });
+});
+
+describe('useAvatarUpload home-screen icons (US-481)', () => {
+  const AVATAR_URL =
+    'https://example.supabase.co/storage/v1/object/public/avatars/u1/avatar-1700000000000.jpg';
+  const icon192 = new Blob(['192'], { type: 'image/png' });
+  const icon512 = new Blob(['512'], { type: 'image/png' });
+
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    fromBucket.mockClear();
+    storageMock.upload.mockReset().mockResolvedValue({ error: null });
+    storageMock.getPublicUrl.mockReset().mockReturnValue({ data: { publicUrl: AVATAR_URL } });
+    storageMock.list.mockReset().mockResolvedValue({
+      data: [
+        { name: 'avatar-1.jpg' },
+        { name: 'avatar-1-app-icon-192.png' },
+        { name: 'avatar-1700000000000.jpg' },
+        { name: 'avatar-1700000000000-app-icon-192.png' },
+        { name: 'avatar-1700000000000-app-icon-512.png' },
+      ],
+    });
+    storageMock.remove.mockReset().mockResolvedValue({ error: null });
+    profilesMock.update.mockReset().mockReturnValue(profilesMock);
+    profilesMock.eq.mockReset().mockReturnValue(profilesMock);
+    profilesMock.select.mockReset().mockReturnValue(profilesMock);
+    profilesMock.single.mockReset().mockResolvedValue({ data: { id: 'u1' }, error: null });
+    validateMock.mockReset().mockResolvedValue(null);
+    toastMock.mockReset();
+    renderIconsMock.mockReset().mockResolvedValue(
+      new Map([
+        [192, icon192],
+        [512, icon512],
+      ])
+    );
+  });
+
+  const uploadPhoto = async () => {
+    const { result } = renderHook(() => useAvatarUpload(), { wrapper });
+    let url: string | null = null;
+    await act(async () => {
+      url = await result.current.uploadAvatar(new File(['x'], 'me.jpg', { type: 'image/jpeg' }));
+    });
+    return url;
+  };
+
+  it('stores square PNG icons named after the photo, before the profile points at it', async () => {
+    expect(await uploadPhoto()).toBe(AVATAR_URL);
+
+    expect(storageMock.upload).toHaveBeenCalledWith(
+      'u1/avatar-1700000000000-app-icon-192.png',
+      icon192,
+      expect.objectContaining({ contentType: 'image/png', upsert: true })
+    );
+    expect(storageMock.upload).toHaveBeenCalledWith(
+      'u1/avatar-1700000000000-app-icon-512.png',
+      icon512,
+      expect.objectContaining({ contentType: 'image/png', upsert: true })
+    );
+    const lastIconUpload = Math.max(...storageMock.upload.mock.invocationCallOrder);
+    expect(profilesMock.single.mock.invocationCallOrder[0]).toBeGreaterThan(lastIconUpload);
+  });
+
+  it("removes the old photo's icons but keeps the new ones", async () => {
+    await uploadPhoto();
+    expect(storageMock.remove).toHaveBeenCalledWith([
+      'u1/avatar-1.jpg',
+      'u1/avatar-1-app-icon-192.png',
+    ]);
+  });
+
+  it('keeps the photo when the browser cannot draw the icons', async () => {
+    renderIconsMock.mockRejectedValue(new Error('This browser cannot draw images'));
+    expect(await uploadPhoto()).toBe(AVATAR_URL);
+
+    expect(storageMock.upload).toHaveBeenCalledTimes(1);
+    expect(profilesMock.update).toHaveBeenCalledWith({ avatar_url: AVATAR_URL });
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Success' }));
+  });
+
+  it('keeps the photo when an icon upload fails', async () => {
+    storageMock.upload
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: { message: 'quota exceeded' } });
+    expect(await uploadPhoto()).toBe(AVATAR_URL);
+    expect(profilesMock.update).toHaveBeenCalledWith({ avatar_url: AVATAR_URL });
+  });
+
+  it('is not done for the brokerage logo', async () => {
+    const { result } = renderHook(() => useBrokerageLogoUpload(), { wrapper });
+    await act(async () => {
+      await result.current.uploadLogo(new File(['x'], 'logo.png', { type: 'image/png' }));
+    });
+    expect(renderIconsMock).not.toHaveBeenCalled();
   });
 });

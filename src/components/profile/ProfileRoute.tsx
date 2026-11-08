@@ -19,7 +19,7 @@
  */
 import { Suspense, useEffect, type ComponentType } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import { publicProfileQueryOptions } from '@/hooks/usePublicProfile';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -49,9 +49,16 @@ export function ProfileRoute({ page: Page }: ProfileRouteProps) {
     void queryClient.prefetchQuery(publicProfileQueryOptions(username, viewerId));
   }, [queryClient, username, viewerId]);
 
+  // The same query, read only for the photo: the home-screen icon on iOS
+  // (US-481). It shares the key, so it adds no request.
+  const { data: avatarUrl } = useQuery({
+    ...publicProfileQueryOptions(username, viewerId),
+    select: (page) => page.profile.avatar_url ?? null,
+  });
+
   // Add to Home Screen here installs the agent's page, not the dashboard
-  // (US-460).
-  useProfileManifest(username);
+  // (US-460), under the agent's photo (US-481).
+  useProfileManifest(username, avatarUrl ?? null);
 
   return (
     <Suspense fallback={<ProfileSkeleton />}>
