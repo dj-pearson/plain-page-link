@@ -18,7 +18,6 @@ export const mockLead: Lead = {
   message: "I'm interested in the Maple Avenue listing. Is it still available?",
   status: 'new',
   source: 'public_profile',
-  notes: null,
   form_data: { listing_id: 1, budget: '400000-450000' },
   email_hash: null,
   update_token_hash: null,

@@ -4,7 +4,7 @@ import type { LeadReadRow } from '@/types/lead';
  * The columns of `leads` the browser may select (US-254).
  *
  * Every column except encrypted_email and encrypted_phone. Migration
- * 20261101000016 grants anon/authenticated SELECT on exactly these, so a
+ * 20261108000452 (which dropped leads.notes; before it, 20261101000016) grants anon/authenticated SELECT on exactly these, so a
  * `select('*')` — or a bare `.select()` after an insert or update, which asks
  * for `*` — is refused. Read with this list and decrypt through pii-crypto by
  * lead id (decryptLeadContacts), which is where the plan's lead allowance is
@@ -16,7 +16,7 @@ import type { LeadReadRow } from '@/types/lead';
  * the migration's grant together.
  */
 export const LEAD_COLUMNS =
-  'id, user_id, lead_type, name, message, status, source, form_data, created_at, updated_at, first_responded_at, assigned_to, contacted_at, closed_at, listing_id, price_range, timeline, property_address, preapproved, notes, referrer_url, utm_source, utm_medium, utm_campaign, device, is_sample, open_house_id, email_hash, update_token_hash, update_token_expires_at';
+  'id, user_id, lead_type, name, message, status, source, form_data, created_at, updated_at, first_responded_at, assigned_to, contacted_at, closed_at, listing_id, price_range, timeline, property_address, preapproved, referrer_url, utm_source, utm_medium, utm_campaign, device, is_sample, open_house_id, email_hash, update_token_hash, update_token_expires_at';
 
 /**
  * Every readable column, keyed so the compiler fails when `leads` gains or
@@ -42,7 +42,6 @@ export const LEAD_COLUMN_SET: Record<keyof LeadReadRow, true> = {
   timeline: true,
   property_address: true,
   preapproved: true,
-  notes: true,
   referrer_url: true,
   utm_source: true,
   utm_medium: true,

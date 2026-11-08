@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { assertLeadOwnedBy, taskAssignee } from './ownership.ts';
+import { workflowNoteRow } from './workflowNote.ts';
 import { maskEmail } from '../_shared/log-redaction.ts';
 import { isLeadStatus, LEAD_STATUS_VALUES } from '../_shared/lead-status.ts';
 
@@ -32,6 +33,8 @@ interface WorkflowEdge {
 interface ExecutionContext {
   /** The agent who owns the workflow; plan quotas are charged to them. */
   ownerId: string;
+  /** The workflow being run, recorded on the timeline rows it writes. */
+  workflowId: string | null;
   variables: Record<string, any>;
   triggerData: Record<string, any>;
   results: Record<string, any>;
@@ -75,7 +78,7 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
     // `score` is NOT a column on leads — scores live in lead_scores, one row
     // per lead (UNIQUE (lead_id)). Writing updates.score here made PostgREST
     // reject the whole statement, so a workflow that set a score also failed to
-    // apply the status and notes beside it (US-100).
+    // apply the status and note beside it (US-100).
     const updates: Record<string, any> = {};
     if (status) {
       // leads_status_check (US-428) refuses anything else; say which value and
@@ -87,7 +90,6 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
       }
       updates.status = status;
     }
-    if (notes) updates.notes = notes;
 
     if (!resolvedLeadId) {
       return { success: true, leadId: resolvedLeadId, updates };
@@ -99,6 +101,26 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
     if (Object.keys(updates).length > 0) {
       const { error } = await supabase.from('leads').update(updates).eq('id', resolvedLeadId);
       if (error) throw error;
+    }
+
+    // "Add Note" lands on the lead's timeline (US-452). It used to be written
+    // to leads.notes, which no screen reads, so the agent never saw it.
+    let noteId: string | undefined;
+    const noteRow = workflowNoteRow({
+      leadId: resolvedLeadId,
+      ownerId: lead.user_id,
+      content: notes ? resolveVariables(notes, context) : null,
+      workflowId: context.workflowId,
+      nodeId: node.id,
+    });
+    if (noteRow) {
+      const { data: noteData, error: noteError } = await supabase
+        .from('lead_activities')
+        .insert(noteRow)
+        .select('id')
+        .single();
+      if (noteError) throw noteError;
+      noteId = noteData.id;
     }
 
     let scored: { score: number; priority: string } | undefined;
@@ -129,7 +151,7 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
       scored = { score: numericScore, priority };
     }
 
-    return { success: true, leadId: resolvedLeadId, updates, scored };
+    return { success: true, leadId: resolvedLeadId, updates, scored, noteId };
   },
 
   create_task: async (node, context, supabase) => {
@@ -392,6 +414,7 @@ serve(async (req) => {
     // Initialize context
     const context: ExecutionContext = {
       ownerId: workflow.user_id,
+      workflowId: workflow.id ?? null,
       variables: execution.variables || {},
       triggerData: execution.trigger_data || {},
       results: {},
