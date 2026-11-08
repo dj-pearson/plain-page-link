@@ -7,7 +7,15 @@ import { checkRateLimitDb, RATE_LIMITS, type RateLimitConfig } from '../_shared/
 import { getClientIP } from '../_shared/client-ip.ts'
 import { stripLinks, safeHtmlText, safeNumber } from '../_shared/public-email.ts'
 import { getErrorMessage } from '../_shared/errorHelpers.ts'
-import { getSiteUrl } from '../_shared/env.ts';
+import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts';
+import {
+  isSuppressed,
+  unsubscribeFooterText,
+  unsubscribeHeaders,
+  unsubscribeLinks,
+  unsubscribeSecret,
+  type UnsubscribeLinks,
+} from '../_shared/marketing-unsubscribe.ts';
 import { BIO_DRIP_SEQUENCE_NUMBERS, bioDripSubject } from '../_shared/bio-drip-emails.ts';
 
 interface BioAnalyzerEmailData {
@@ -49,6 +57,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+    // US-425: no marketing email without a working opt-out.
+    const secret = unsubscribeSecret()
+    if (!secret) {
+      console.error('[send-bio-analyzer-email] PII_ENCRYPTION_KEY is not set; refusing to send without an unsubscribe link')
+      return json(503, { error: 'Email is temporarily unavailable.' })
+    }
+
     const ipLimit = await checkRateLimitDb(supabase, getClientIP(req), 'send-bio-analyzer-email', RATE_LIMITS.submission)
     if (!ipLimit.allowed) {
       return json(429, { error: 'Rate limit exceeded. Please try again later.' })
@@ -78,6 +93,13 @@ serve(async (req) => {
       return json(429, { error: 'This address has received enough email today.' })
     }
 
+    if (await isSuppressed(supabase, String(capture.email), secret)) {
+      // They opted out before (from either tool's emails): send nothing and
+      // schedule nothing. The visitor still has the results on screen.
+      await supabase.from('instagram_bio_email_captures').update({ email_sequence_completed: true }).eq('id', captureId)
+      return json(200, { success: true, sent: false })
+    }
+
     const { data: analysis } = capture.analysis_id
       ? await supabase.from('instagram_bio_analyses').select('result_data').eq('id', capture.analysis_id).maybeSingle()
       : { data: null }
@@ -102,11 +124,17 @@ serve(async (req) => {
     }
     const subject = `${plainData.firstName}, Your 3 Optimized Instagram Bios + Action Plan Inside`
 
+    const unsubscribe = await unsubscribeLinks('bio', captureId, secret, {
+      siteUrl: getSiteUrl(),
+      functionsUrl: getFunctionsUrl(),
+    })
+
     const sent = await sendEmail({
       to: capture.email,
       subject,
-      body: getEmail1PlainText(plainData),
-      html: getEmail1HTML(htmlData),
+      body: `${getEmail1PlainText(plainData)}\n\n${unsubscribeFooterText(unsubscribe, UNSUBSCRIBE_REASON)}`,
+      html: getEmail1HTML(htmlData, unsubscribe),
+      headers: unsubscribeHeaders(unsubscribe),
     })
     if (!sent.ok) {
       await supabase.from('instagram_bio_email_captures').update({ last_email_sent_at: null }).eq('id', captureId)
@@ -210,7 +238,9 @@ P.S. Reply to this email if you have questions about implementing your new bio!
   `.trim()
 }
 
-function getEmail1HTML(data: BioAnalyzerEmailData): string {
+const UNSUBSCRIBE_REASON = 'You received this email because you used our Instagram Bio Analyzer tool.'
+
+function getEmail1HTML(data: BioAnalyzerEmailData, unsubscribe: UnsubscribeLinks): string {
   const siteUrl = getSiteUrl()
 
   return `
@@ -320,7 +350,8 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
         <a href="${siteUrl}/blog" style="color: #9333ea; text-decoration: none;">Blog</a>
       </p>
       <p style="margin: 15px 0 0 0; font-size: 12px;">
-        You received this email because you used our Instagram Bio Analyzer tool.
+        ${UNSUBSCRIBE_REASON}
+        <a href="${unsubscribe.pageUrl.replace(/&/g, '&amp;')}" style="color: #6b7280;">Unsubscribe</a>
       </p>
     </div>
   </div>

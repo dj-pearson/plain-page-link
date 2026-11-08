@@ -58,6 +58,8 @@ const RESERVED_USERNAMES = [
   'open-house',
   // /:username/listing/:id is a listing page (US-275).
   'listing',
+  // The Unsubscribe link in marketing email (US-425).
+  'unsubscribe',
 ];
 
 export const containsProfanity = (text: string): boolean => {

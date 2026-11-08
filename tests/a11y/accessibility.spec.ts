@@ -288,6 +288,8 @@ const PAGES: { name: string; path: string; authenticated?: boolean }[] = [
   { name: 'privacy', path: '/privacy' },
   { name: 'terms', path: '/terms' },
   { name: 'dmca', path: '/dmca' },
+  // US-425: with no parameters it shows the invalid-link state.
+  { name: 'unsubscribe', path: '/unsubscribe' },
   { name: 'acceptable use', path: '/acceptable-use' },
   { name: 'accessibility statement', path: '/accessibility' },
   { name: 'cookies', path: '/cookies' },
