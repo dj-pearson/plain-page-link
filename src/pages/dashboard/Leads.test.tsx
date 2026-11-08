@@ -342,6 +342,42 @@ describe('Leads page', () => {
       );
     });
 
+    // US-557: the type filter and the name search narrowed the list but not
+    // the chips, so ?type=seller showed three rows under "New 40".
+    it('sends no type or search to lead_stats when neither is set', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() => expect(statsArgs().length).toBeGreaterThan(0));
+      for (const args of statsArgs()) {
+        expect(args.p_lead_type).toBeUndefined();
+        expect(args.p_search).toBeUndefined();
+      }
+    });
+
+    it('counts the chips over the lead type the list is filtered to', async () => {
+      window.history.replaceState(null, '', '/?type=seller');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      expect(eqCalls).toContainEqual(['lead_type', 'seller']);
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(expect.objectContaining({ p_lead_type: 'seller' }))
+      );
+    });
+
+    it('counts the chips over the name search once it settles', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await userEvent.type(screen.getByRole('textbox', { name: /search leads/i }), '  Jane ');
+
+      // Trimmed, as the list's ilike is.
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(expect.objectContaining({ p_search: 'Jane' }))
+      );
+    });
+
     it('pushes the status filter into the query rather than filtering in JS', async () => {
       renderWithProviders(<Leads />);
       await screen.findByText(mockLead.name);

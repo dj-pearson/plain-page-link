@@ -2365,6 +2365,18 @@ check('lead_stats counts every lead the caller owns, and only those', () => {
     );
     const assigned = JSON.parse(assignedRaw);
     if (assigned.total !== 10) out.push(`an assignee's "assigned to me" counted ${assigned.total}, expected 10`);
+    // US-557: the type filter and the name search narrow the counts too.
+    // Names run L1..L120, so 'l11' (case-insensitive) matches L11 and L110-L119.
+    q(`UPDATE public.leads SET lead_type = 'seller'
+         WHERE id IN (SELECT id FROM public.leads WHERE user_id = '${me}' ORDER BY name DESC LIMIT 5);`);
+    const sellers = asMe(`p_lead_type => 'seller'`);
+    if (sellers.total !== 5) out.push(`p_lead_type => 'seller' counted ${sellers.total}, expected 5`);
+    const named = asMe(`p_search => 'l11'`);
+    if (named.total !== 11) out.push(`p_search => 'l11' counted ${named.total}, expected 11`);
+    const blank = asMe(`p_search => '   '`);
+    if (blank.total !== 120) out.push(`a blank p_search counted ${blank.total}, expected 120`);
+    const both = asMe(`p_lead_type => 'buyer', p_search => 'l11'`);
+    if (both.total !== 11) out.push(`p_lead_type => 'buyer' with p_search => 'l11' counted ${both.total}, expected 11`);
     try {
       q(`SET ROLE anon; SELECT public.lead_stats();`);
       out.push('anon can call lead_stats');
