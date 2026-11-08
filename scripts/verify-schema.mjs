@@ -3253,6 +3253,7 @@ check('an assignee works a lead but cannot take it or hand it away', () => {
   const mate = '00000000-dead-beef-0000-000000236b02';
   const third = '00000000-dead-beef-0000-000000236b03';
   const lead = '00000000-dead-beef-0000-000000236b04';
+  const team = '00000000-dead-beef-0000-000000236b05';
   const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
   const row = () => q(`SELECT user_id || '|' || coalesce(assigned_to::text, '-') FROM public.leads WHERE id = '${lead}';`)[0];
   const refused = (fn) => {
@@ -3267,6 +3268,13 @@ check('an assignee works a lead but cannot take it or hand it away', () => {
     q(`INSERT INTO auth.users (id, email) VALUES
          ('${owner}', 'take-owner@example.test'), ('${mate}', 'take-mate@example.test'), ('${third}', 'take-third@example.test')
          ON CONFLICT (id) DO NOTHING;
+       -- Both are accepted teammates of the owner: since US-497 a lead can only
+       -- be handed to one (guard_lead_assignee), so the owner's reassignment to
+       -- third below needs third on the owner's team.
+       INSERT INTO public.teams (id, owner_id, name) VALUES ('${team}', '${owner}', 'Take Check Team');
+       INSERT INTO public.team_members (team_id, user_id, email, role, accepted_at) VALUES
+         ('${team}', '${mate}', 'take-mate@example.test', 'member', now()),
+         ('${team}', '${third}', 'take-third@example.test', 'member', now());
        INSERT INTO public.leads (id, user_id, assigned_to, lead_type, name, encrypted_email)
          VALUES ('${lead}', '${owner}', '${mate}', 'buyer', 'Assigned Lead', 'enc');`);
 
@@ -3302,6 +3310,8 @@ check('an assignee works a lead but cannot take it or hand it away', () => {
     try {
       q(`DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}', '${third}');
          DELETE FROM public.leads WHERE id = '${lead}';
+         DELETE FROM public.team_members WHERE team_id = '${team}';
+         DELETE FROM public.teams WHERE id = '${team}';
          DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}', '${third}');
          DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}', '${third}');`);
     } catch {
