@@ -57,7 +57,7 @@ export interface SocialTags {
  * deliberately included even though it can render JavaScript: it renders on a
  * second pass, days later, and the first pass is what seeds the snippet.
  */
-const CRAWLER_TOKENS = [
+const PREVIEW_AND_SEARCH_TOKENS = [
   'facebookexternalhit',
   'facebookcatalog',
   'twitterbot',
@@ -79,7 +79,40 @@ const CRAWLER_TOKENS = [
   'outbrain',
   'iframely',
   'developers.google.com/+/web/snippet',
+  // US-520. Search engines that robots.txt admits under `*` but this list
+  // used to miss.
+  'duckduckbot',
+  'yandexbot',
 ];
+
+/**
+ * Answer engines' fetchers (US-520): the crawlers that build ChatGPT,
+ * Claude, Perplexity, Alexa and DuckDuckGo answers, and the fetchers those
+ * assistants send when a person pastes a link. robots.txt explicitly allows
+ * them, for citation, and none of them executes scripts.
+ *
+ * Without these, GPTBot or PerplexityBot fetching agentbio.net/jane received
+ * dist/index.html as it is: the prerendered homepage, whose body is the
+ * platform's pitch and whose JSON-LD declares WebSite, SoftwareApplication and
+ * FAQPage. An assistant asked about Jane read and cited AgentBio's marketing
+ * page; an unknown handle answered 200 with that same page instead of 404.
+ */
+const ANSWER_ENGINE_TOKENS = [
+  'gptbot',
+  'oai-searchbot',
+  'chatgpt-user',
+  'claudebot',
+  'claude-searchbot',
+  'claude-user',
+  'perplexitybot',
+  'perplexity-user',
+  'amazonbot',
+  'duckassistbot',
+  'mistralai-user',
+  'meta-externalfetcher',
+];
+
+const CRAWLER_TOKENS = [...PREVIEW_AND_SEARCH_TOKENS, ...ANSWER_ENGINE_TOKENS];
 
 export function isCrawler(userAgent: string | null | undefined): boolean {
   if (!userAgent) return false;

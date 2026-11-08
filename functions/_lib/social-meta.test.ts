@@ -5,6 +5,8 @@
  * Slack and LinkedIn never run.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   buildListingTags,
   buildProfileTags,
@@ -60,7 +62,60 @@ describe('isCrawler', () => {
     }
   });
 
+  it("recognises answer engines' crawlers and fetchers, which run no scripts either (US-520)", () => {
+    for (const ua of [
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.1; +https://openai.com/gptbot',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +Claude-User@anthropic.com)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-SearchBot/1.0; +Claude-SearchBot@anthropic.com)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot) Chrome/119.0.6045.214 Safari/537.36',
+      'DuckAssistBot/1.2; (+http://duckduckgo.com/duckassistbot.html)',
+      'DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)',
+      'Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)',
+    ]) {
+      expect(isCrawler(ua), ua).toBe(true);
+    }
+  });
+
+  it('prerenders for every crawler robots.txt invites by name (US-520)', () => {
+    // robots.txt allows these bots "for citation and search results". One that
+    // is not prerendered for reads the homepage under every agent's URL.
+    // Google-Extended is a robots.txt product token only; no request carries it.
+    const robots = readFileSync(join(__dirname, '..', '..', 'public', 'robots.txt'), 'utf8');
+    const invited: string[] = [];
+    let agents: string[] = [];
+    for (const raw of robots.split('\n')) {
+      const line = raw.replace(/#.*/, '').trim();
+      const colon = line.indexOf(':');
+      const field = colon === -1 ? line : line.slice(0, colon).trim();
+      const value = colon === -1 ? '' : line.slice(colon + 1).trim();
+      if (/^user-agent$/i.test(field)) {
+        agents.push(value);
+      } else if (/^allow$/i.test(field) && value === '/') {
+        invited.push(...agents);
+      } else if (line === '') {
+        agents = [];
+      }
+    }
+    const named = invited.filter((agent) => agent !== '*' && agent !== 'Google-Extended');
+    expect(named).toEqual(expect.arrayContaining(['GPTBot', 'ClaudeBot', 'PerplexityBot']));
+    for (const agent of named) {
+      expect(isCrawler(`Mozilla/5.0 (compatible; ${agent}/1.0)`), agent).toBe(true);
+    }
+  });
+
   it('does not divert a person', () => {
+    for (const ua of [
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1',
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 YaBrowser/24.10.0.0 Safari/537.36',
+    ]) {
+      expect(isCrawler(ua), ua).toBe(false);
+    }
     expect(
       isCrawler(
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36'
