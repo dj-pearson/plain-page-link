@@ -67,7 +67,13 @@ import { timeAgo } from '@/lib/timeAgo';
 import { useLeadStats } from '@/hooks/useLeadStats';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useLeadAssignees } from '@/hooks/useLeadAssignees';
-import { describeAssignee, normalizeAssigneeFilter } from '@/lib/leadAssignee';
+import {
+  describeAssignee,
+  isNotTeammateError,
+  normalizeAssigneeFilter,
+  planBulkAssign,
+  summarizeBulkAssign,
+} from '@/lib/leadAssignee';
 
 /*
  * Every dialog on this page is closed on first render, so none of them ships
@@ -91,6 +97,9 @@ const UpgradeModal = lazy(() =>
 
 /** A failed prefetch is retried by the click that needs the chunk. */
 const preloadLeadDetail = () => void loadLeadDetailModal().catch(() => undefined);
+
+/** The bulk assign select's value for "nobody"; a Radix Select item cannot hold ''. */
+const BULK_UNASSIGNED = '__unassigned';
 
 export default function Leads() {
   // Search is local; status and type live in the URL so a filtered view is
@@ -165,6 +174,7 @@ export default function Leads() {
     hasNextPage,
     isFetchingNextPage,
     bulkUpdateStatus,
+    bulkAssign,
     bulkDelete,
   } = useLeads({
     status: statusFilter,
@@ -191,7 +201,7 @@ export default function Leads() {
 
   // Who holds each lead (US-497). The roster is the owner's own team; a
   // teammate viewing leads assigned to them gets an empty one.
-  const { teamId: ownedTeamId, assignees } = useLeadAssignees();
+  const { teamId: ownedTeamId, assignees, refetch: refetchAssignees } = useLeadAssignees();
   const assigneeText = (lead: Lead): string | null => {
     const text = describeAssignee(lead, user?.id ?? null, assignees, !!ownedTeamId);
     // 'Unassigned' on every row of a team owner's list is noise; the detail
@@ -401,6 +411,46 @@ export default function Leads() {
         description: 'Failed to update lead status',
         variant: 'destructive',
       });
+    } finally {
+      setIsBulkActing(false);
+    }
+  };
+
+  // US-573: hand the selected leads to a teammate (or to nobody) in one go.
+  // Only the owner's own leads can move; the rest of the selection is
+  // reported rather than silently skipped.
+  const handleBulkAssign = async (value: string) => {
+    if (selectedLeadIds.size === 0 || !user?.id) return;
+    const next = value === BULK_UNASSIGNED ? null : value;
+    const target =
+      next === null
+        ? null
+        : next === user.id
+          ? 'you'
+          : (assignees.find((a) => a.userId === next)?.label ?? 'that teammate');
+    const plan = planBulkAssign(selectedLeadIds, leads ?? [], user.id, next);
+
+    setIsBulkActing(true);
+    try {
+      const updated = await bulkAssign.mutateAsync({ ids: plan.toUpdate, assignedTo: next });
+      const summary = summarizeBulkAssign(plan, updated.length, target);
+      toast({
+        title: summary.title,
+        description: summary.description,
+        variant: summary.partial ? 'destructive' : undefined,
+      });
+      setSelectedLeadIds(new Set());
+    } catch (error) {
+      logger.error('Bulk assign failed', error as Error);
+      const notTeammate = isNotTeammateError(error);
+      toast({
+        title: 'Leads not reassigned',
+        description: notTeammate
+          ? `${target ?? 'That person'} is no longer an accepted member of your team, so no lead was changed. Refresh and try again.`
+          : 'Couldn’t change who holds the selected leads. Please try again.',
+        variant: 'destructive',
+      });
+      if (notTeammate) void refetchAssignees();
     } finally {
       setIsBulkActing(false);
     }
@@ -940,6 +990,30 @@ export default function Leads() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {ownedTeamId && (
+                    <Select
+                      // Remounted after each use so the same choice can be made again.
+                      key={isBulkActing ? 'assigning' : 'idle'}
+                      onValueChange={handleBulkAssign}
+                      disabled={isBulkActing}
+                    >
+                      <SelectTrigger
+                        className="w-[140px] sm:w-[160px] min-h-[44px] bg-white"
+                        aria-label="Assign selected leads to"
+                      >
+                        <SelectValue placeholder="Assign to…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={BULK_UNASSIGNED}>Unassigned</SelectItem>
+                        {user?.id && <SelectItem value={user.id}>Me</SelectItem>}
+                        {assignees.map((a) => (
+                          <SelectItem key={a.userId} value={a.userId}>
+                            {a.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Button
                     variant="destructive"
                     size="sm"

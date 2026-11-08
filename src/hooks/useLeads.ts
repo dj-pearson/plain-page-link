@@ -302,6 +302,32 @@ export function useLeads(filters: LeadFilters = {}) {
     onSuccess: invalidateLeadCaches,
   });
 
+  // US-573: hand the selected leads to one teammate, or to nobody. The same
+  // guard_lead_assignee trigger as the detail dialog (20261108000497) refuses
+  // anyone who is not an accepted member of the owner's team. Returns the ids
+  // the server actually changed, so the page can report the rest.
+  const bulkAssign = useMutation({
+    mutationFn: async ({
+      ids,
+      assignedTo,
+    }: {
+      ids: string[];
+      assignedTo: string | null;
+    }): Promise<string[]> => {
+      if (!user?.id) throw new Error('User not authenticated');
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from('leads')
+        .update({ assigned_to: assignedTo })
+        .in('id', ids)
+        .eq('user_id', user.id)
+        .select('id');
+      if (error) throw error;
+      return (data ?? []).map((row) => row.id);
+    },
+    onSuccess: invalidateLeadCaches,
+  });
+
   const bulkDelete = useMutation({
     mutationFn: async (ids: string[]) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -324,6 +350,7 @@ export function useLeads(filters: LeadFilters = {}) {
     updateLead,
     deleteLead,
     bulkUpdateStatus,
+    bulkAssign,
     bulkDelete,
   };
 }

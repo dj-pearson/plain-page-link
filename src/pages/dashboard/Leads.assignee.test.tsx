@@ -23,7 +23,8 @@ vi.mock('@/stores/useAuthStore', () => ({
     select({ user: { id: mockLeadRow.user_id } }),
 }));
 
-vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
+const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
+vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }));
 
 vi.mock('@/hooks/useSubscriptionLimits', () => ({
   useSubscriptionLimits: () => ({ subscription: { plan_name: 'pro' } }),
@@ -71,7 +72,11 @@ const builderFor = (table: string, opts: { ownsTeam: boolean; leadRows: unknown[
   b.eq = vi.fn(record('eq'));
   b.is = vi.fn(record('is'));
   b.in = vi.fn(record('in'));
-  for (const m of ['select', 'not', 'order', 'limit', 'range', 'ilike', 'or', 'update']) {
+  b.update = vi.fn((patch: unknown) => {
+    if (table === 'leads') leadCalls.push(['update', '', patch]);
+    return b;
+  });
+  for (const m of ['select', 'not', 'order', 'limit', 'range', 'ilike', 'or']) {
     b[m] = vi.fn(() => b);
   }
   b.maybeSingle = vi.fn(async () => ({
@@ -102,6 +107,7 @@ describe('Leads assignee filter (US-515)', () => {
     fromMock.mockReset();
     rpcMock.mockReset();
     exportToCSVMock.mockReset();
+    toastMock.mockReset();
     rpcMock.mockResolvedValue({ data: null, error: null });
   });
 
@@ -161,6 +167,73 @@ describe('Leads assignee filter (US-515)', () => {
     await screen.findByText(mockLeadRow.name);
 
     expect(screen.queryByRole('combobox', { name: /filter by assignee/i })).toBeNull();
+  });
+
+  describe('bulk assign (US-573)', () => {
+    const otherOwnersLead = {
+      ...mockLeadRow,
+      id: '55555555-5555-4555-8555-555555555555',
+      name: 'Handed To Me',
+      user_id: '99999999-9999-4999-8999-999999999999',
+      assigned_to: mockLeadRow.user_id,
+    };
+
+    it('assigns the selected leads to a teammate, scoped to the owner', async () => {
+      setup({ ownsTeam: true });
+      renderWithProviders(<Leads />);
+      await userEvent.click(
+        await screen.findByRole('button', { name: `Select ${mockLeadRow.name}` })
+      );
+      leadCalls.length = 0;
+
+      await userEvent.click(screen.getByRole('combobox', { name: /assign selected leads to/i }));
+      await userEvent.click(await screen.findByRole('option', { name: 'sam@team.example' }));
+
+      await waitFor(() => expect(toastMock).toHaveBeenCalled());
+      expect(leadCalls).toContainEqual(['update', '', { assigned_to: TEAMMATE }]);
+      expect(leadCalls).toContainEqual(['in', 'id', [mockLeadRow.id]]);
+      expect(leadCalls).toContainEqual(['eq', 'user_id', mockLeadRow.user_id]);
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Leads reassigned',
+          description: '1 lead is now assigned to sam@team.example.',
+        })
+      );
+    });
+
+    it('reports a selected lead owned by another agent instead of skipping it silently', async () => {
+      setup({ ownsTeam: true, leadRows: [mockLeadRow, otherOwnersLead] });
+      renderWithProviders(<Leads />);
+      await userEvent.click(
+        await screen.findByRole('button', { name: `Select ${mockLeadRow.name}` })
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Select Handed To Me' }));
+      leadCalls.length = 0;
+
+      await userEvent.click(screen.getByRole('combobox', { name: /assign selected leads to/i }));
+      await userEvent.click(await screen.findByRole('option', { name: 'Unassigned' }));
+
+      await waitFor(() => expect(toastMock).toHaveBeenCalled());
+      // Only the owner's lead is sent; mockLeadRow is already unassigned, so
+      // nothing needs to change on the server.
+      expect(leadCalls.some(([m]) => m === 'update')).toBe(false);
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Some leads were not reassigned',
+          variant: 'destructive',
+          description: expect.stringContaining('only a lead’s owner can reassign it'),
+        })
+      );
+    });
+
+    it('is not offered to a solo agent', async () => {
+      setup({ ownsTeam: false });
+      renderWithProviders(<Leads />);
+      await userEvent.click(
+        await screen.findByRole('button', { name: `Select ${mockLeadRow.name}` })
+      );
+      expect(screen.queryByRole('combobox', { name: /assign selected leads to/i })).toBeNull();
+    });
   });
 
   it('says the filters match nothing, and clears them, instead of "No leads yet"', async () => {
