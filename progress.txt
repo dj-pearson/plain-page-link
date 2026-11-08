@@ -6429,3 +6429,77 @@ Other findings:
 - [mobile] src/components/ui/textarea.tsx:13 and src/components/forms/TwoStepLeadForm.tsx:47 are still text-sm on narrow non-touch windows. Harmless now that the coarse-pointer rule exists, but aligning them with Input's text-base sm:text-sm would make the primitives consistent.
 - [mobile] Optional, not done: the new rule also applies to Android, which does not auto-zoom. It is harmless there, since 16px is the readable size anyway, but it could be limited to iOS with @supports (-webkit-touch-callout: none) if the owner wants Android to keep 14px fields.
 - [mobile] CLAUDE.md still lists the deleted src/hooks/useOfflineStorage.ts and src/lib/offline-storage.ts. This was carried over from US-618 and is still unaddressed. I did not edit CLAUDE.md.
+
+---
+
+## Continuous improvement loop — round 19 — 2026-11-08 (US-651 to US-660 done)
+
+All ten approved with no fix-ups, no merge conflicts. Closed US-581, US-582, US-586, US-602, US-638, US-640, US-642, US-644, US-645, US-648, US-649. Security: service-role auth accepted an empty key; agents could self-report Stripe usage (endpoint removed). Enterprise: users could write forged high-risk audit rows (allowlist).
+verify:schema now runs in the sandbox: root reaches the local Postgres 16 over /var/run/postgresql. Against a fresh database with the prelude and all 93 migrations, the only failure was a false positive (Buffer.from(...) in resend-webhook.test.ts read as a table); the scanner now skips Buffer/Array/Uint8Array.from. Result: 59 checks, 'All schema checks passed'. Lane prompts now require it for migrations.
+Final: tsc clean (app + node config), 3390 unit tests pass (from 3298), verify:migrations OK (93 files), verify:schema all pass, vite build OK, eslint 528 warnings (CI ratchet 555 -> 528).
+
+- US-651 [listings] Open houses could be scheduled in the past through the API, using up the monthly allowance and opening the kiosk for a past date
+- US-652 [leads] Contacts are now fingerprinted when they are saved and in the background, so the duplicate-client check sees the whole sphere (US-640)
+- US-653 [profile] Deleting the live page now warns that the public page loses its blocks
+- US-654 [uiux] Overview showed lost leads as green "wins", the pills broke in dark mode, and the stat cards looked tappable but did nothing (US-602)
+- US-655 [performance] The Clients dashboard route no longer downloads date-fns on first paint (closes US-581 and US-582)
+- US-656 [security] Service-role auth accepted an empty key, and agents could self-report their own Stripe usage
+- US-657 [enterprise] Signed-in users could write forged high-risk rows into their own audit log
+- US-658 [marketing] Comparison pages no longer say what Linktree, Beacons or Later lack (closes US-648)
+- US-659 [seo] The agent's page in the browser named none of their homes in its structured data. Only the crawler HTML did. (US-586)
+- US-660 [mobile] Public profile Contact button covers the last content on iPhones and tablets
+
+Owner actions:
+- US-651: Apply migration supabase/migrations/20261108000651_open_house_start_not_in_past.sql in production (it adds a trigger function and trigger only; no data change)
+- US-651: Redeploy Cloudflare Pages so the scheduling dialog words the new database refusal
+- US-652: Redeploy the edge-functions server (functions.agentbio.net, Coolify, root Dockerfile) so pii-crypto has the index_contacts op and scheduled-maintenance runs the contact_lookup_hashes task. Until then indexOwnContacts fails silently and contacts are hashed only during lead conversion, as before.
+- US-652: Requires migration 20261108000629_contact_lookup_hashes.sql (from US-629) to be applied first; without it both the new op and the maintenance task fail because lookup_hashed_at does not exist.
+- US-652: scheduled-maintenance needs PII_ENCRYPTION_KEY (or ENCRYPTION_KEY) set; it already reads it for data exports. If it is missing, the task logs 'skipped' instead of failing.
+- US-656: Redeploy the edge-functions Coolify app (functions.agentbio.net) so the hardened service-auth goes live and report-stripe-usage stops being served.
+- US-656: Confirm SUPABASE_SERVICE_ROLE_KEY is set and non-empty on that deployment. A missing or empty key now refuses every service-role caller (schedulers, notify-lead, process-account-deletions) instead of letting them through.
+- US-657: Redeploy the audit-log edge function (functions.agentbio.net Coolify app) so the allowlist takes effect
+- US-658: None beyond a normal Cloudflare Pages deploy: frontend copy and a test only. No migration, no edge function, no secret.
+- US-659: Deploy Cloudflare Pages. This changes the SPA (FullProfilePage) and the Pages Functions crawler modules (social-meta.ts, profile-route.ts); the crawler output is unchanged. No migration, no edge function, no secrets.
+
+Opened:
+- US-661 [listings] Open-house kiosk refuses sign-ins for an open house that ended long ago
+- US-662 [leads] Prioritise the just-saved contact explicitly in index_contacts
+- US-663 [uiux] Make the Badge variants follow the dark theme
+- US-664 [performance] OpenHouseVisitorsDialog: drop date-fns from the first open
+- US-665 [performance] ContactDetail first open: measure and budget it beyond Clients
+- US-666 [security] Use the shared constant-time service-role check in functions that compare the key inline
+- US-667 [enterprise] Admin audit viewer: mark client-reported rows and filter by source
+- US-668 [enterprise] Pre-existing forged audit rows
+
+Other findings:
+- [listings] [listings] Taking a past open house from status 'cancelled' back to 'scheduled' without moving starts_at is still allowed by design: the start is unchanged. enforce_open_house_plan_limit charges for it (OLD.status = 'cancelled'), so the agent can spend a monthly slot reviving a past open house. This is minor and would be a status rule rather than a start rule.
+- [listings] [verify-schema] 'zip routing rules match against the property address' fails locally: 'unassigning a departed member's leads left no audit row' (scripts/verify-schema.mjs around line 709). It is unrelated to this change and fails at the loop-branch HEAD, so CI's verify-backend will fail on it alongside the known resend-webhook false positive.
+- [listings] [tooling] Root can reach the sandbox's local Postgres 16 at /var/run/postgresql (peer auth, superuser). verify:schema can therefore be run end to end in this sandbox by creating a scratch database, applying scripts/supabase-prelude.sql and then the migrations. Earlier notes said this was impossible because su to postgres is blocked.
+- [leads] supabase/functions/_shared/contact-lookup-hashes.ts hashContactBacklog: if 50 or more of the most recently updated unhashed contacts fail to save every time (a persistent DB error on those rows), each run stops after the first batch and older rows starve. Only a save error causes this; an undecryptable value is saved with null hashes. Low risk.
+- [leads] A contact whose ciphertext will not decrypt (corrupt, or under a rotated key) is saved with null hashes and lookup_hashed_at set, so it is never retried after a key fix. This is the same behaviour as US-629.
+- [leads] src/hooks/useContacts.ts toStoredContact re-encrypts email and phone on every edit, even when they did not change, because ContactFormDialog sends both every time. Each edit therefore rewrites the ciphertext, which clears the fingerprints by trigger and writes a new audit row. Skipping unchanged values would save a pii-crypto round trip and churn per edit.
+- [leads] US-418 (step-two enrichment email) still awaits an owner decision; skipped as instructed.
+- [profile] [profile] Still open from this lane: US-525 (custom_css is still declared on the theme-settings types at src/types/theme.ts:39,64), and US-544 (the custom-CSS preview has no links, testimonials or listings markup). US-525 is a small, self-contained cleanup for the next round.
+- [profile] [profile] src/components/pageBuilder/PageList.tsx: handleSetActive logs the error again after the store has already logged it and shown a toast. This was noted in round 18 and is still there. It is harmless duplication.
+- [profile] [profile] src/components/pageBuilder/PageList.tsx: the useEffect around line 145 has an empty dependency array while it calls loadPages. This is an existing exhaustive-deps warning; wrapping loadPages in useCallback would clear it.
+- [uiux] US-580 is already done in code by US-588 (src/hooks/useLeads.ts:290-313; src/pages/dashboard/Leads.tsx:402-528). The integrator can mark it as passing.
+- [uiux] src/pages/dashboard/Leads.tsx:634-646 getStatusBadge uses a second status-to-colour mapping (Badge variants with no tone meaning: qualified and lost are both 'outline'). It could reuse leadStatusTone.
+- [uiux] src/pages/dashboard/Overview.tsx:198-215 the copy-profile-link button is p-1 with a 12px icon, well below the 44px touch target.
+- [uiux] The StatCard icons still use text-blue-600, text-green-600, text-purple-600 and text-orange-600 (Overview.tsx:115-140). They read on dark backgrounds, but they are not theme tokens.
+- [uiux] The lint-staged pre-commit hook again wrote a backup entry (53fa599) into the git stash that all worktrees share.
+- [performance] Overview is at 37.7 KB against a 38 KB budget (scripts/check-dashboard-weight.mjs:71). Any small addition to a shared chunk will fail CI. The next performance round should trim it or record why it needs the headroom.
+- [performance] US-643 (AvatarImage on dashboard avatars) and US-625 (preload the next gallery photo) are still open and were not touched this round.
+- [security] supabase/functions/_shared/service-auth.ts getAuthenticatedUser still uses console.log/console.warn and `supabase: any`. It should move to the shared logger and a typed client.
+- [security] getAuthenticatedUser returns null for service-role callers and also for unauthenticated ones, so a caller that treats null as 'service role' would let anonymous requests through. publish-article-to-social checks isServiceRoleRequest separately, but the API invites the mistake. A discriminated result would be safer.
+- [enterprise] scripts/verify-schema.mjs:263: the 'every table referenced in code exists' regex /\.from\(\s*['"]([a-z0-9_]+)['"]/ still matches Buffer.from('0123456789abcdefghijklmn') in supabase/functions/_shared/resend-webhook.test.ts:19-20, so the verify-backend CI job flags a nonexistent table. Rounds 17 and 18 reported this too and it is still unfixed. Fix with a (?<![A-Za-z])Buffer/Array exclusion or by skipping *.test.ts.
+- [enterprise] src/hooks/useAuditLog.ts: the standalone logAuditEvent export and the hook's logEvent mutation have no callers outside the file. Everything goes through src/lib/audit.ts. They could be removed.
+- [enterprise] supabase/functions/audit-log/index.ts GET still uses select('*') on audit_logs and duplicates the query the hook already runs directly through RLS (useAuditLog.ts:140-147). The GET branch looks unused by the frontend.
+- [marketing] [marketing] src/pages/landing/InstagramBioForRealtors.tsx:112 subtitle 'Stop Wasting Your Instagram Traffic on Basic Links', and other non-comparison landing pages, may carry similar 'generic tools can't' prose. They are not in COMPARISON_PAGES, so the new patterns do not cover them. Consider adding a shared negative-claim guard over src/pages/landing/*.tsx.
+- [marketing] [marketing] src/pages/landing/VsBeacons.tsx:79-81 FAQ 'Is AgentBio better than Beacons for realtors?' and src/pages/landing/VsLater.tsx:589 ('Plenty of agents use Later... and AgentBio') still carry unsourced statements about what agents do. They are mild, and FALSE_CLAIMS does not cover them.
+- [marketing] [marketing] src/pages/landing/VsBeacons.tsx and VsLater.tsx still use green-50/red-50/purple-50 tinted panels and hard-coded gray text (VsLater direct-answer section 'bg-white ... text-gray-700'), which ignore dark mode. This is a uiux/craft-floor follow-up.
+- [marketing] [marketing] US-447's craft-floor email HTML half (gradient headers and border-left callouts in the three drip functions) is still doable without the owner. US-585 (add pricing-plans.ts and seo.ts to CLAIM_MODULES) is still a small open slice.
+- [seo] src/pages/public/FullProfilePage.tsx (LocalBusiness node, about line 335): numberOfEmployees value 1 is emitted only when the agent has sold listings. That is an odd, invented claim that is unrelated to sales. Worth dropping in a later seo slice.
+- [seo] src/pages/public/FullProfilePage.tsx: the WebPage primaryImageOfPage and the RealEstateAgent image are emitted with url/image null when avatar_url is null. Those properties should be omitted, not null.
+- [seo] functions/_lib/*.ts are ignored by the eslint config ('File ignored because no matching configuration'), so lint never sees Pages Functions code.
+- [mobile] src/components/profile/StickyActionBar.tsx quick-actions panel has no max-height. On a phone in landscape (about 320-375px tall), a 2x2 grid sitting at 6rem plus the inset from the bottom can run past the top of the viewport. A max-h-[calc(100dvh-...)] with overflow-y-auto would cover that case.
+- [mobile] CLAUDE.md still lists the deleted src/hooks/useOfflineStorage.ts and src/lib/offline-storage.ts (carried over from US-618). Not edited.

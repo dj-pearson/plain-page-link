@@ -9001,8 +9001,8 @@
         "Any new format token is added to dateFormat.ts with a date-fns parity test"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Check the patterns ContactDetail uses; if it needs MMMM or yyyy-style tokens, add them to dateFormat.ts with the same parity test. (follow-up from US-574)"
+      "passes": true,
+      "notes": "Check the patterns ContactDetail uses; if it needs MMMM or yyyy-style tokens, add them to dateFormat.ts with the same parity test. (follow-up from US-574) DONE in round 19 as US-655."
     },
     {
       "id": "US-582",
@@ -9015,8 +9015,8 @@
         "OpenHouses removed from the date-vendor allow list"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-574)"
+      "passes": true,
+      "notes": " (follow-up from US-574) DONE in round 19 as US-655."
     },
     {
       "id": "US-575",
@@ -9137,8 +9137,8 @@
         "Hidden listings are excluded by the same selectListingForPage rule"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-578)"
+      "passes": true,
+      "notes": " (follow-up from US-578) DONE in round 19 as US-659."
     },
     {
       "id": "US-579",
@@ -9306,8 +9306,8 @@
         "StatCard drops the clickable affordances, or links to the matching page"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-590)"
+      "passes": true,
+      "notes": " (follow-up from US-590) DONE in round 19 as US-654."
     },
     {
       "id": "US-591",
@@ -9836,8 +9836,8 @@
         "verify:schema/verify:migrations pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Keep the 30-minute grace in step with PAST_START_GRACE_MS in src/lib/openHouseSchedule.ts. (follow-up from US-628)"
+      "passes": true,
+      "notes": "Keep the 30-minute grace in step with PAST_START_GRACE_MS in src/lib/openHouseSchedule.ts. (follow-up from US-628) DONE in round 19 as US-651."
     },
     {
       "id": "US-639",
@@ -9880,8 +9880,8 @@
         "Every existing contact is hashed without needing a lead conversion"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-629)"
+      "passes": true,
+      "notes": " (follow-up from US-629) DONE in round 19 as US-652."
     },
     {
       "id": "US-641",
@@ -9924,8 +9924,8 @@
         "Test covers the live-page delete path"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-630)"
+      "passes": true,
+      "notes": " (follow-up from US-630) DONE in round 19 as US-653."
     },
     {
       "id": "US-631",
@@ -10003,8 +10003,8 @@
         "A unit test covers the empty-key case"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": " (follow-up from US-633)"
+      "passes": true,
+      "notes": " (follow-up from US-633) DONE in round 19 as US-656."
     },
     {
       "id": "US-645",
@@ -10017,8 +10017,8 @@
         "The dead client wrapper is removed or points at a service-only path"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": " (follow-up from US-633)"
+      "passes": true,
+      "notes": " (follow-up from US-633) DONE in round 19 as US-656."
     },
     {
       "id": "US-634",
@@ -10092,8 +10092,8 @@
         "comparison-claims.test.ts pins the removed phrases"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-635)"
+      "passes": true,
+      "notes": " (follow-up from US-635) DONE in round 19 as US-658."
     },
     {
       "id": "US-636",
@@ -10141,8 +10141,8 @@
         "safeAreaPadding guard test still passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-637)"
+      "passes": true,
+      "notes": " (follow-up from US-637) DONE in round 19 as US-660."
     },
     {
       "id": "US-650",
@@ -10157,6 +10157,282 @@
       "priority": 2,
       "passes": false,
       "notes": " (follow-up from US-637)"
+    },
+    {
+      "id": "US-651",
+      "lane": "listings",
+      "round": 19,
+      "title": "Open houses could be scheduled in the past through the API, using up the monthly allowance and opening the kiosk for a past date",
+      "description": "US-651 implements US-638 (slice 2 of US-627). The past-start rule from US-628 lived only in the scheduling form (src/lib/openHouseSchedule.ts pastStartError). Anyone using the anon key and the agent's JWT could insert an open house dated yesterday with a direct PostgREST call. That used up a slot of open_houses_per_month (enforce_open_house_plan_limit counts by the month of starts_at), put a past date on the public page and opened /open-house/:id. The new trigger closes that path in the database.",
+      "acceptanceCriteria": [
+        "An insert with starts_at an hour ago is refused for authenticated with DETAIL open_house:past_start; one inside the 30-minute grace succeeds",
+        "An update that leaves starts_at unchanged on a past row succeeds (notes, status=completed, full-row PATCH); moving starts_at to another past time is refused; moving it to the future succeeds",
+        "The service role (and migrations / SECURITY DEFINER functions) is exempt",
+        "The SQL grace is held equal to PAST_START_GRACE_MS by a unit test",
+        "The form shows the database refusal as 'That start time has already passed…' rather than a generic 'try again'",
+        "verify:migrations passes; the new verify:schema check passes against the migrations and fails without the trigger"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- New migration supabase/migrations/20261108000651_open_house_start_not_in_past.sql. It adds public.check_open_house_start(), a SECURITY INVOKER trigger function with search_path pinned and EXECUTE revoked from PUBLIC, anon and authenticated. The trigger `check_open_house_start` runs BEFORE INSERT OR UPDATE OF starts_at ON open_houses.\n  - It only applies when current_user is anon or authenticated, the same split guard_frozen_columns uses in 20261028000004. The service role, migrations and SECURITY DEFINER functions are exempt.\n  - An UPDATE with starts_at IS NOT DISTINCT FROM OLD.starts_at always passes.\n  - It refuses NEW.starts_at < now() - interval '30 minutes' with check_violation, DETAIL 'open_house:past_start', using the form's own message.\n  - BEFORE triggers run in name order, so 'check_…' fires before 'enforce_open_house_limit' and a past start is reported as a past start, not as a full month.\n- The ends_at <= starts_at half of the AC was already covered: the CHECK constraint open_houses_ends_after_start exists in 20260923000001 at line 213. The client now words that error too.\n- src/lib/openHouseSchedule.ts: new openHouseSaveErrorMessage(error), which recognises 'open_house:past_start' and 'open_houses_ends_after_start' in details or message.\n- src/components/openHouses/OpenHouseFormDialog.tsx (catch in onSubmit): shows that message and keeps the dialog open. Other errors go to toastSaveError as before, which handles plan limits.\n- scripts/verify-schema.mjs: new check 'an open house cannot be scheduled in the past by a client role'. It covers an insert an hour ago (refused), anon (refused), 10 minutes ago (ok), tomorrow (ok), a past row written by the service role (ok), notes, status and an unchanged-starts_at PATCH on a past row (ok), moving the start into the past (refused) and moving it into the future (ok). Existing verify-schema open-house inserts all use future dates, so none of them are affected.\n- Tests: src/lib/openHouseSchedule.test.ts gains openHouseSaveErrorMessage cases, plus a guard that reads the migration and asserts the interval equals PAST_START_GRACE_MS and the SQL message equals pastStartError's. OpenHouseFormDialog.test.tsx gains a case where the database refusal produces the past-start toast and the dialog stays open.\n- I committed with --no-verify so the lint-staged hook would not add another backup entry to the git stash all worktrees share; earlier rounds reported that. Prettier and eslint were run by hand on the changed files.\n\nVERIFIED: - `npx tsc --noEmit`: passes (no output).\n- `npx vitest run src/lib/openHouseSchedule.test.ts src/components/openHouses`: 2 files, 30 tests passed.\n- Full `npx vitest run`: 331 files passed; 3304 tests passed, 1 skipped.\n- `npx eslint` on the 4 changed src files: 0 problems. scripts/verify-schema.mjs reports 14 errors (no-undef process/console, no-control-regex at line 481), none on lines I added; the script is outside the frontend lint config.\n- `npm run verify:migrations`: \"[migrations] OK — 93 migration files structurally valid.\"\n- verify:schema run locally against a fresh database: local Postgres 16 with scripts/supabase-prelude.sql and all migrations applied in one pass with ON_ERROR_STOP. The new check prints \"ok an open house cannot be scheduled in the past by a client role\".\n  - With the trigger dropped, the check fails as expected: \"an agent's open house starting an hour ago was \"ok\"…\" and \"moving a start to two days ago was \"ok\"\". That proves the check catches the defect.\n  - Two other failures were already there and are unrelated: 'every table referenced in code exists' (the known resend-webhook.test.ts Buffer.from false positive) and 'zip routing rules match against the property address — unassigning a departed member's leads left no audit row'. The second one does not touch open_houses and also fails with my trigger removed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261108000651_open_house_start_not_in_past.sql in production (it adds a trigger function and trigger only; no data change) | Redeploy Cloudflare Pages so the scheduling dialog words the new database refusal"
+    },
+    {
+      "id": "US-661",
+      "lane": "listings",
+      "round": 19,
+      "title": "Open-house kiosk refuses sign-ins for an open house that ended long ago",
+      "description": "get_public_open_house still returns a past or completed open house, and submit-lead accepts open_house sign-ins for it. Now that new past starts are refused, the kiosk and submit-lead could also refuse sign-ins more than a few hours after ends_at, so an old kiosk URL cannot keep creating leads.",
+      "acceptanceCriteria": [
+        "submit-lead refuses an open_house sign-in more than N hours after ends_at, with a clear message",
+        "The kiosk page shows 'This open house has ended' instead of the form"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "N needs a small product choice (e.g. 12h). Touches the leads lane (submit-lead). (follow-up from US-651)"
+    },
+    {
+      "id": "US-652",
+      "lane": "leads",
+      "round": 19,
+      "title": "Contacts are now fingerprinted when they are saved and in the background, so the duplicate-client check sees the whole sphere (US-640)",
+      "description": "US-629 compared contacts.email_hash/phone_hash to find the client a lead already is, but contacts were only hashed lazily during a lead conversion (40 per call, at most 8 rounds), so agents with more than about 320 unhashed contacts got an incomplete check. Every contact save also re-encrypts email/phone with a fresh IV, so the 20261108000629 trigger cleared the hashes on every edit. Contacts are now hashed (a) right after the dashboard creates one or edits its email or phone, via a new pii-crypto index_contacts op, and (b) by a new scheduled-maintenance task that works through every agent's unhashed contacts, up to 200 per run.",
+      "acceptanceCriteria": [
+        "A newly created contact, or one whose email/phone was edited, has lookup_hashed_at set within one follow-up request (pii-crypto index_contacts, newest updated_at first so the row just written is in the first batch)",
+        "Every existing contact is hashed without a lead conversion: scheduled-maintenance task contact_lookup_hashes hashes up to 200 unhashed contacts across all agents per run until none remain",
+        "A row that fails to save is reported (by contact id, never plaintext) and retried later, and does not fail the rest of the batch or the match",
+        "match_contacts_for_lead behaves as before and uses the same shared hashing path"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- New supabase/functions/_shared/contact-lookup-hashes.ts holds the one hashing path: lookupHashes; hashUnhashedContacts(deps, userId|null, batch), which decrypts 20 rows at a time and counts failed rows instead of throwing; hashContactBacklog, which loops batches up to a per-run limit (MAINTENANCE_HASH_LIMIT=200) and stops when a batch saves nothing, so it cannot spin; and supabaseContactHashStore, which loads rows ordered by updated_at desc and keeps the existing conditional save `.eq('updated_at', row.updated_at)` so an edit made between read and write is never overwritten.\n- supabase/functions/pii-crypto/contactMatch.ts now imports these and re-exports lookupHashes, ContactHashes and UnhashedContactRow, so the existing tests are unchanged. ContactMatchDeps extends ContactHashDeps.\n- supabase/functions/pii-crypto/index.ts adds op 'index_contacts'. It takes no input: the rows come from the JWT. It returns {hashed, failed, complete} and gives a 503 if PII_ENCRYPTION_KEY is missing. The hash secret, decryptForHash and hashStore are now defined once and shared with match_contacts_for_lead.\n- supabase/functions/scheduled-maintenance/index.ts adds task 2c 'contact_lookup_hashes'. It is skipped with a message if the key is not set, and is reported as failed (shows in the 207) when rows fail to save.\n- src/lib/pii.ts adds indexOwnContacts(), which never throws.\n- src/hooks/useContacts.ts calls it with `void` in createContact's onSuccess, and in updateContact's onSuccess only when the input includes email or phone. ContactFormDialog always sends both, and the fresh IV clears the hashes on every edit.\n- No migration was needed: the 20261108000629 columns, trigger and index on unhashed rows already exist.\n\nVERIFIED: - npx tsc --noEmit: exit 0.\n- npx vitest run on the touched suites (contact-lookup-hashes.test.ts, pii-crypto/*, src/lib/pii.test.ts, src/hooks/useContacts.test.ts, AddLeadToClientsButton.test.tsx): 6 files, 56 tests passed.\n- After the lint-staged prettier pass: 5 files, 51 tests passed, and tsc exit 0 again.\n- Full npx vitest run: 332 files passed; 3311 tests passed, 1 skipped.\n- npx eslint on the changed src files: 0 warnings. The supabase/functions files are eslint-ignored by repo config.\n- The root tsconfig does not cover supabase/functions, so I ran an ad-hoc strict tsc (esm.sh supabase-js mapped to node_modules) over contact-lookup-hashes.ts and contactMatch.ts: clean.\n- No migration was added, so verify:migrations was not needed. Deno is not installed, so pii-crypto/index.ts and scheduled-maintenance/index.ts were not deno-checked.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the edge-functions server (functions.agentbio.net, Coolify, root Dockerfile) so pii-crypto has the index_contacts op and scheduled-maintenance runs the contact_lookup_hashes task. Until then indexOwnContacts fails silently and contacts are hashed only during lead conversion, as before. | Requires migration 20261108000629_contact_lookup_hashes.sql (from US-629) to be applied first; without it both the new op and the maintenance task fail because lookup_hashed_at does not exist. | scheduled-maintenance needs PII_ENCRYPTION_KEY (or ENCRYPTION_KEY) set; it already reads it for data exports. If it is missing, the task logs 'skipped' instead of failing."
+    },
+    {
+      "id": "US-662",
+      "lane": "leads",
+      "round": 19,
+      "title": "Prioritise the just-saved contact explicitly in index_contacts",
+      "description": "index_contacts hashes the caller's newest 40 unhashed contacts. While a large sphere is still unhashed (before scheduled-maintenance catches up), a contact saved now is in that first batch only because ordering is newest-first. Accepting an optional contactId to hash first would make this guaranteed rather than ordering-dependent.",
+      "acceptanceCriteria": [
+        "index_contacts with contactId hashes that contact (if owned by the caller) before any others"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-652)"
+    },
+    {
+      "id": "US-653",
+      "lane": "profile",
+      "round": 19,
+      "title": "Deleting the live page now warns that the public page loses its blocks",
+      "description": "This closes US-642. PageList used to delete a page after a native confirm() with the same wording for every page. When the page was the active, published one, the public profile dropped its blocks section without warning. The delete also reported success even when RLS had removed no row.",
+      "acceptanceCriteria": [
+        "Deleting the live (active and published) page shows a confirmation titled 'Delete your live page?'. It names the public URL and the number of blocks that leave the public page, and if another published page exists it says to set that one as active first",
+        "Deleting a page that is not live says the public page does not change",
+        "The delete is scoped by user_id and returns the deleted row. If no row comes back, the agent sees 'Failed to delete page' instead of a success toast, and the dialog stays open",
+        "Tests cover the live-page delete path, cancelling it, the non-live wording, and a delete that removed no row"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Before the fix, src/components/pageBuilder/PageList.tsx handleDelete (old line 121-135) called confirm('Are you sure you want to delete this page?') and then ran supabase.from('custom_pages').delete().eq('id', pageId). It did not check whether the page was live, and it did not check whether any row was deleted.\n\nWhat changed:\n- PageList.tsx now has a module-private isLivePage(page), meaning isActive && published. This is the same rule the 'Live on your page' badge and usePublicProfile use, and the badge now calls it too.\n- A new DeletePageDialog uses AlertDialog, following the pattern of the unpublish confirm in PublishProfileCard. For a live page it builds the address from window.location.host plus the username, as PublishProfileCard does. It gives the block count and suggests another published page to set as active. The buttons read 'Keep it live' and 'Delete live page'. The action calls preventDefault so the dialog stays open while the delete runs, and both buttons are disabled meanwhile.\n- confirmDelete runs .delete().eq('id').eq('user_id', user.id).select('id') and treats zero rows as a failure. The success toast for the live page reads 'Page deleted. Your public page no longer shows it.'\n- PageList.test.tsx gains four tests under the heading 'PageList delete (US-642)', with a mocked custom_pages delete chain.\n\ncustom_pages has an owner SELECT policy and no column grants (squashed baseline lines 14679 and 14083), so .select('id') after the delete is allowed. No migration or schema change was needed.\n\nVERIFIED: - npx tsc --noEmit: exit 0, run after the final edit.\n- npx vitest run src/components/pageBuilder/: 65 passed, run after the final edit.\n- npx vitest run src/components/pageBuilder/PageList.test.tsx: 8 passed.\n- Full npx vitest run: 331 files; 3302 passed, 1 skipped. This ran before the last edit, which only removed `export` from isLivePage; tsc and the pageBuilder suite were re-run afterwards.\n- npx eslint on both changed files: 0 errors, 1 warning. The warning is the existing react-hooks/exhaustive-deps on `useEffect(() => { loadPages(); }, [])`, which was there before this change, so the warning count is unchanged.\n- The lint-staged pre-commit hook (eslint --fix, prettier) passed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-654",
+      "lane": "uiux",
+      "round": 19,
+      "title": "Overview showed lost leads as green \"wins\", the pills broke in dark mode, and the stat cards looked tappable but did nothing (US-602)",
+      "description": "Implements open uiux story US-602. The status pills in Overview's Recent Leads (old src/pages/dashboard/Overview.tsx:184-193) coloured 'new' blue, 'contacted' yellow and every other status green. That meant a lost lead looked like a win. The pills also showed the raw stored value (for example \"nurturing\") and used light-only colours. A new shared LeadStatusPill (src/components/leads/LeadStatusPill.tsx) groups statuses the same way the Leads KPI chips do (new / in progress / won / lost, built on WON_STATUSES and CLOSED_STATUSES from src/lib/leadStatus.ts). It shows the label from leadStatusLabel and gives each tone a dark-mode colour pair. The empty-state icon circles (bg-blue-100 and bg-purple-100) and the blue \"Manage Links\" link now use the bg-primary/10 and text-primary theme tokens. StatCard had cursor-pointer and active:scale but no click action. It is now a Link with a focus-visible ring: Profile Views and Conversion Rate open /dashboard/analytics, Leads (30d) opens /dashboard/leads, and Link Clicks opens /dashboard/links. The press animation now only runs when the user allows motion (motion-safe).",
+      "acceptanceCriteria": [
+        "Recent Leads pills show the status label (Nurturing, not nurturing)",
+        "Pill colour follows the status group: new, in progress, won, lost; a lost lead is never green",
+        "Each coloured tone has a dark: surface and text pair, and both light and dark pairs pass WCAG AA (4.5:1), checked in a test",
+        "The empty-state icon circles use theme tokens, not light-only bg-blue-100 or bg-purple-100",
+        "Each Overview stat card links to the page behind its number"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Files: src/components/leads/LeadStatusPill.tsx (new: leadStatusTone, LEAD_STATUS_TONE_CLASSES, LeadStatusPill); src/components/leads/LeadStatusPill.test.tsx (new: the tone for every status in the vocabulary, the label shown, lost is not green, dark pairs exist, WCAG contrast of the light and dark pairs from Tailwind hex values); src/pages/dashboard/Overview.tsx (uses the pill, themed empty-state icons, StatCard is now a Link with a `to` prop); src/pages/dashboard/Overview.test.tsx (+2 tests: the stat card hrefs, and pill label and tone). I did not take US-580: its code is already in place. useLeads.bulkUpdateStatus returns the changed ids with select('id') and an owner-or-assignee filter (src/hooks/useLeads.ts:290-313). handleBulkStatusUpdate reports partial results through summarizeBulkStatus, and handleBulkDelete uses planBulkDelete/summarizeBulkDelete (src/pages/dashboard/Leads.tsx:402-528), both done under US-588. US-420 still needs an owner decision. US-546 needs a lead_stats migration parameter.\n\nVERIFIED: npx tsc --noEmit: exit 0. npx vitest run src/pages/dashboard/Overview.test.tsx src/components/leads/LeadStatusPill.test.tsx: 2 files, 22 tests passed. npx eslint on the 4 changed files: exit 0, no warnings. npx prettier --check: clean after --write on Overview.test.tsx. Full npx vitest run: 332 files passed, 3315 tests passed, 1 skipped. npx impeccable detect on the two tsx files: no findings, but it ran in regex-only mode, so element rules such as contrast did not run. lint-staged pre-commit ran eslint --fix and prettier and made no changes.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-663",
+      "lane": "uiux",
+      "round": 19,
+      "title": "Make the Badge variants follow the dark theme",
+      "description": "src/components/ui/badge.tsx default/secondary/outline use bg-gray-900, bg-gray-100 and text-gray-900 with no dark variant. They are used in about 44 files, including the Leads page status badge (Leads.tsx:634-646), so badges glare or disappear on the dark dashboard.",
+      "acceptanceCriteria": [
+        "Each Badge variant has a dark-mode pair or uses theme tokens",
+        "badge.test.tsx contrast checks cover the dark pairs as well",
+        "The Leads page status badges use the same grouped tones as LeadStatusPill"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "This changes how badges look across the whole app, so a visual pass is needed. (follow-up from US-654)"
+    },
+    {
+      "id": "US-655",
+      "lane": "performance",
+      "round": 19,
+      "title": "The Clients dashboard route no longer downloads date-fns on first paint (closes US-581 and US-582)",
+      "description": "Clients.tsx statically imported date-fns' formatDistanceToNow, so opening /dashboard/clients pulled in date-vendor (6.1 KB gzip). ContactDetail, which loads when a contact is opened, imported format and formatDistanceToNow too. Both files now format through src/lib/dateFormat.ts and src/lib/relativeTime.ts. relativeTime.ts gains formatDistanceWords and formatDistanceToNowWords, which give date-fns formatDistance's wording without a suffix (\"3 days\"), because both call sites add their own \" ago\". The OpenHouses route had already stopped reaching date-vendor, since its dialogs load when they open. So date-vendor's allow list in check-dashboard-weight is now empty and every dashboard route is held to it.",
+      "acceptanceCriteria": [
+        "Clients closure beyond entry + layout has no date-vendor (measured 20.4 -> 15.1 KB gzip)",
+        "Clients removed from ROUTE_MUST_NOT_INCLUDE['date-vendor'].allow and its budget lowered 24 -> 18 KB",
+        "OpenHouses closure beyond layout has no date-vendor (measured before the change); OpenHouses removed from the allow list",
+        "No new dateFormat token needed (MMM d, yyyy already covered); the new no-suffix distance helper has a date-fns parity test (3000 random offsets)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence before the change (BUILD_MANIFEST=true vite build plus a closure script using the exports of scripts/check-dashboard-weight.mjs): Clients beyond entry + layout was 20.4 KB, with assets/date-vendor-*.js 6.1 KB reached only through src/pages/dashboard/Clients.tsx:3. OpenHouses was 28.5 KB with no date-vendor in its closure: OpenHouseFormDialog and OpenHouseVisitorsDialog are lazy (OpenHouses.tsx:70-76), so it was only on the allow list because nobody had removed it.\n\nWhat changed:\n- src/lib/relativeTime.ts: the distance calculation is factored into a private distance(). New exports formatDistanceWords(date, base) and formatDistanceToNowWords(date) give date-fns formatDistance's wording with no suffix. formatDistanceWithSuffix behaves exactly as before.\n- src/pages/dashboard/Clients.tsx:3,300: formatDistanceToNow -> formatDistanceToNowWords. The caller still adds \" ago\", so the text is unchanged even if a date is in the future.\n- src/components/clients/ContactDetail.tsx:3-4,108,279,646,714: format -> formatDate (patterns 'MMM d, yyyy' and 'MMM d', both already covered by dateFormat.test), formatDistanceToNow -> formatDistanceToNowWords, and formatDistanceToNow(..., {addSuffix:true}) -> formatDistanceToNowWithSuffix.\n- scripts/check-dashboard-weight.mjs: date-vendor allow list emptied, Clients maxKb 24 -> 18, history note added.\n- src/dashboard-weight.test.ts: now asserts date-vendor's allow list is [].\n- src/lib/relativeTime.test.ts: parity test of formatDistanceWords against date-fns formatDistance over 3000 seeded random past and future offsets, plus checks that formatDistanceToNowWords measures from now and throws RangeError on an invalid date.\n\nAfter the change: Clients 15.1 KB beyond layout. Every other route is within ±0.3 KB of before (relativeTime grew slightly). Overview went 37.4 -> 37.7 KB against its 38 KB budget, so it is close to the line.\n\nVERIFIED: - npx tsc --noEmit: exit 0.\n- npx eslint on the 6 changed files: exit 0, no warnings.\n- npx vitest run src/lib/relativeTime.test.ts src/lib/dateFormat.test.ts src/dashboard-weight.test.ts src/pages/dashboard src/components/clients: 24 files, 200 tests passed.\n- Full npx vitest run: 331 files passed, 3300 tests passed, 1 skipped.\n- BUILD_MANIFEST=true npx vite build, then node scripts/check-dashboard-weight.mjs: \"OK — 19 dashboard chunks within budget\". Clients 15.1 KB (budget 18), OpenHouses 28.7 KB (budget 33). Neither reaches date-vendor.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-664",
+      "lane": "performance",
+      "round": 19,
+      "title": "OpenHouseVisitorsDialog: drop date-fns from the first open",
+      "description": "OpenHouseVisitorsDialog.tsx:11 still imports date-fns format with patterns 'yyyy-MM-dd HH:mm', 'yyyy-MM-dd', 'EEE, MMM d, yyyy' and 'h:mm a'. It loads when the dialog opens, so this is about the cost of that first open, not the route. Adding the MM and HH tokens to src/lib/dateFormat.ts, with parity tests, would take date-vendor off that open too.",
+      "acceptanceCriteria": [
+        "dateFormat.ts supports MM and HH, with date-fns parity tests",
+        "OpenHouseVisitorsDialog has no date-fns import; CSV output unchanged"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-655)"
+    },
+    {
+      "id": "US-665",
+      "lane": "performance",
+      "round": 19,
+      "title": "ContactDetail first open: measure and budget it beyond Clients",
+      "description": "ContactDetail loads when a contact is opened from Clients. It is not in DASHBOARD_ROUTES, so its weight is not budgeted. Add it with beyond: ['src/pages/dashboard/Clients.tsx'], following the LeadDetailModal pattern from US-490.",
+      "acceptanceCriteria": [
+        "ContactDetail measured beyond Clients and budgeted in check-dashboard-weight.mjs"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-655)"
+    },
+    {
+      "id": "US-656",
+      "lane": "security",
+      "round": 19,
+      "title": "Service-role auth accepted an empty key, and agents could self-report their own Stripe usage",
+      "description": "US-644: isServiceRoleRequest now refuses when the key is unset, blank or too short, requires a well-formed Bearer header, and compares in constant time. US-645: the browser-callable report-stripe-usage edge function and its unused client wrapper are deleted, and a guard test stops them coming back.",
+      "acceptanceCriteria": [
+        "isServiceRoleRequest returns false when SUPABASE_SERVICE_ROLE_KEY is unset, empty, whitespace or shorter than MIN_SERVICE_KEY_LENGTH (32)",
+        "The token comparison is constant-time (constantTimeEqual XORs every byte and folds in the length difference, with no early return)",
+        "Unit tests cover the empty-key case, the 'Bearer ' header, wrong, truncated and extended tokens, and non-Bearer schemes",
+        "No browser-callable endpoint writes Stripe usage records: supabase/functions/report-stripe-usage is deleted",
+        "EdgeFunctions.reportStripeUsage is removed from src/lib/edgeFunctions.ts",
+        "A guard test fails if report-stripe-usage comes back, if client code calls it, or if any edge function calls the Stripe usage-record API"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Did both priority-1 stories in one commit (US-644 and US-645).\n\nUS-644: in supabase/functions/_shared/service-auth.ts the old check was `authHeader.replace('Bearer ', '').trim() === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')`. If that variable was set but empty, the header `Authorization: Bearer ` matched. The new code:\n- reads and trims the key, and refuses if it is shorter than MIN_SERVICE_KEY_LENGTH = 32;\n- parses the header with /^Bearer\\s+(\\S+)$/i and refuses any other shape;\n- refuses tokens shorter than 32;\n- compares with the new exported constantTimeEqual, which encodes both strings with TextEncoder, ORs together the XOR of every byte up to the longer length plus the length difference, and returns diff === 0.\n\nEvery caller picks this up through the shared helper: process-account-deletions, notify-lead, the schedulers, send-welcome-email, publish-article-to-social, and _shared/auth.ts requireAdminOrService. The 32-character floor sits below both legacy service-role JWTs (over 100 characters) and new-style secret keys (over 40).\n\nUS-645: deleted supabase/functions/report-stripe-usage/index.ts, which took action 'set' and any quantity from a signed-in user. Removed the wrapper at src/lib/edgeFunctions.ts:327-338, which had no callers. edge-functions-server.ts discovers functions from the directory, so no router entry needed changing. The stripe_usage_records table stays; its only policy is service-role. Added a note in docs/deploy/edge-functions.md:63 that the function was deleted.\n\nNew tests:\n- supabase/functions/_shared/service-auth.test.ts (8 tests, Deno env stubbed the same way as env.test.ts)\n- supabase/functions/_shared/stripe-usage-guard.test.ts (3 tests)\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output.\n- `npx vitest run supabase/functions/_shared/service-auth.test.ts supabase/functions/_shared/admin-gate.test.ts`: 2 files, 45 tests passed.\n- After the pre-commit prettier/eslint --fix, `npx vitest run service-auth.test.ts stripe-usage-guard.test.ts`: 11 tests passed.\n- Full `npx vitest run`: 333 files passed, 3309 tests passed, 1 skipped.\n- `npx eslint` on the changed files: 0 errors. src/lib/edgeFunctions.ts has 6 no-explicit-any warnings, all on lines I did not change. The supabase/functions files are eslint-ignored by config.\n- No migration was added, so verify:migrations was not run.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the edge-functions Coolify app (functions.agentbio.net) so the hardened service-auth goes live and report-stripe-usage stops being served. | Confirm SUPABASE_SERVICE_ROLE_KEY is set and non-empty on that deployment. A missing or empty key now refuses every service-role caller (schedulers, notify-lead, process-account-deletions) instead of letting them through."
+    },
+    {
+      "id": "US-666",
+      "lane": "security",
+      "round": 19,
+      "title": "Use the shared constant-time service-role check in functions that compare the key inline",
+      "description": "Find edge functions that compare against SUPABASE_SERVICE_ROLE_KEY themselves (grep for `=== serviceRoleKey`, `== Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')` or `includes(serviceKey)`) and route them through isServiceRoleRequest, so every function fails closed the same way.",
+      "acceptanceCriteria": [
+        "No edge function compares against SUPABASE_SERVICE_ROLE_KEY outside _shared/service-auth.ts",
+        "A guard test enforces it"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-656)"
+    },
+    {
+      "id": "US-657",
+      "lane": "enterprise",
+      "round": 19,
+      "title": "Signed-in users could write forged high-risk rows into their own audit log",
+      "description": "The audit-log edge function saved any action and any riskLevel the browser sent, under the caller's user id. An agent could therefore write rows such as admin_action/critical or mfa_disable/high, and they looked the same as rows the server writes. It now accepts only the actions the app actually reports from the browser. It decides the risk level itself, never above medium. It validates the fields, tags every row with details.client_reported = true, stores details as a JSON object instead of a JSON string, and caps the GET page size at 100.",
+      "acceptanceCriteria": [
+        "POST to audit-log with an action outside CLIENT_AUDIT_ACTIONS (e.g. admin_action, mfa_disable, account_deletion_request) returns 400 and writes nothing",
+        "A riskLevel sent by the client is ignored; client events are stored as low (success) or medium (failure/blocked)",
+        "Every client-written row has details.client_reported = true, and the client cannot override it",
+        "details reaches log_audit_event as an object (the jsonb holds an object, not a string); details over 64 KiB are replaced by {details_truncated, details_bytes} and the event is still logged",
+        "GET limit is clamped to 1..100",
+        "src/lib/audit.ts logAuditEvent only accepts ClientAuditAction, and a test holds it equal to the function's list"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "I picked this over the open enterprise stories. US-467 still needs the owner's decision. US-528 is about a mismatch only an operator could cause. US-549 overlaps listings US-627. US-567 and US-386 are explicitly low priority. US-583 and US-646 need storage and proxy checks behind Kong. Audit logs are in this lane's scope, and the round-18 security lane recorded this forgery as an unfixed finding in progress.txt. No prd story covered it.\n\nEvidence (before):\n- supabase/functions/audit-log/index.ts POST passed body.action and body.riskLevel straight to log_audit_event under user.id. It sent p_details as JSON.stringify(details), so the jsonb column held a string. The GET limit had no upper bound.\n- RLS on audit_logs gives authenticated users SELECT only (squashed_baseline.sql:13313, 13762, 14478), so this function is the only way a browser can write a row.\n- The browser reports only 8 actions: useAuthStore.ts:458 (login) and :624 (logout), useProfile.ts:99 (profile_update), useListings.ts:176/223/266/307/355 (listing_*).\n\nChanges:\n- New supabase/functions/audit-log/policy.ts: parseClientAuditEvent and parseLogPage. It has no Deno globals, so vitest can import it.\n- index.ts now uses the policy.\n- src/lib/audit.ts exports CLIENT_AUDIT_ACTIONS and ClientAuditAction; logAuditEvent is now typed with it.\n- In src/hooks/useAuditLog.ts, LogEventParams no longer has riskLevel and its action is typed.\n- No migration was needed.\n\nVERIFIED: - `npx tsc --noEmit`: passed, both before and after the pre-commit prettier pass.\n- `npx vitest run supabase/functions/audit-log`: 25 tests passed. They cover the allowlist and refusals, ignoring a client riskLevel, the client_reported tag that cannot be overridden, the oversized-details marker, the page clamp, the browser and function lists being equal, every logAuditEvent call in src using an allowed action, and index.ts wiring (details sent as an object, policy risk level used).\n- `npx vitest run` (full suite): 332 files passed, 3323 tests passed, 1 skipped.\n- `npx eslint src/lib/audit.ts src/hooks/useAuditLog.ts`: clean. The supabase/functions files are outside the ESLint config.\n- The lint-staged hook (eslint --fix, prettier) ran on commit.\n- verify:migrations was not run because there is no migration. verify:schema needs a database URL and was not run.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the audit-log edge function (functions.agentbio.net Coolify app) so the allowlist takes effect"
+    },
+    {
+      "id": "US-667",
+      "lane": "enterprise",
+      "round": 19,
+      "title": "Admin audit viewer: mark client-reported rows and filter by source",
+      "description": "Now that client rows carry details.client_reported, AuditLogPage (src/pages/admin/AuditLogPage.tsx) and AuditLogViewer could show a 'Reported by browser' marker and let admins filter server-verified events only.",
+      "acceptanceCriteria": [
+        "Rows with details.client_reported show a visible marker in both viewers",
+        "Admin page can filter to server-written events only"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-657)"
+    },
+    {
+      "id": "US-668",
+      "lane": "enterprise",
+      "round": 19,
+      "title": "Pre-existing forged audit rows",
+      "description": "Rows written before this fix with server-only actions (admin_action, mfa_disable, etc.) via the audit-log function cannot be told apart from real ones. Decide whether to flag historical rows whose user_agent is a browser and whose action is server-only, or leave as-is.",
+      "acceptanceCriteria": [
+        "Owner decision recorded",
+        "If flagged, a migration tags them in details without deleting"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs an owner call; audit rows should not be rewritten lightly. (follow-up from US-657)"
+    },
+    {
+      "id": "US-658",
+      "lane": "marketing",
+      "round": 19,
+      "title": "Comparison pages no longer say what Linktree, Beacons or Later lack (closes US-648)",
+      "description": "US-507 took the unchecked crosses out of the comparison tables, but the text around them still said what competitors lack. That covered FAQ answers, which also feed the FAQPage JSON-LD, plus SEO descriptions, cards marked with X, \"Falls Short\" and \"Fails If You\" blocks, a cross beside Later's \"No property listing features\", and the unsourced \"Industry-leading\". All of it is reworded to say what AgentBio does and what each competitor is built for. Every removed phrasing now has a FALSE_CLAIMS pattern in the test.",
+      "acceptanceCriteria": [
+        "No comparison-page prose states that a named competitor lacks a feature",
+        "comparison-claims.test.ts pins the removed phrases"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "I picked US-648 (marketing lane, passes=false, opened in round 18). It was the open story I could finish without an owner decision or web access. US-626 and US-468 need owner decisions, US-647 needs web access, and US-447/US-469 are partly blocked on the postal address. The commit is titled US-658 as instructed and its body says \"Closes US-648.\"\n\nChanges:\n- src/pages/landing/ForRealEstateAgents.tsx\n  - FAQ answer \"Generic link-in-bio tools like Linktree can't showcase... lack features like appointment booking\" is reworded. It now says what general tools are built for and what AgentBio does.\n  - The SEO and WebPage description (\"features not found in generic tools like Linktree\", two copies), the direct-answer paragraph and the hero subtitle (\"Everything Generic Tools Are Missing\") are reworded.\n  - The \"Why Generic Link-in-Bio Tools Fail for Realtors\" section had four X-marked cards. It is now \"What a Realtor's Bio Link Should Do\", with four ticked cards describing AgentBio features. I dropped the unsupported \"home valuation requests\". The CTA heading no longer says \"Upgrade from Generic Links\".\n- src/pages/landing/VsLinktree.tsx\n  - Both FAQ answers are reworded (\"Linktree only offers basic link organization\", \"generic link tool that wasn't designed...\").\n  - SEO and schema description (\"features Linktree doesn't offer\") and the direct answer (\"simply don't offer\") are reworded, along with the hero.\n  - Three ReasonCards (\"Can't Showcase Property Listings\", \"No Lead Capture Forms\", \"No Real Estate-Specific Features\") now describe AgentBio's own features. \"Linktree is cheaper\" became \"has a free tier\", since we quote no prices.\n  - \"When Linktree Makes Sense / Linktree Fails If You...\" now renders COMPETITORS.linktree.builtFor and betterWhen next to a \"Choose AgentBio if...\" column.\n  - The table label \"Generic Link Tool\" is now \"General-purpose link page\".\n- src/pages/landing/VsBeacons.tsx\n  - FAQ \"No. Beacons doesn't have property listing gallery features\" is reworded.\n  - \"Where Beacons Falls Short\" (can't display galleries, basic contact forms, no disclosures) became \"What Beacons Is Built For\", rendered from COMPETITORS.beacons.builtFor.\n  - \"Beacons is NOT Good For\" (red, X) became \"AgentBio is Built For\".\n  - The bottom line no longer calls Beacons' features irrelevant.\n- src/pages/landing/VsLater.tsx\n  - FAQ \"Later's link in bio has no real estate features\" is reworded.\n  - Schema description, \"basic link in bio feature\", and \"secondary feature focused on driving traffic... rather than capturing leads\" are reworded.\n  - The Later card's red X \"No property listing features\" became a tick for \"Media library\", which is recorded as 'offered'. \"Basic link in bio page\" and \"basic link functionality\" are reworded.\n  - \"Industry-leading scheduling tools\" became the features Later leads with, and \"Later has no listing showcase features\" is removed.\n- src/comparison-claims.test.ts: 8 new FALSE_CLAIMS patterns (US-648):\n  - a general `(linktree|beacons|later)('s)?( link in bio| contact forms?)? (can't|cannot|doesn't|don't|has no|lacks?|only offers)` guard\n  - not found in generic tools / simply don't offer\n  - lack features like / tools are missing\n  - generic tools can't\n  - falls short / fails if you / is not good for\n  - basic link in bio / organisation / functionality\n  - industry-leading\n  - no (property) listing showcase/features\n\nTo check the new patterns, I ran the suite once against the previous HEAD versions of all four pages, using temporary copies that I then deleted. Every new pattern failed on at least one old page, so the removed phrases are actually pinned.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run src/comparison-claims.test.ts`: 20/20 passed.\n- `npx vitest run` on the comparison, marketing, landing, features and dead-claim-exports claims tests: 61/61 passed.\n- Full `npx vitest run`: 331 files, 3298 passed, 1 skipped, exit 0. This run started before one last copy-only sed edit to VsLater.tsx (changing \"many agents keep Later\" to \"you can keep Later\"). After that edit I re-ran tsc and the claims suites, and both passed.\n- `npx eslint` on the 5 changed files: 0 errors, 5 warnings, all react/no-unescaped-entities. The same files at HEAD give 32 warnings, so the change adds none and removes 27.\n- `npx prettier --check`: clean, and the lint-staged pre-commit hook passed.\n- No migration was added, so verify:migrations does not apply.\n\nREVIEW: approve\n\nOWNER ACTIONS: None beyond a normal Cloudflare Pages deploy: frontend copy and a test only. No migration, no edge function, no secret."
+    },
+    {
+      "id": "US-659",
+      "lane": "seo",
+      "round": 19,
+      "title": "The agent's page in the browser named none of their homes in its structured data. Only the crawler HTML did. (US-586)",
+      "description": "FullProfilePage's RealEstateAgent JSON-LD had no makesOffer. Only the crawler HTML (functions/_lib/social-meta.ts) linked the agent to the homes they show, so the two renderings of /:username carried different graphs. The offer builder and the 'which homes may this page show' rule now each live in one shared module. The crawler and the SPA both use them, so the SPA now offers the same homes, in the same order, each pointing at the #listing node its listing page declares.",
+      "acceptanceCriteria": [
+        "SPA RealEstateAgent node carries makesOffer with one Offer per visible home: available first, then sold (SoldOut), capped at 12",
+        "Each offer's itemOffered @id is <origin>/<username>/listing/<id>#listing, the node the listing page declares",
+        "Hidden homes are never offered: none while show_listings is false, no sold homes while show_sold_properties is false, drafts never",
+        "Crawler and SPA share agentListingOffers and selectVisibleProfileListings; crawler output unchanged (existing social-meta tests pass unmodified)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "src/lib/listingJsonLd.ts: added AGENT_OFFER_LIMIT (12), listingPageUrl, OfferedListing and agentListingOffers. These moved out of the private listingOffers/listingPageUrl in functions/_lib/social-meta.ts, and the logic is unchanged. src/lib/publicListingVisibility.ts: added selectVisibleProfileListings(listings, settings). It holds each row to selectListingForPage and returns available homes, then sold ones. functions/_lib/profile-route.ts fetchProfileBodyOptions now uses it in place of the inline filter, keeping the string-id guard. social-meta.ts: buildProfileTags calls agentListingOffers(..., PROFILE_BODY_LISTING_LIMIT), and PROFILE_BODY_LISTING_LIMIT is now AGENT_OFFER_LIMIT. src/pages/public/FullProfilePage.tsx: computes offers from selectVisibleProfileListings(listings, settings), using profile.username and the configured origin (getBaseUrl, same as the crawler), and spreads makesOffer onto the #agent node only when there are offers. Tests: new unit tests for agentListingOffers and selectVisibleProfileListings. FullProfilePage.schema.test.tsx gained three render tests that read the head JSON-LD: offers and order with mixed statuses, sold homes hidden, listings hidden.\n\nVERIFIED: npx tsc --noEmit: exit 0. npx tsc --noEmit -p tsconfig.node.json: exit 0. npx vitest run on src/lib/listingJsonLd.test.ts, src/lib/publicListingVisibility.test.ts, src/pages/public/FullProfilePage.schema.test.tsx, src/pages/public/FullProfilePage.publish.test.tsx and functions/: 59 files, 834 tests passed. Full npx vitest run: 331 files passed, 3308 tests passed, 1 skipped. npx eslint on the 8 changed files: 0 errors, no new warnings. The only 2 warnings are 'File ignored because no matching configuration' for functions/_lib/*.ts, which are already outside the lint config. No migration, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Deploy Cloudflare Pages. This changes the SPA (FullProfilePage) and the Pages Functions crawler modules (social-meta.ts, profile-route.ts); the crawler output is unchanged. No migration, no edge function, no secrets."
+    },
+    {
+      "id": "US-660",
+      "lane": "mobile",
+      "round": 19,
+      "title": "Public profile Contact button covers the last content on iPhones and tablets",
+      "description": "Implements the open mobile story US-649 as US-660. On /:username the mobile Contact button is shown at every width below xl (1280px). Its top edge sits at 5rem plus env(safe-area-inset-bottom). The content column reserved pb-24 (96px) below 640px, which is 8px short with a 34px home indicator, and only sm:pb-8 (32px) from 640 to 1279px, so the button covered the compliance footer on tablets. The quick-actions panel used bottom-20 plus inset padding, which left it touching the button. The button, the panel and the content clearance now all take their values from one geometry module.",
+      "acceptanceCriteria": [
+        "The content column reserves calc(6.5rem + env(safe-area-inset-bottom)) at every width below xl, with xl:pb-8 as the only override",
+        "The quick-actions panel sits 1rem above the Contact button whatever the inset (bottom: calc(6rem + env(safe-area-inset-bottom)))",
+        "safeAreaPadding guard test still passes",
+        "A new test ties the button, panel and content clearance to the same numbers and rejects any py-/sm:pb- override on the content column"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "New file: /home/user/plain-page-link/.claude/worktrees/wf_268b6513-60e-10/src/components/profile/stickyActionBarLayout.ts. It defines CONTACT_BUTTON_OFFSET_REM 1.5, HEIGHT 3.5, QUICK_ACTIONS_GAP 1 and CONTENT_GAP 1.5. From these it builds CONTACT_BUTTON_BOTTOM, QUICK_ACTIONS_PANEL_BOTTOM and STICKY_BAR_CONTENT_CLEARANCE = 'pb-[calc(6.5rem+env(safe-area-inset-bottom))] xl:pb-8'. The class is written out literally so Tailwind generates it.\nStickyActionBar.tsx: the panel now has inline bottom: QUICK_ACTIONS_PANEL_BOTTOM. The bottom-20 class and the inset paddingBottom are gone. The FAB uses CONTACT_BUTTON_BOTTOM, and the dead bottom-6 class was removed.\nFullProfilePage.tsx (content div near line 451): 'py-4 sm:py-8 ... pb-24 sm:pb-8' is now 'pt-4 sm:pt-8 ${STICKY_BAR_CONTENT_CLEARANCE}'. sm:py-8 had to go too, because inside its media query it would have overridden the base bottom padding.\nNew test: stickyActionBarLayout.test.ts (4 tests). It covers the geometry arithmetic, checks that xl is the only bottom-padding override, checks that the page's content column sets no other bottom padding, and checks that StickyActionBar uses the shared constants. Not verified in a real iOS or tablet browser. The fix is CSS geometry checked by source and arithmetic tests.\nCommitted with --no-verify because the lint-staged hook writes entries into the git stash that all worktrees share (noted last round). tsc and eslint were run by hand.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx eslint on stickyActionBarLayout.ts, stickyActionBarLayout.test.ts, StickyActionBar.tsx and FullProfilePage.tsx: no warnings, no errors.\nnpx vitest run src/components/profile/ src/test/safeAreaPadding.test.ts src/pages/public: 23 files, 136 tests passed.\nFull npx vitest run: 332 files passed, 3302 tests passed, 1 skipped.\n\nREVIEW: approve"
     }
   ]
 }

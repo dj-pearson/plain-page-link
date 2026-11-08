@@ -17,6 +17,8 @@ migration, an edge-function change or a setting.
    - `SUPABASE_URL` is the public API origin. Data-export links are built
      from it.
    - The email provider settings are set (`RESEND_API_KEY`).
+   - `SUPABASE_SERVICE_ROLE_KEY` is set and non-empty. A missing or empty key
+     now refuses every service-role caller (schedulers, notify-lead).
    - Storage allows files of at least 500 MB, for data exports.
    - On the Cloudflare Pages project, `VITE_APP_URL` (if set) is
      `https://agentbio.net`. Pages Functions now read it for canonical URLs.
@@ -108,6 +110,7 @@ app and the frontend depend on each other in both directions:
 20261108000610_contact_touch_follows_deleted_interactions.sql
 20261108000615_past_due_grace_from_paid_period.sql
 20261108000629_contact_lookup_hashes.sql
+20261108000651_open_house_start_not_in_past.sql
 ```
 
 ## What changes for users the moment it ships

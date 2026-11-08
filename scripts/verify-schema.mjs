@@ -256,11 +256,12 @@ const relations = new Set(
 check('every table referenced in code exists', () => {
   const out = [];
   for (const file of sourceFiles(['src', 'supabase/functions'])) {
-    // Drop storage.from(...) so buckets are not mistaken for tables.
-    const text = stripComments(readFileSync(file, 'utf8')).replace(
-      /storage\s*\.\s*from\([^)]*\)/g,
-      ''
-    );
+    // Drop storage.from(...) so buckets are not mistaken for tables, and
+    // Buffer/Array/Uint8Array.from(...), which take data, not a table name
+    // (resend-webhook.test.ts builds its signing secret with Buffer.from).
+    const text = stripComments(readFileSync(file, 'utf8'))
+      .replace(/storage\s*\.\s*from\([^)]*\)/g, '')
+      .replace(/\b(?:Buffer|Array|Uint8Array)\s*\.\s*from\([^)]*\)/g, '');
     for (const m of text.matchAll(/\.from\(\s*['"]([a-z0-9_]+)['"]/g)) {
       const t = m[1];
       if (relations.has(t) || STORAGE_BUCKETS.has(t) || KNOWN_UNDEFINED_TABLES.has(t)) continue;

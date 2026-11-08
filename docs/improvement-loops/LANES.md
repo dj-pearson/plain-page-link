@@ -47,8 +47,10 @@ Each lane is one agent per round. A lane only looks inside its own scope.
    that fits one session. Cite file:line evidence.
 3. If the real fix is bigger than one session, do the first slice only and
    return the remaining slices; they become open stories for the next round.
-4. Implement with tests. Run `npx tsc --noEmit` and the relevant
-   `npx vitest run <paths>`; migrations must follow the RLS / SECURITY DEFINER
+4. Implement with tests. Run `npx tsc --noEmit`, the full `npx vitest run`
+   and `npx eslint` on changed files (no new warnings). A migration also runs
+   `verify:schema` against a scratch local Postgres (see `progress.txt`,
+   round 19); migrations must follow the RLS / SECURITY DEFINER
    rules in CLAUDE.md.
 5. Do **not** edit `prd.json` or `progress.txt` — the integrator writes them,
    so parallel lanes never conflict on them.
