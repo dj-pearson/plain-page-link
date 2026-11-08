@@ -39,6 +39,12 @@ vi.mock('@/lib/renderAppIcons', () => ({
   renderAppIcons: (...args: unknown[]) => renderAppIcons(...args),
 }));
 
+// US-604: no companion unless a test says so (jsdom cannot encode WebP).
+const storeAvatarVariant = vi.fn(async (..._args: unknown[]): Promise<string | null> => null);
+vi.mock('@/lib/storeAvatarVariant', () => ({
+  storeAvatarVariant: (...args: unknown[]) => storeAvatarVariant(...args),
+}));
+
 vi.mock('@/lib/signupIntent', () => ({
   readPlanIntent: () => null,
 }));
@@ -251,6 +257,31 @@ describe('OnboardingWizardPage', () => {
     );
     expect(updateProfile.mock.calls[0][0]).toMatchObject({
       avatar_url: 'https://cdn.test/user-1/avatar-1700000000000.png',
+    });
+    vi.mocked(Date.now).mockRestore();
+  });
+
+  it('names the onboarding photo -full once its 256px companion is stored (US-604)', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    storeAvatarVariant.mockResolvedValueOnce('avatar-1700000000000-256.webp');
+    updateProfile.mockResolvedValueOnce(undefined);
+
+    renderWithProviders(<OnboardingWizardPage />);
+    const user = await fillToPreview({ address: '123 Main St', city: 'Austin', price: '$750,000' });
+    await user.click(screen.getByRole('button', { name: /Save & publish/ }));
+    expect(await screen.findByText(/Your Profile is Live/)).toBeInTheDocument();
+
+    expect(storeAvatarVariant).toHaveBeenCalledWith(
+      'user-1',
+      'avatar-1700000000000',
+      expect.any(File)
+    );
+    expect(upload.mock.calls[0][0]).toBe('user-1/avatar-1700000000000-full.png');
+    expect(storeAvatarVariant.mock.invocationCallOrder[0]).toBeLessThan(
+      upload.mock.invocationCallOrder[0]
+    );
+    expect(updateProfile.mock.calls[0][0]).toMatchObject({
+      avatar_url: 'https://cdn.test/user-1/avatar-1700000000000-full.png',
     });
     vi.mocked(Date.now).mockRestore();
   });

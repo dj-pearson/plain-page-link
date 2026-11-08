@@ -2,6 +2,7 @@ import { MapPin, Award, ShieldCheck, Zap, Star, Building2, CheckCircle2 } from '
 import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
 import { formatServiceCities } from '@/lib/serviceAreas';
+import { AvatarImage } from './AvatarImage';
 
 interface ProfileHeaderProps {
   profile: PublicProfile;
@@ -65,12 +66,12 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
             {/* Profile Photo */}
             <div className="relative mb-3">
               {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  // Avatars have no resized variants (optimize-image only runs
-                  // on listing photos); since US-591 the stored file itself is
-                  // downscaled to 800px at upload. The dimensions reserve its
-                  // box (US-243). Photos uploaded before then are unchanged.
+                <AvatarImage
+                  url={profile.avatar_url}
+                  // The 256px companion when the upload stored one (US-604),
+                  // else the photo: downscaled to 800px since US-591, as
+                  // uploaded before that. The dimensions reserve its box
+                  // (US-243).
                   width={128}
                   height={128}
                   decoding="async"

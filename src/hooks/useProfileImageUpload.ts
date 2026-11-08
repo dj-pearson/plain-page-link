@@ -6,6 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { validateUpload } from '@/lib/fileValidation';
 import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
+import { storeAvatarVariant } from '@/lib/storeAvatarVariant';
+import { avatarObjectName } from '@/lib/avatarVariant';
 import {
   PROFILE_IMAGE_CACHE_CONTROL,
   shrinkProfileImage,
@@ -38,6 +40,12 @@ export interface ProfileImageUploadConfig {
    * public page is not served a multi-megabyte original for a 128px box.
    */
   shrink?: ShrinkOptions;
+  /**
+   * Also store a 256px WebP companion that the public page draws in place of
+   * the photo (US-604). The avatar only: the name scheme lives in
+   * src/lib/avatarVariant.ts and only knows the avatars bucket.
+   */
+  smallVariant?: boolean;
 }
 
 /**
@@ -51,7 +59,17 @@ export interface ProfileImageUploadConfig {
  * page until the agent noticed.
  */
 export function useProfileImageUpload(config: ProfileImageUploadConfig) {
-  const { bucket, column, filePrefix, accept, maxBytes, label, appIcons = false, shrink } = config;
+  const {
+    bucket,
+    column,
+    filePrefix,
+    accept,
+    maxBytes,
+    label,
+    appIcons = false,
+    shrink,
+    smallVariant = false,
+  } = config;
   const user = useAuthStore((s) => s.user);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -78,8 +96,14 @@ export function useProfileImageUpload(config: ProfileImageUploadConfig) {
       // Validated as uploaded (magic number), then shrunk; the shrunk file is
       // our own canvas output, so it needs no second check.
       const stored = shrink ? await shrinkProfileImage(file, shrink) : file;
-      const fileExt = stored.name.split('.').pop();
-      const objectName = `${filePrefix}-${Date.now()}.${fileExt}`;
+      const fileExt = stored.name.split('.').pop() ?? 'jpg';
+      const stem = `${filePrefix}-${Date.now()}`;
+      // Stored first: the photo's name records whether it exists (US-604).
+      const variantName =
+        smallVariant && bucket === 'avatars'
+          ? await storeAvatarVariant(user.id, stem, stored)
+          : null;
+      const objectName = avatarObjectName(stem, fileExt, variantName !== null);
       const path = `${user.id}/${objectName}`;
 
       const { error: uploadError } = await supabase.storage.from(bucket).upload(path, stored, {
@@ -111,7 +135,9 @@ export function useProfileImageUpload(config: ProfileImageUploadConfig) {
       try {
         const { data: existing } = await supabase.storage.from(bucket).list(user.id);
         const stale = (existing ?? [])
-          .filter((f) => f.name !== objectName && !iconNames.includes(f.name))
+          .filter(
+            (f) => f.name !== objectName && f.name !== variantName && !iconNames.includes(f.name)
+          )
           .map((f) => `${user.id}/${f.name}`);
         if (stale.length > 0) await supabase.storage.from(bucket).remove(stale);
       } catch (cleanupError) {
