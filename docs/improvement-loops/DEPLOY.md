@@ -26,8 +26,13 @@ migration, an edge-function change or a setting.
 
 ## Order
 
-Do these back to back. The database and the functions app depend on each
-other in both directions, so keep the gap between steps 1 and 2 short:
+Do steps 1 to 3 back to back, in a quiet hour. The database, the functions
+app and the frontend depend on each other in both directions:
+
+- The dashboard in production today reads `leads.notes` and `leads.email_hash`
+  (its `LEAD_COLUMNS`). Migrations `20261108000452` and `20261108000559` take
+  those away, so the live Leads page errors from step 1 until step 3 is done.
+- The new functions need the new columns, so step 2 cannot go first.
 
 1. **Apply the migrations** in filename order (list below), then run
    `NOTIFY pgrst, 'reload schema';`.
@@ -83,6 +88,8 @@ other in both directions, so keep the gap between steps 1 and 2 short:
 20261108000531_leads_visitor_id.sql
 20261108000532_leads_phone_lookup_hash.sql
 20261108000534_lead_stats_assignee_filter.sql
+20261108000557_lead_stats_type_search_filter.sql
+20261108000559_lead_lookup_hashes_not_browser_readable.sql
 ```
 
 ## What changes for users the moment it ships

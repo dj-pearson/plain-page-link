@@ -6028,3 +6028,76 @@ Other findings:
 - [seo] US-530 (the named AI bot groups in robots.txt not inheriting Disallow: /api/) and US-509/US-370 (dead FAQ sets and the unused PageSEO/SchemaMarkup components) are still small, self-contained seo-lane slices.
 - [mobile] US-511 is still open: src/hooks/useOfflineStorage.ts and src/lib/offline-storage.ts plus the idb dependency. It is a clean deletion story for the next mobile round.
 - [mobile] The crawler HTML still carries index.html's <meta name="apple-mobile-web-app-title" content="AgentBio"> and apple-touch-icon /Icon.png (index.html:73,87). In the browser, useProfileManifest lifts or swaps these. Only crawlers see the crawler HTML, so the impact is low, but it is inconsistent with the agent's manifest.
+
+---
+
+## Continuous improvement loop — round 14 — 2026-11-08 (US-554 to US-563 done)
+
+Ten lanes, all approved with no fix-ups, no merge conflicts. Closed US-296, US-523, US-545, US-547, US-550, US-551, US-553.
+DEPLOY.md updated: the production dashboard reads leads.notes and leads.email_hash, which migrations 000452/000559 remove, so steps 1-3 must run back to back in a quiet hour.
+Final: tsc clean (app + node config), 2941 unit tests pass (from 2886), verify:migrations OK (88 files), vite build OK, eslint 562 warnings (CI ratchet 563 -> 562).
+
+- US-554 [listings] Closing the listing editor mid-save deleted the photos the save was writing
+- US-555 [leads] A visitor's enquiry from a deleted listing's page was lost, and other agents' listings were accepted
+- US-556 [profile] Agents' custom CSS can now include animations without overriding the app's own
+- US-557 [uiux] Leads stats chips and the Needs-attention count ignore the type filter and the name search
+- US-558 [performance] Analytics dashboard route loaded the report builder, the upgrade dialog and date-fns on first paint (47.4 KB beyond layout); Listings paid for date-fns through format.ts
+- US-559 [security] The browser could read the lead email hash, so an agent over the lead allowance could identify a locked lead
+- US-560 [enterprise] Agents who onboarded before US-537 were never asked for their time zone, so their morning email still follows UTC
+- US-561 [marketing] Pricing config priced features that do not exist (dead USAGE_PRICING and unread plan feature keys)
+- US-562 [seo] Answer engines reading an agent's page learned nothing about their homes from its structured data
+- US-563 [mobile] A buyer's browser saw the AgentBio dashboard app, not the agent's, as the installable app on /:username until React ran
+
+Owner actions:
+- US-554: Deploy Cloudflare Pages (frontend only; no migration, no edge function, no secret).
+- US-555: Redeploy the submit-lead edge function (functions.agentbio.net Coolify app, root Dockerfile) so the listing ownership check reaches production
+- US-557: Apply migration supabase/migrations/20261108000557_lead_stats_type_search_filter.sql (needs 20261108000534 applied first). It drops the 3-argument lead_stats and creates the 5-argument one. Ideally apply it before or with the Cloudflare Pages deploy: if the frontend ships first, a filtered Leads view's lead_stats call fails, the page falls back to counts over the loaded rows, and unfiltered views are unaffected.
+- US-557: Deploy Cloudflare Pages (frontend). No edge functions and no secrets.
+- US-558: Deploy Cloudflare Pages (frontend only; no migration, no edge function, no secret).
+- US-559: Apply migration supabase/migrations/20261108000559_lead_lookup_hashes_not_browser_readable.sql after 20261108000531 and 20261108000532. Deploy the frontend at the same time or after: an older bundle selecting the old LEAD_COLUMNS would be refused once the grant narrows.
+- US-560: US-560: Deploy Cloudflare Pages (frontend only). Migration 20261107000433_profile_timezone.sql (US-433) must already be applied; without it the save fails and the prompt shows an error toast.
+- US-562: Redeploy Cloudflare Pages: the change is in the Pages Functions for /:username and /:username/listing/:id. There is no migration or edge function to deploy.
+- US-563: The change takes effect on the next Cloudflare Pages deploy (Pages Functions). No migration, no secret and no edge function redeploy is needed.
+
+Opened:
+- US-564 [listings] AddListingModal: stop a double-click creating two listings, and block closing mid-save
+- US-565 [leads] Step two of the form (enrich) can overwrite the step-one message
+- US-566 [performance] Analytics: decide whether useLeadStats (7.1 KB shared useLeads chunk) must be on first paint
+- US-567 [enterprise] Remember 'Not now' on the time zone prompt across devices
+- US-568 [seo] Give the listing page's crawler JSON-LD and the SPA's the same node type
+- US-569 [mobile] Human profile HTML drops the AgentBio apple-mobile-web-app-title before the bundle runs
+
+Other findings:
+- [listings] US-541 (lead scoring uses measured listing views) is still open. src/lib/ml-lead-scoring.ts:27-36 removes the behavioural features from the ML model on purpose (US-105), and UnifiedLeadScorer's rule path (ml-lead-scoring.ts:~889) passes no listingViews to LeadScoringSystem.calculateScore. Adding listingViews back means changing the scorer's LeadFeatures and feeding it a per-lead count in batch, from useLeadViewedListings or a SQL count, through useMLLeadScoring. That is a coherent next-round slice, and it touches the leads lane's lead list.
+- [listings] src/components/modals/AddListingModal.tsx: the double-submit race described in nextSlices.
+- [listings] The lint-staged pre-commit hook again wrote a backup into the shared git stash on commit ('Backed up original state in git stash (1aa1588)'). This was already noted in earlier rounds.
+- [leads] US-463 can be marked passing: src/types/lead.ts (34 lines) declares only LeadRow, LeadReadRow and Lead. The legacy family went in 2521ff6. LeadFormType (src/components/profile/LeadFormModal.tsx:9) and ContactMethod (src/lib/analyticsEvents.ts:33) are unrelated live types.
+- [leads] Leads that were filed against another agent's listing before this fix still carry that listing_id. notify-lead already scopes its listing read by user_id (notify-lead/index.ts:183-189), so the emails are safe. A one-off cleanup could null leads.listing_id where the listing's user_id differs from the lead's.
+- [leads] supabase/functions/submit-lead/index.ts still logs with console.* throughout, while reportError is used elsewhere in the same function (already noted at progress.txt:5534).
+- [leads] The lint-staged pre-commit hook wrote a backup entry into the shared git stash (888b6e3) while this commit was made, the same as in earlier rounds.
+- [profile] US-525 is still open and small: src/types/theme.ts still declares a dead custom_css field on the theme settings types (cited at lines 39 and 64 in prd.json).
+- [profile] US-486 is still open and small: public/manifest.json theme_color is #2563eb but the index.html theme-color meta is #0ea5e9. It needs a test that holds the two together.
+- [profile] Behaviour change to note: an agent whose current CSS animates the page container (body/html/:root { animation: ... }) loses that declaration. It was already able to move the container through app keyframes, which is why it is now refused. Animations on elements inside the page are unaffected.
+- [profile] The lint-staged pre-commit hook wrote a backup entry (3d63f4f) to the git stash, which all worktrees share. This was already reported in progress.txt.
+- [uiux] The lint-staged pre-commit hook again wrote a backup into the shared git stash ('Backed up original state in git stash (bd3b7d9)'); parallel lanes share that stash.
+- [uiux] US-420 (blocking a second team versus a team switcher) still needs an owner decision. supabase/functions/teams/index.ts accept does not check existing membership.
+- [uiux] The 'Hot' chip is still counted over the loaded pages only, because it needs the client-side ML score (src/pages/dashboard/Leads.tsx:316-320 comment). With more than one page of leads it undercounts, and nothing on the chip says so.
+- [performance] src/lib/analytics.test.ts:108 'should format dates correctly' depends on the time zone. new Date('2025-01-15') is UTC midnight, so the test fails under TZ=America/New_York, with the old date-fns code too. It passes in UTC CI.
+- [performance] src/pages/public/ListingPage.tsx still reaches date-vendor statically through its own date-fns imports, not through format.ts. It would be a candidate for the same native-Intl treatment for public listing visitors.
+- [performance] The lint-staged pre-commit hook again wrote a backup into the shared git stash ('Backed up original state in git stash (98e0fe3)'), as noted in earlier rounds.
+- [security] US-342 is still open: useSecureListings and ListingsBlock still call select('*') on listings (not touched this round).
+- [security] US-444: generate-article still does not honour the x-api-key auth that docs/setup/MAKE_COM_INTEGRATION.md:70-110 promises.
+- [security] The grant on leads goes only to authenticated; anon has had no column SELECT since 20261108000452. That is correct, but verify:schema has no check that pins it. A check that the newest leads grant never reaches anon, and never includes *_hash or encrypted_* columns, would guard against a careless future restatement.
+- [enterprise] US-467 (agent-chosen quiet hours) still needs the product decision noted in prd.json, so I did not take it.
+- [enterprise] US-528: src/components/settings/TimeZoneSetting.tsx (CardDescription, around line 55) still says '7am unless you change it', which is wrong if an operator sets DIGEST_LOCAL_HOUR. The new prompt avoids naming an hour.
+- [enterprise] US-549 (client-side 'today' should use the stored zone) is still open. Agents whose device zone differs from the saved one are not prompted by this change, by design.
+- [marketing] US-369 is still open and small. These exports are imported nowhere and still carry price, rating or plan claims: GEO_FAQS in src/lib/geo.ts; COMPARISON_DATA and PRICING_TIERS in src/config/seo.config.ts (PRICING_TIERS starts around line 250, with features lists); and HOMEPAGE_FAQS/PRICING_FAQS in src/lib/faq-schema.ts. A good next marketing slice.
+- [marketing] src/hooks/useSubscription.ts:55 types `features: Record<string, any>`, an explicit any that goes against the CLAUDE.md type-safety rule; usePlanUsage.ts already uses Record<string, unknown>.
+- [marketing] The lint-staged pre-commit hook again wrote a backup entry into the git stash that all worktrees share (stash 3f64d35), as earlier rounds noted.
+- [marketing] The reminder from last round is still open: planCardCopy.ts and Pricing.tsx keep their own lists of unshipped quotas, separate from LIMIT_META.ships.
+- [seo] The profile JSON-LD in FullProfilePage.tsx:228-300 (the SPA) still names no listings either; only the crawler output has them now. After the type question above is settled, adding makesOffer there too would give both renderings the same graph.
+- [seo] US-530 (named AI-bot groups in public/robots.txt do not inherit Disallow: /api/), US-509 (unused FAQ sets in src/lib/faq-schema.ts) and US-370 (unused PageSEO/SchemaMarkup components) are still open. Each is a small, self-contained seo-lane slice.
+- [seo] US-552 (?listing=<hidden> gets only the summary body) is a small follow-on in profile-route.ts. Run fetchProfileBodyOptions when the lookup state is 'hidden' and the path is not listingPath; then the new makesOffer JSON-LD reaches that URL too.
+- [mobile] [mobile] US-511 is still open: src/hooks/useOfflineStorage.ts, src/lib/offline-storage.ts and the idb dependency have no importers. It is a clean deletion slice for the next mobile round.
+- [mobile] [mobile] The crawler and human HTML still carry index.html's apple-touch-icon /Icon.png (index.html:87). Only iOS Safari reads it, and useProfileManifest swaps it to the agent's photo after a HEAD check. Doing that on the server would need the avatar lookup the human path deliberately avoids.
+- [mobile] [mobile] The lint-staged pre-commit hook created a backup entry in the git stash, which all worktrees share (stash 416db6b) and which other worktrees can see.
