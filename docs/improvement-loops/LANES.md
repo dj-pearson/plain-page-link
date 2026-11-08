@@ -61,6 +61,12 @@ The integrator merges lanes one at a time onto the loop branch, re-runs
 (with `lane`) and `progress.txt`, and lists owner actions (migrations to
 apply, functions to redeploy, secrets to set).
 
+## Deploying
+
+`docs/improvement-loops/DEPLOY.md` is the single runbook: pre-checks,
+order, and the list of migrations not yet in production. The integrator
+updates it every round.
+
 ## Running another round
 
 Ask Claude in this repo: "run another improvement loop round". Each round
