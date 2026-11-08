@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useProfileManifest, profileManifestHref } from './useProfileManifest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  useProfileManifest,
+  profileManifestHref,
+  DASHBOARD_APPLE_TITLE,
+} from './useProfileManifest';
 import { profileManifestPath } from '../../functions/_lib/profile-manifest';
 
 /**
@@ -45,6 +51,29 @@ describe('useProfileManifest', () => {
     expect(manifestHref()).toBe('/jane/manifest.json');
     unmount();
     expect(manifestHref()).toBe('/manifest.json');
+  });
+
+  it('copes with the server having already dropped the label, and gives it back on leaving (US-569)', () => {
+    document.head.innerHTML = '<link rel="manifest" href="/jane/manifest.json" />';
+    const { rerender, unmount } = renderHook(({ u }) => useProfileManifest(u), {
+      initialProps: { u: 'jane' },
+    });
+    expect(appleTitle()).toBeNull();
+    rerender({ u: 'dana-rivers' });
+    expect(appleTitle()).toBeNull();
+    unmount();
+    expect(document.querySelectorAll('meta[name="apple-mobile-web-app-title"]')).toHaveLength(1);
+    expect(appleTitle()?.getAttribute('content')).toBe('AgentBio');
+  });
+
+  it("restores the label index.html carries, which is the dashboard manifest's short_name", () => {
+    const manifest = JSON.parse(
+      readFileSync(join(process.cwd(), 'public', 'manifest.json'), 'utf8')
+    ) as { short_name: string };
+    expect(DASHBOARD_APPLE_TITLE).toBe(manifest.short_name);
+    expect(readFileSync(join(process.cwd(), 'index.html'), 'utf8')).toContain(
+      `<meta name="apple-mobile-web-app-title" content="${DASHBOARD_APPLE_TITLE}" />`
+    );
   });
 
   it('leaves the dashboard manifest alone without a username', () => {

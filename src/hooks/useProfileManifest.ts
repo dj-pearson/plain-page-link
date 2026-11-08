@@ -28,6 +28,8 @@ import { useEffect } from 'react';
 import { avatarAppIconUrls } from '@/lib/avatarAppIcon';
 
 const DASHBOARD_MANIFEST = '/manifest.json';
+/** index.html's apple-mobile-web-app-title; must equal public/manifest.json short_name. */
+export const DASHBOARD_APPLE_TITLE = 'AgentBio';
 /** Any agent's manifest: /<one segment>/manifest.json. */
 const PROFILE_MANIFEST_HREF = /^\/[^/]+\/manifest\.json$/;
 
@@ -88,12 +90,20 @@ export function useProfileManifest(username: string, avatarUrl: string | null = 
       currentHref && !PROFILE_MANIFEST_HREF.test(currentHref) ? currentHref : DASHBOARD_MANIFEST;
     link.setAttribute('href', profileManifestHref(username));
 
-    const appleTitle = document.querySelector<HTMLMetaElement>(
+    // The server drops this meta from an agent's page too (US-569), so it may
+    // already be gone. Either way the dashboard gets its label back on leaving.
+    const foundAppleTitle = document.querySelector<HTMLMetaElement>(
       'meta[name="apple-mobile-web-app-title"]'
     );
-    const appleTitleParent = appleTitle?.parentNode ?? null;
-    const appleTitleNext = appleTitle?.nextSibling ?? null;
-    appleTitle?.remove();
+    const appleTitleParent = foundAppleTitle?.parentNode ?? document.head;
+    const appleTitleNext = foundAppleTitle?.nextSibling ?? null;
+    let appleTitle = foundAppleTitle;
+    if (!appleTitle) {
+      appleTitle = document.createElement('meta');
+      appleTitle.name = 'apple-mobile-web-app-title';
+      appleTitle.content = DASHBOARD_APPLE_TITLE;
+    }
+    foundAppleTitle?.remove();
 
     return () => {
       if (created) {
@@ -101,7 +111,9 @@ export function useProfileManifest(username: string, avatarUrl: string | null = 
       } else {
         link?.setAttribute('href', previousHref);
       }
-      if (appleTitle && appleTitleParent) {
+      if (appleTitleNext && appleTitleNext.parentNode !== appleTitleParent) {
+        appleTitleParent.appendChild(appleTitle);
+      } else {
         appleTitleParent.insertBefore(appleTitle, appleTitleNext);
       }
     };

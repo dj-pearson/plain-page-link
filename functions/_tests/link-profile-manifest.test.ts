@@ -3,7 +3,7 @@
  * agent's manifest, exactly once, whatever shape the source link had.
  */
 import { describe, it, expect } from 'vitest';
-import { linkProfileManifest } from '../_lib/profile-route';
+import { dropAppleWebAppTitle, linkProfileManifest } from '../_lib/profile-route';
 
 const EXPECTED = '<link rel="manifest" href="/jane/manifest.json" />';
 
@@ -44,5 +44,37 @@ describe('linkProfileManifest', () => {
     expect(
       linkProfileManifest('<head><link rel="manifest" href="/m.json"></head>', 'a b')
     ).toContain('href="/a%20b/manifest.json"');
+  });
+});
+
+describe('dropAppleWebAppTitle (US-569)', () => {
+  it("removes index.html's label with its indentation and line break, and nothing else", () => {
+    const html =
+      '<head>\n    <meta name="apple-mobile-web-app-capable" content="yes" />\n' +
+      '    <meta name="apple-mobile-web-app-title" content="AgentBio" />\n' +
+      '    <title>x</title>\n</head>';
+    expect(dropAppleWebAppTitle(html)).toBe(
+      '<head>\n    <meta name="apple-mobile-web-app-capable" content="yes" />\n    <title>x</title>\n</head>'
+    );
+  });
+
+  it('matches any attribute order or quoting, and every copy', () => {
+    const html =
+      "<head><meta content='AgentBio' name='apple-mobile-web-app-title'><meta name=apple-mobile-web-app-title content=X></head>";
+    expect(dropAppleWebAppTitle(html)).toBe('<head></head>');
+  });
+
+  it('leaves a document without the label unchanged', () => {
+    const html =
+      '<head><meta name="apple-mobile-web-app-status-bar-style" content="default"></head>';
+    expect(dropAppleWebAppTitle(html)).toBe(html);
+  });
+
+  it('is applied by linkProfileManifest, which every agent-page response goes through', () => {
+    const out = linkProfileManifest(
+      '<head><meta name="apple-mobile-web-app-title" content="AgentBio" /><link rel="manifest" href="/manifest.json" /></head>',
+      'jane'
+    );
+    expect(out).toBe(`<head>${EXPECTED}</head>`);
   });
 });
