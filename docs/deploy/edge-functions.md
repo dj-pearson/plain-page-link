@@ -60,7 +60,8 @@ US-122 was right that the router served far fewer functions than the app calls.
 It carried a literal `FUNCTIONS_MAP` of **15** names while the app calls **40**,
 so **29 answered 404** — among them `gdpr-export` and `gdpr-deletion` (the
 subject-access and erasure paths), `create-portal-session`,
-`create-stripe-customer` and `report-stripe-usage` (billing), `verify-mfa`,
+`create-stripe-customer` and `report-stripe-usage` (billing; since deleted in
+US-656, because it let an agent self-report their own metered usage), `verify-mfa`,
 `disable-mfa`, `login-security`, `get-sessions` and `revoke-session` (account
 security), `sso-initiate` and `sso-callback`, `submit-review`, `teams`,
 `api-keys` and `send-welcome-email`. One entry, `submit-contact`, named a
