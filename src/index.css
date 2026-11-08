@@ -517,3 +517,63 @@ html {
 .page-exit-active {
   @apply opacity-0 -translate-y-4 transition-all duration-300 ease-in;
 }
+
+/*
+ * US-637: iOS Safari, and the installed iOS app, zoom the whole page in when
+ * a form field under 16px takes focus, and leave it zoomed after the keyboard
+ * closes. Input was already 16px on phones, but Textarea, native <select>s and
+ * every field given `text-sm` were 14px, so a buyer tapping "Message" in the
+ * lead form on an agent's page found the dialog blown up and half off screen.
+ *
+ * Two rules, both for touch screens only (mouse-and-keyboard screens keep the
+ * compact 14px sizes), and both raise small fields without touching big ones:
+ *
+ * 1. A field given a small size utility (text-sm, text-xs, sm:text-sm, ...)
+ *    is set to 16px. `!important` because the utilities come later in the
+ *    stylesheet; outside any @layer so Tailwind does not hoist it above them.
+ *    It names the small utilities rather than flooring every field with
+ *    max(16px, 1em): in font-size, 1em is the *parent's* size, so a floor on
+ *    every field would pull text-lg kiosk fields and text-2xl OTP digits down
+ *    to 16px.
+ * 2. A field with no size class of its own inherits its parent's size
+ *    (preflight sets font-size: 100%), so one inside a text-sm container would
+ *    be 14px. It defaults to at least 16px, without !important and at element
+ *    specificity in @layer base, so any size utility on the field still wins.
+ */
+@media (pointer: coarse) {
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+        [type='file']
+      ):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not(
+        [type='hidden']
+      ),
+    select,
+    textarea
+  ):is(
+    .text-xs,
+    .text-sm,
+    .text-\[10px\],
+    .text-\[11px\],
+    .sm\:text-xs,
+    .sm\:text-sm,
+    .md\:text-sm
+  ) {
+    font-size: 16px !important;
+  }
+}
+
+@layer base {
+  @media (pointer: coarse) {
+    input:where(
+      :not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+          [type='file']
+        ):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not(
+          [type='hidden']
+        )
+    ),
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
+  }
+}
