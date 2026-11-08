@@ -11,6 +11,7 @@ import { SkeletonProfile } from '@/components/ui/skeleton';
 import { planLimitKeyFromError, UPGRADE_PATH } from '@/lib/planLimits';
 import { urlSchemeErrorFrom } from '@/lib/urlSchemeErrors';
 import { profileTabFromSearch } from '@/lib/profileCompletion';
+import { AvatarImage } from '@/components/profile/AvatarImage';
 import {
   normalizeProfileUrls,
   PROFILE_URL_FIELDS,
@@ -466,8 +467,8 @@ export default function Profile() {
         <div className="flex items-center gap-6">
           <div className="relative">
             {formData.avatar_url ? (
-              <img
-                src={formData.avatar_url}
+              <AvatarImage
+                url={formData.avatar_url}
                 alt="Profile"
                 className="w-24 h-24 rounded-full object-cover"
               />

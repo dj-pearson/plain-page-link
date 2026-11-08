@@ -26,7 +26,8 @@ import { PublishProfileCard } from '@/components/settings/PublishProfileCard';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { AvatarImage } from '@/components/profile/AvatarImage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileDisplaySettings } from '@/components/settings/ProfileDisplaySettings';
 import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
@@ -346,10 +347,17 @@ export default function Settings() {
         <CardContent className="space-y-6">
           <div className="flex items-center gap-6">
             <Avatar className="w-20 h-20">
-              <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="text-xl">
-                {profile?.full_name?.[0] || profile?.username?.[0] || 'U'}
-              </AvatarFallback>
+              {profile?.avatar_url ? (
+                <AvatarImage
+                  url={profile.avatar_url}
+                  alt=""
+                  className="aspect-square h-full w-full object-cover"
+                />
+              ) : (
+                <AvatarFallback className="text-xl">
+                  {profile?.full_name?.[0] || profile?.username?.[0] || 'U'}
+                </AvatarFallback>
+              )}
             </Avatar>
           </div>
 

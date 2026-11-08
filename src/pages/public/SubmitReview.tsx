@@ -13,6 +13,7 @@ import { logger } from '@/lib/logger';
 import { normalizeUsername } from '@/lib/username';
 import { SEOHead } from '@/components/SEOHead';
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunctions';
+import { AvatarImage } from '@/components/profile/AvatarImage';
 
 /**
  * The limits submit-review enforces (validateReviewData in
@@ -243,8 +244,8 @@ export default function SubmitReview() {
           <CardHeader>
             <div className="flex items-center gap-4 mb-4">
               {profile.avatar_url && (
-                <img
-                  src={profile.avatar_url}
+                <AvatarImage
+                  url={profile.avatar_url}
                   alt={profile.full_name ?? ''}
                   className="w-16 h-16 rounded-full object-cover"
                 />

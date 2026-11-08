@@ -28,6 +28,7 @@ import { toStringList } from '@/types/profile';
 import { cn } from '@/lib/utils';
 import { useSpamGuard } from '@/hooks/useSpamGuard';
 import { HoneypotField } from '@/components/forms/HoneypotField';
+import { AvatarImage } from '@/components/profile/AvatarImage';
 
 /** How long the thank-you stays up before the form clears for the next visitor. */
 const KIOSK_RESET_MS = 8000;
@@ -395,8 +396,8 @@ export default function OpenHouseSignIn() {
 
           <div className="flex items-center gap-4 border-t border-border pt-5">
             {openHouse.agentAvatar ? (
-              <img
-                src={openHouse.agentAvatar}
+              <AvatarImage
+                url={openHouse.agentAvatar}
                 alt=""
                 className="h-14 w-14 shrink-0 rounded-full object-cover"
               />
