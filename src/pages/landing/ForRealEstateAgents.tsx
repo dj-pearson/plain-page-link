@@ -9,7 +9,14 @@ import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
 import { PRICING_PLANS } from '@/config/pricing-plans';
-import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
+import {
+  CHECK_THEIR_SITE,
+  COMPETITORS,
+  COMPETITOR_CELLS_NOTE,
+  COMPETITORS_VERIFIED_LABEL,
+  competitorCell,
+  type ComparisonFeature,
+} from '@/config/competitors';
 
 /**
  * The AgentBio cell of the comparison table, from the plans we actually sell.
@@ -23,8 +30,24 @@ const AGENTBIO_PRICE_CELL = (() => {
   return hasFree ? `Free, or ${from}` : from;
 })();
 
-/** What the competitor columns say for price: nothing we would have to keep current. */
-const COMPETITOR_PRICE_CELL = 'See their site';
+/**
+ * A table row whose competitor cells come from COMPETITORS (US-507). They were
+ * literals here: Linktree and Beacons "Basic" lead forms, "Limited" calendar
+ * booking and a cross for testimonials, none of it recorded as checked.
+ */
+interface TableRow {
+  feature: string;
+  agentbio: boolean | string;
+  linktree: boolean | string;
+  beacons: boolean | string;
+}
+
+const featureRow = (feature: string, key: ComparisonFeature): TableRow => ({
+  feature,
+  agentbio: true,
+  linktree: competitorCell('linktree', key),
+  beacons: competitorCell('beacons', key),
+});
 
 const FAQ_ENTRIES: FaqEntry[] = [
   {
@@ -257,60 +280,27 @@ export default function ForRealEstateAgents() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    {
-                      feature: 'Property Listing Galleries',
-                      agentbio: true,
-                      linktree: false,
-                      beacons: false,
-                    },
-                    {
-                      feature: 'Lead Capture Forms',
-                      agentbio: true,
-                      linktree: 'Basic',
-                      beacons: 'Basic',
-                    },
-                    {
-                      feature: 'Calendar Booking',
-                      agentbio: true,
-                      linktree: 'Limited',
-                      beacons: 'Limited',
-                    },
-                    {
-                      feature: 'Testimonials Display',
-                      agentbio: true,
-                      linktree: false,
-                      beacons: false,
-                    },
-                    {
-                      feature: 'Real Estate Analytics',
-                      agentbio: true,
-                      linktree: false,
-                      beacons: false,
-                    },
-                    {
-                      feature: 'Sold Properties Showcase',
-                      agentbio: true,
-                      linktree: false,
-                      beacons: false,
-                    },
-                    {
-                      feature: 'MLS # on each listing',
-                      agentbio: true,
-                      linktree: false,
-                      beacons: false,
-                    },
-                    {
-                      // The competitor cells were "$24" and "$10", unsourced
-                      // and undated (US-319). Their prices change and vary by
-                      // region, so we name the tiers and send the reader to
-                      // their sites, as /vs/linktree and /vs/beacons do.
-                      feature: 'Price (monthly)',
-                      agentbio: AGENTBIO_PRICE_CELL,
-                      linktree: COMPETITOR_PRICE_CELL,
-                      beacons: COMPETITOR_PRICE_CELL,
-                    },
-                  ].map((row, i) => (
+                  {(
+                    [
+                      featureRow('Property Listing Galleries', 'listingGalleries'),
+                      featureRow('Lead Capture Forms', 'leadCaptureForms'),
+                      featureRow('Calendar Booking', 'calendarBooking'),
+                      featureRow('Testimonials Display', 'testimonials'),
+                      featureRow('Real Estate Analytics', 'realEstateAnalytics'),
+                      featureRow('Sold Properties Showcase', 'soldShowcase'),
+                      featureRow('MLS # on each listing', 'mlsNumbers'),
+                      {
+                        // The competitor cells were "$24" and "$10", unsourced
+                        // and undated (US-319). Their prices change and vary by
+                        // region, so we name the tiers and send the reader to
+                        // their sites, as /vs/linktree and /vs/beacons do.
+                        feature: 'Price (monthly)',
+                        agentbio: AGENTBIO_PRICE_CELL,
+                        linktree: CHECK_THEIR_SITE,
+                        beacons: CHECK_THEIR_SITE,
+                      },
+                    ] satisfies TableRow[]
+                  ).map((row, i) => (
                     <tr key={i} className="border-b border-glass-border/50">
                       <td className="p-4 glass-body">{row.feature}</td>
                       <td className="text-center p-4">
@@ -370,7 +360,7 @@ export default function ForRealEstateAgents() {
                   beacons.ai
                 </a>{' '}
                 on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices, which change and vary
-                by region.
+                by region. {COMPETITOR_CELLS_NOTE}
               </p>
             </div>
           </div>
