@@ -446,5 +446,35 @@ describe('writeExportDocument (US-576)', () => {
       // Cancelling stops the reads.
       expect(calls.length).toBeLessThanOrEqual(readsAtStart + 1);
     });
+
+    it('a consumer cancelling a streamed body is reported, so the partial release is audited', async () => {
+      const start = await startExportDownload(
+        exportDocumentChunks(fakeReader(tables()).reader, subject, decrypt, { now: NOW, pageSize: 10, failFast: true }),
+        200
+      );
+      if (start.kind !== 'streaming') throw new Error('expected a streamed download');
+      const outcomes: unknown[] = [];
+      const body = exportDownloadStream(start.head, start.rest, (o) => void outcomes.push(o)).getReader();
+      await body.read(); // the held head
+      await body.read(); // one more page
+      await body.cancel('client timeout');
+      expect(outcomes).toEqual([{ ok: false, cancelled: true, reason: 'client timeout' }]);
+    });
+
+    it('a cancelled body is reported once even if onDone throws', async () => {
+      const start = await startExportDownload(
+        exportDocumentChunks(fakeReader(tables()).reader, subject, decrypt, { now: NOW, pageSize: 10, failFast: true }),
+        200
+      );
+      if (start.kind !== 'streaming') throw new Error('expected a streamed download');
+      let calls = 0;
+      const body = exportDownloadStream(start.head, start.rest, () => {
+        calls += 1;
+        throw new Error('audit down');
+      }).getReader();
+      await body.read();
+      await expect(body.cancel()).resolves.toBeUndefined();
+      expect(calls).toBe(1);
+    });
   });
 });

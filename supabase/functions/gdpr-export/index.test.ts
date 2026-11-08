@@ -39,6 +39,12 @@ describe('gdpr-export GET', () => {
     expect(branch).toMatch(/exportDownloadStream\(/);
   });
 
+  it('audits a streamed download the client cancelled part-way', () => {
+    const branch = getBranch();
+    expect(branch).toMatch(/'cancelled' in outcome/);
+    expect(branch).toMatch(/p_details: \{ streamed: true, cancelled: true \}/);
+  });
+
   it('still answers 503 when a section fails before anything was sent', () => {
     const branch = getBranch();
     expect(branch).toMatch(/start\.kind === 'failed'/);

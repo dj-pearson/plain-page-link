@@ -665,20 +665,33 @@ export async function startExportDownload(
 }
 
 /**
+ * How a streamed download ended. `cancelled` means the consumer stopped
+ * reading (tab closed, client timeout, a caller that read part and left):
+ * part of the document had already been released, so it must be audited too.
+ */
+export type ExportDownloadOutcome =
+  | { ok: true; summary: ExportSummary }
+  | { ok: false; error: unknown }
+  | { ok: false; cancelled: true; reason?: unknown };
+
+/**
  * The response body for a streamed download: `head`, then each chunk as the
  * consumer asks for it, so only one page is held at a time. `onDone` hears
- * how it ended. A failure errors the stream, which aborts the response
- * rather than ending it cleanly.
+ * how it ended, exactly once, including when the consumer cancels. A failure
+ * errors the stream, which aborts the response rather than ending it cleanly.
  */
 export function exportDownloadStream(
   head: string,
   rest: AsyncGenerator<string, ExportSummary, void>,
-  onDone: (outcome: { ok: true; summary: ExportSummary } | { ok: false; error: unknown }) => void | Promise<void>
+  onDone: (outcome: ExportDownloadOutcome) => void | Promise<void>
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   let headSent = false;
   // A failure to record the outcome must not change what the subject receives.
-  const report = async (outcome: Parameters<typeof onDone>[0]) => {
+  let reported = false;
+  const report = async (outcome: ExportDownloadOutcome) => {
+    if (reported) return;
+    reported = true;
     try {
       await onDone(outcome);
     } catch {
@@ -705,9 +718,16 @@ export function exportDownloadStream(
         controller.error(error);
       }
     },
-    async cancel() {
-      // The subject's browser went away: stop reading the database.
-      await rest.return({ counts: {}, truncated: [] });
+    async cancel(reason) {
+      // The consumer went away after part of the document was sent: record it
+      // before anything else, so a released-but-unfinished export is never
+      // missing from the audit log. Then stop reading the database.
+      await report({ ok: false, cancelled: true, reason });
+      try {
+        await rest.return({ counts: {}, truncated: [] });
+      } catch {
+        // The generator is being abandoned; a failure to close it changes nothing.
+      }
     },
   });
 }

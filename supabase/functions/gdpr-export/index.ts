@@ -247,6 +247,23 @@ serve(async (req: Request) => {
       const body = exportDownloadStream(start.head, start.rest, async (outcome) => {
         if (outcome.ok) {
           await auditSuccess(outcome.summary);
+        } else if ('cancelled' in outcome) {
+          // The client stopped reading (tab closed, the dashboard's timeout, a
+          // caller that read part and left). Part of the PII was released, so
+          // the download is still recorded.
+          const { error: auditError } = await serviceSupabase.rpc('log_audit_event', {
+            p_user_id: user.id,
+            p_action: 'gdpr_data_export',
+            p_status: 'failure',
+            p_resource_type: 'gdpr',
+            p_ip_address: clientIP,
+            p_user_agent: userAgent,
+            p_details: { streamed: true, cancelled: true },
+            p_risk_level: 'medium',
+          });
+          if (auditError) {
+            console.error('[gdpr-export] could not write audit entry:', auditError.message);
+          }
         } else if (outcome.error instanceof ExportIncompleteError) {
           await auditFailure(outcome.error, true);
         } else {
