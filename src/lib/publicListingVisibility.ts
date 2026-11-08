@@ -83,3 +83,22 @@ export function reachableListingHref(
       ? listingPagePath(username, listing.id)
       : null;
 }
+
+/**
+ * Every listing the agent's page shows, available first and then sold, each
+ * held to selectListingForPage (US-586).
+ *
+ * The set the profile's JSON-LD offers, in both renderings: the crawler body
+ * (functions/_lib/profile-route.ts) and FullProfilePage. A home the agent hid
+ * (every listing while show_listings is off, sold ones while
+ * show_sold_properties is off) is never in it.
+ */
+export function selectVisibleProfileListings<T extends HasStatus & { id: string }>(
+  listings: T[],
+  settings: ListingPageSettings | null | undefined
+): T[] {
+  const visible = listings.filter(
+    (listing) => selectListingForPage([listing], listing.id, settings) !== null
+  );
+  return [...selectAvailableListings(visible), ...selectSoldListings(visible)];
+}

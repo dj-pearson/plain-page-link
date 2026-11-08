@@ -10,6 +10,7 @@ import {
   selectAvailableListings,
   reachableListingHref,
   selectListingForPage,
+  selectVisibleProfileListings,
   selectSoldListings,
 } from './publicListingVisibility';
 
@@ -115,5 +116,34 @@ describe('reachableListingHref (US-589)', () => {
     expect(reachableListingHref('jane', { show_sold_properties: true })(l('s', 'sold'))).toBe(
       '/jane/listing/s'
     );
+  });
+});
+
+describe('selectVisibleProfileListings (US-586)', () => {
+  const rows = [
+    l('s1', 'sold'),
+    l('p1', 'pending'),
+    l('d1', 'draft'),
+    l('a1', 'active'),
+    l('u1', 'under_contract'),
+  ];
+
+  it('lists available homes first, then sold, and drops what is not public', () => {
+    expect(selectVisibleProfileListings(rows, {}).map((r) => r.id)).toEqual([
+      'a1',
+      'p1',
+      'u1',
+      's1',
+    ]);
+  });
+
+  it('drops sold homes while the agent hides sold properties', () => {
+    expect(
+      selectVisibleProfileListings(rows, { show_sold_properties: false }).map((r) => r.id)
+    ).toEqual(['a1', 'p1', 'u1']);
+  });
+
+  it('is empty while the agent hides listings', () => {
+    expect(selectVisibleProfileListings(rows, { show_listings: false })).toEqual([]);
   });
 });

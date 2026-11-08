@@ -169,3 +169,58 @@ export function listingReference(pageUrl: string, name: string): JsonLd {
     url: pageUrl,
   };
 }
+
+/** How many homes an agent's page offers in its JSON-LD. The sitemap carries the rest. */
+export const AGENT_OFFER_LIMIT = 12;
+
+/** A listing's own page: <origin>/<username>/listing/<id> (US-275). */
+export function listingPageUrl(origin: string, username: string, listingId: string): string {
+  return `${origin.replace(/\/$/, '')}/${encodeURIComponent(username)}/listing/${encodeURIComponent(listingId)}`;
+}
+
+/** The listing fields an agent's offer needs. */
+export interface OfferedListing {
+  id: string;
+  status?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  /** listings.price is text ("$525,000", "call"); a number is accepted too. */
+  price?: string | number | null;
+}
+
+/**
+ * The homes an agent's page shows, as the offers the agent makes (US-551,
+ * US-586): the RealEstateAgent node's makesOffer.
+ *
+ * The one builder for both renderings of /:username, the crawler HTML
+ * (functions/_lib/social-meta.ts buildProfileTags) and the SPA
+ * (FullProfilePage.tsx), so the two carry the same graph. Each offer names
+ * its listing page by url and by the `#listing` node id that page declares,
+ * so a consumer merging by @id links the agent to the home's full
+ * description. Sold homes stay in the list, as on the page, with
+ * availability SoldOut.
+ *
+ * Callers pass only the listings the page may show
+ * (selectVisibleProfileListings), so nothing the agent hid can reach this.
+ */
+export function agentListingOffers(
+  listings: readonly OfferedListing[],
+  username: string,
+  origin: string,
+  limit: number = AGENT_OFFER_LIMIT
+): JsonLd[] {
+  return listings.slice(0, limit).map((listing) => {
+    const url = listingPageUrl(origin, username, listing.id);
+    const address = listing.address?.trim() || 'Property';
+    const place = [listing.city?.trim(), listing.state?.trim()].filter(Boolean).join(', ');
+    const price = positive(Number(String(listing.price ?? '').replace(/[^0-9.]/g, '')));
+    return {
+      '@type': 'Offer',
+      url,
+      availability: listingAvailability(listing.status),
+      ...(price !== undefined ? { price, priceCurrency: 'USD' } : {}),
+      itemOffered: listingReference(url, `${address}${place ? `, ${place}` : ''}`),
+    };
+  });
+}

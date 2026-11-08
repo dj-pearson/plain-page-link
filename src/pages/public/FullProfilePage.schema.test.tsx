@@ -61,13 +61,17 @@ const profileWith = (service_cities: unknown[]) => ({
   is_published: true,
 });
 
-const loaded = (service_cities: unknown[]) => ({
+const loaded = (
+  service_cities: unknown[],
+  listings: Record<string, unknown>[] = [],
+  settingsOverride: Record<string, boolean> = {}
+) => ({
   isLoading: false,
   error: null,
   refetch: vi.fn(),
   data: {
     profile: profileWith(service_cities),
-    listings: [],
+    listings,
     testimonials: [],
     links: [],
     responseHours: null,
@@ -78,6 +82,7 @@ const loaded = (service_cities: unknown[]) => ({
       show_testimonials: true,
       show_social_proof: true,
       show_contact_buttons: true,
+      ...settingsOverride,
     },
   },
 });
@@ -138,5 +143,74 @@ describe('FullProfilePage structured data: service area (US-281)', () => {
     await waitFor(() => expect(nodeOfType('RealEstateAgent')).toBeDefined());
     expect(nodeOfType('RealEstateAgent')).not.toHaveProperty('areaServed');
     expect(nodeOfType('LocalBusiness')).not.toHaveProperty('areaServed');
+  });
+});
+
+const listingRow = (id: string, status: string, address: string, price: string) => ({
+  id,
+  status,
+  address,
+  city: 'Austin',
+  state: 'TX',
+  zip_code: '78701',
+  price,
+  bedrooms: 3,
+  bathrooms: 2,
+  square_feet: 1800,
+  photos: [],
+  image: null,
+  property_type: 'single_family',
+  description: null,
+  is_featured: false,
+  sort_order: 0,
+  created_at: '2026-01-01T00:00:00Z',
+  sold_date: status === 'sold' ? '2026-03-01' : null,
+  days_on_market: null,
+});
+
+describe('FullProfilePage structured data: offered homes (US-586)', () => {
+  const rows = [
+    listingRow('sold-1', 'sold', '9 Birch Court', '$410,000'),
+    listingRow('draft-1', 'draft', '1 Hidden Lane', '$1'),
+    listingRow('act-1', 'active', '412 Maple Avenue', '$525,000'),
+  ];
+
+  const offerIds = () =>
+    ((nodeOfType('RealEstateAgent')?.makesOffer as LdNode[] | undefined) ?? []).map(
+      (o) => (o.itemOffered as LdNode)['@id']
+    );
+
+  it("offers each visible home, available first, linked to its listing page's node", async () => {
+    h.result = loaded(['Austin'], rows);
+    renderPage();
+    expect(await screen.findByRole('heading', { name: /Jane Doe/, level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(nodeOfType('RealEstateAgent')?.makesOffer).toBeDefined());
+
+    const offers = nodeOfType('RealEstateAgent')?.makesOffer as LdNode[];
+    expect(offers.map((o) => o.availability)).toEqual([
+      'https://schema.org/InStock',
+      'https://schema.org/SoldOut',
+    ]);
+    expect(offerIds()[0]).toMatch(/\/janedoe\/listing\/act-1#listing$/);
+    expect(offerIds()[1]).toMatch(/\/janedoe\/listing\/sold-1#listing$/);
+    expect(offers[0]).toMatchObject({ price: 525000, priceCurrency: 'USD' });
+    expect((offers[0].itemOffered as LdNode).name).toBe('412 Maple Avenue, Austin, TX');
+  });
+
+  it('leaves out sold homes while the agent hides sold properties', async () => {
+    h.result = loaded(['Austin'], rows, { show_sold_properties: false });
+    renderPage();
+    expect(await screen.findByRole('heading', { name: /Jane Doe/, level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(nodeOfType('RealEstateAgent')?.makesOffer).toBeDefined());
+    expect(offerIds()).toHaveLength(1);
+    expect(offerIds()[0]).toMatch(/act-1#listing$/);
+  });
+
+  it('names no homes while the agent hides listings', async () => {
+    h.result = loaded(['Austin'], rows, { show_listings: false });
+    renderPage();
+    expect(await screen.findByRole('heading', { name: /Jane Doe/, level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(nodeOfType('RealEstateAgent')).toBeDefined());
+    expect(nodeOfType('RealEstateAgent')).not.toHaveProperty('makesOffer');
   });
 });

@@ -23,9 +23,8 @@ import { profileManifestPath } from './profile-manifest';
 import { siteOrigin } from './site-origin';
 import { needsCanonicalRedirect, normalizeUsername } from '../../src/lib/username';
 import {
-  selectAvailableListings,
   selectListingForPage,
-  selectSoldListings,
+  selectVisibleProfileListings,
 } from '../../src/lib/publicListingVisibility';
 
 export interface Env {
@@ -207,11 +206,10 @@ async function fetchProfileBodyOptions(
   ]);
   if (!settings) return { listings: [], showContact: false };
   const toggles = settings[0] ?? null;
-  const visible = (listings ?? []).filter(
-    (row) => typeof row?.id === 'string' && selectListingForPage([row], row.id, toggles) !== null
-  );
+  const rows = (listings ?? []).filter((row) => typeof row?.id === 'string');
   return {
-    listings: [...selectAvailableListings(visible), ...selectSoldListings(visible)],
+    // The same set, in the same order, FullProfilePage offers in its JSON-LD (US-586).
+    listings: selectVisibleProfileListings(rows, toggles),
     showContact: toggles?.show_contact_buttons !== false,
   };
 }
