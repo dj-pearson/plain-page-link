@@ -12,6 +12,7 @@ import { ReviewInvite } from '@/components/profile/ReviewInvite';
 import { SocialProofBanner } from '@/components/profile/SocialProofBanner';
 import { FeaturedListingsCarousel } from '@/components/profile/FeaturedListingsCarousel';
 import { StickyActionBar } from '@/components/profile/StickyActionBar';
+import { STICKY_BAR_CONTENT_CLEARANCE } from '@/components/profile/stickyActionBarLayout';
 import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
 import { UpcomingOpenHouses } from '@/components/profile/UpcomingOpenHouses';
@@ -447,7 +448,11 @@ export default function FullProfilePage() {
         className="min-h-screen relative"
         style={PROFILE_MAIN_STYLE}
       >
-        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 max-w-5xl relative z-10 pb-24 sm:pb-8">
+        {/* Top padding only here: the bottom clears the mobile Contact button
+            and the home indicator at every width the button is shown (US-660). */}
+        <div
+          className={`container mx-auto px-3 sm:px-4 pt-4 sm:pt-8 max-w-5xl relative z-10 ${STICKY_BAR_CONTENT_CLEARANCE}`}
+        >
           <div className="space-y-4 sm:space-y-6">
             {/* Everything the agent's custom CSS may style (US-514). The
                 compliance footer stays outside it. */}
