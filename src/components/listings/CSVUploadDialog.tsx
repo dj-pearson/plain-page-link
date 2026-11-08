@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Upload, FileSpreadsheet, Check, X, AlertCircle, Download, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { sanitizeExternalUrl } from '@/utils/sanitize';
+import { sanitizeExternalUrl } from '@/utils/sanitizeUrl';
 
 interface CSVRow {
   address: string;
