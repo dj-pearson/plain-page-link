@@ -11,6 +11,8 @@ import { normalizeUsername } from '@/lib/username';
 import { publicProfileFilter } from '@/lib/profilePublishing';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
+  agentFactRowsFromPublicPage,
+  agentPageFactsQueryOptions,
   profileShowsBrandingQueryOptions,
   publicOpenHousesQueryOptions,
   type PublicOpenHouse,
@@ -184,11 +186,12 @@ export const publicProfileQueryOptions = (rawUsername: string, viewerId: string 
       if (page === null) throw notFound();
       if (page) {
         seedSideQueries(client, page);
+        seedPageFacts(client, page, viewerId);
         return shapePublicProfilePage(page);
       }
-      return shapePublicProfilePage(
-        await fetchPublicProfilePageByTables(client, username, viewerId)
-      );
+      const raw = await fetchPublicProfilePageByTables(client, username, viewerId);
+      seedPageFacts(client, raw, viewerId);
+      return shapePublicProfilePage(raw);
     },
     enabled: !!username,
     staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds - reduces unnecessary refetches
@@ -210,6 +213,20 @@ function seedSideQueries(client: QueryClient, page: PublicProfilePageRpcResult) 
   if (Array.isArray(page.openHouses)) {
     client.setQueryData(publicOpenHousesQueryOptions(agentId).queryKey, page.openHouses);
   }
+}
+
+/**
+ * The page builder's Stats and Testimonial blocks read the agent's listing
+ * counts, years of experience and published testimonials. The payload already
+ * holds all of it, so hand it over under the blocks' own key and they make no
+ * requests of their own on /:username (US-316); before, that was four more.
+ * Only when the page has blocks to show; agentFactRowsFromPublicPage declines
+ * for the owner's own view, which can include sample listings.
+ */
+function seedPageFacts(client: QueryClient, raw: RawPublicProfilePage, viewerId: string | null) {
+  if (!raw.customPage) return;
+  const rows = agentFactRowsFromPublicPage(raw, viewerId);
+  if (rows) client.setQueryData(agentPageFactsQueryOptions(raw.profile.id).queryKey, rows);
 }
 
 /**
