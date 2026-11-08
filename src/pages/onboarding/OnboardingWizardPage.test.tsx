@@ -161,6 +161,39 @@ describe('OnboardingWizardPage', () => {
     expect(window.location.pathname).toBe('/dashboard');
   });
 
+  // US-616: invoke returns { error } rather than throwing, so a failed welcome
+  // email used to be silent while the toast sent the agent to their inbox.
+  it.each([
+    [{ data: { message: 'sent' }, error: null }, /We emailed you/],
+    [
+      { data: null, error: new Error('The welcome email could not be sent') },
+      /Your dashboard shows/,
+    ],
+  ])(
+    'tells the agent about the welcome email only when it was sent (%#)',
+    async (result, description) => {
+      invoke.mockResolvedValue(result);
+      updateProfile.mockResolvedValueOnce(undefined);
+
+      renderWithProviders(<OnboardingWizardPage />);
+      const user = await fillToPreview({
+        address: '123 Main St',
+        city: 'Austin',
+        price: '$750,000',
+      });
+      await user.click(screen.getByRole('button', { name: /Save & publish/ }));
+      await screen.findByText(/Your Profile is Live/);
+
+      expect(invoke).toHaveBeenCalledWith('send-welcome-email', {});
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Welcome to AgentBio',
+          description: expect.stringMatching(description),
+        })
+      );
+    }
+  );
+
   it('will not leave step 3 with a listing that has no city', async () => {
     const user = userEvent.setup();
     renderWithProviders(<OnboardingWizardPage />);
