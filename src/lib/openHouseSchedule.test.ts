@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   PAST_START_GRACE_MS,
   defaultOpenHouseDate,
   formatOpenHouseWhen,
   isoToWallTime,
+  openHouseSaveErrorMessage,
   pastStartError,
   wallTimeToIso,
 } from './openHouseSchedule';
@@ -182,5 +185,58 @@ describe('formatOpenHouseWhen', () => {
     expect(
       formatOpenHouseWhen('2027-01-09T19:00:00Z', '2027-01-09T21:00:00Z', 'America/Chicago', now)
     ).toBe('Sat, Jan 9, 2027 · 1:00–3:00 PM');
+  });
+});
+
+describe('openHouseSaveErrorMessage (US-651)', () => {
+  it('words the database past-start refusal', () => {
+    const error = {
+      code: '23514',
+      message: 'That start time has already passed. Choose a date and time that is still ahead.',
+      details: 'open_house:past_start',
+    };
+    expect(openHouseSaveErrorMessage(error)).toMatch(/already passed/);
+  });
+
+  it('words the ends-after-start CHECK constraint', () => {
+    const error = {
+      code: '23514',
+      message:
+        'new row for relation "open_houses" violates check constraint "open_houses_ends_after_start"',
+      details: null,
+    };
+    expect(openHouseSaveErrorMessage(error)).toBe('End time must be after the start time.');
+  });
+
+  it('leaves other errors (a plan limit, a network failure) to the caller', () => {
+    expect(
+      openHouseSaveErrorMessage({
+        message: 'Your plan allows 1 open house',
+        details: 'plan_limit:open_houses_per_month',
+      })
+    ).toBeNull();
+    expect(openHouseSaveErrorMessage(new Error('Failed to fetch'))).toBeNull();
+    expect(openHouseSaveErrorMessage(null)).toBeNull();
+    expect(openHouseSaveErrorMessage('open_house:past_start')).toBeNull();
+  });
+});
+
+describe('the database past-start rule matches the form (US-651)', () => {
+  const sql = readFileSync(
+    join(process.cwd(), 'supabase/migrations/20261108000651_open_house_start_not_in_past.sql'),
+    'utf8'
+  );
+
+  it('uses the same grace as PAST_START_GRACE_MS', () => {
+    const match = /now\(\) - interval '(\d+) minutes'/.exec(sql);
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1]) * 60 * 1000).toBe(PAST_START_GRACE_MS);
+  });
+
+  it('raises the DETAIL and the wording the client shows', () => {
+    expect(sql).toContain("DETAIL = 'open_house:past_start'");
+    const past = pastStartError(new Date(0).toISOString(), new Date());
+    expect(past).not.toBeNull();
+    expect(sql).toContain(past as string);
   });
 });
