@@ -15,7 +15,7 @@ import {
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { mergeRepeatEnquiry } from '../_shared/lead-repeat.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
-import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl } from '../_shared/validation.ts'
+import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl, leadVisitorId } from '../_shared/validation.ts'
 import { safeFetch } from '../_shared/ssrf-guard.ts'
 import { getAgentContact } from '../_shared/agent-contact.ts'
 import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts'
@@ -40,6 +40,11 @@ interface LeadData {
   utm_medium?: string
   utm_campaign?: string
   device?: string
+  /**
+   * The browser's client-generated visitor id (US-531), so the lead detail can
+   * list the listings this visitor opened. Never set for a kiosk sign-in.
+   */
+  visitor_id?: string
   /**
    * Structured extras the capture form collected that have no dedicated column
    * (bedrooms, condition, year built, …). Persisted to leads.form_data so the
@@ -209,6 +214,7 @@ serve(async (req) => {
       utm_medium: rawData.utm_medium ? sanitizeString(rawData.utm_medium) : undefined,
       utm_campaign: rawData.utm_campaign ? sanitizeString(rawData.utm_campaign) : undefined,
       device: rawData.device ? sanitizeString(rawData.device) : undefined,
+      visitor_id: leadVisitorId(rawData),
       form_data: sanitizeFormData(rawData.form_data),
     };
 

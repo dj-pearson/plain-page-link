@@ -9,7 +9,7 @@
  * supabase/functions/**\/*.test.ts entry in vitest.config.ts).
  */
 import { describe, it, expect } from 'vitest';
-import { validateLeadData, validateReviewData, validateUuid } from './validation.ts';
+import { leadVisitorId, validateLeadData, validateReviewData, validateUuid } from './validation.ts';
 
 const validLead = {
   name: 'Dana Rivers',
@@ -25,6 +25,39 @@ describe('validateUuid', () => {
 
   it.each(['', 'not-a-uuid', '2222', 42, null, undefined])('rejects %s', (value) => {
     expect(validateUuid(value)).toBe(false);
+  });
+});
+
+describe('leadVisitorId (US-531)', () => {
+  const VISITOR = '33333333-3333-4333-8333-333333333333';
+
+  it('keeps the visitor id a public form sent', () => {
+    expect(leadVisitorId({ lead_type: 'buyer', visitor_id: VISITOR })).toBe(VISITOR);
+  });
+
+  it('normalises the case so it matches analytics_events.visitor_id', () => {
+    expect(leadVisitorId({ lead_type: 'buyer', visitor_id: VISITOR.toUpperCase() })).toBe(VISITOR);
+  });
+
+  it.each(['', 'not-a-uuid', 42, null, undefined, { id: VISITOR }])(
+    'drops %s instead of refusing the lead',
+    (value) => {
+      expect(leadVisitorId({ lead_type: 'contact', visitor_id: value })).toBeUndefined();
+    }
+  );
+
+  it('never stores one for an open house kiosk sign-in (one tablet, many visitors)', () => {
+    expect(
+      leadVisitorId({
+        lead_type: 'open_house',
+        open_house_id: '44444444-4444-4444-8444-444444444444',
+        visitor_id: VISITOR,
+      })
+    ).toBeUndefined();
+    expect(leadVisitorId({ lead_type: 'open_house', visitor_id: VISITOR })).toBeUndefined();
+    expect(
+      leadVisitorId({ lead_type: 'buyer', open_house_id: '44444444-4444-4444-8444-444444444444', visitor_id: VISITOR })
+    ).toBeUndefined();
   });
 });
 

@@ -115,6 +115,32 @@ describe('submitLead', () => {
     }
   });
 
+  it("sends this browser's visitor id so the lead joins its listing views (US-531)", async () => {
+    const visitorId = '33333333-3333-4333-8333-333333333333';
+    window.localStorage.setItem('visitor_id', visitorId);
+    try {
+      await submitLead({ ...base, data: {} });
+      const [, options] = callEdgeFunctionMock.mock.calls[0];
+      expect(options.body.visitor_id).toBe(visitorId);
+    } finally {
+      window.localStorage.removeItem('visitor_id');
+    }
+  });
+
+  it('still submits when storage is unavailable, without a visitor id', async () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError');
+    });
+    try {
+      const result = await submitLead({ ...base, data: {} });
+      expect(result.success).toBe(true);
+      const [, options] = callEdgeFunctionMock.mock.calls[0];
+      expect(options.body.visitor_id).toBeUndefined();
+    } finally {
+      getItem.mockRestore();
+    }
+  });
+
   it('reports the failure instead of throwing when the function rejects', async () => {
     callEdgeFunctionMock.mockRejectedValue(new Error('Invalid lead type'));
     await expect(submitLead({ ...base, data: {} })).resolves.toEqual({
