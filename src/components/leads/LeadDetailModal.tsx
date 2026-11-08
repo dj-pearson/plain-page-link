@@ -82,6 +82,7 @@ import { describeLeadOrigin } from '@/lib/leadAttribution';
 import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButton';
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
 import { LeadListingCard } from '@/components/leads/LeadListingCard';
+import { LeadAssigneeControl } from '@/components/leads/LeadAssigneeControl';
 import { describeLeadAnswers } from '@/lib/leadFormSchema';
 import { isAgentAuthoredActivityType } from '@/lib/leadActivityTypes';
 
@@ -481,6 +482,9 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               </SelectContent>
             </Select>
           </div>
+
+          {/* Who holds the lead; the owner can hand it to a teammate (US-497). */}
+          <LeadAssigneeControl lead={lead} onAssigned={onLeadUpdated} />
 
           {/* AI Lead Score */}
           {leadScore && (
