@@ -1322,27 +1322,75 @@ check('subscription entitlement survives a scheduled cancellation', () => {
     q(`UPDATE public.user_subscriptions SET status = 'past_due', current_period_end = now() - interval '2 days' WHERE user_id = '${uid}';`);
     const [pastDue] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
     if (pastDue !== 'professional') {
-      out.push(`a payment that failed 2 days ago already reads as "${pastDue}"; there is no grace`);
+      out.push(`a payment that just failed already reads as "${pastDue}"; there is no grace`);
     }
 
-    // US-605: a failed renewal. Stripe has already rolled into the unpaid
-    // period, so current_period_start is when the paid period ended and
-    // current_period_end is weeks away. Grace runs from the start.
-    q(`UPDATE public.user_subscriptions SET current_period_start = now() - interval '2 days', current_period_end = now() + interval '28 days' WHERE user_id = '${uid}';`);
+    // US-605: the grace is anchored on past_due_since, which a trigger sets on
+    // entering past_due and keeps while the row stays there.
+    const [stamped] = q(
+      `SELECT (past_due_since IS NOT NULL AND past_due_since > now() - interval '1 minute')::text FROM public.user_subscriptions WHERE user_id = '${uid}';`
+    );
+    if (stamped !== 'true') {
+      out.push('entering past_due did not set user_subscriptions.past_due_since to now()');
+    }
+
+    // A failed renewal. Stripe has already rolled into the unpaid period, so
+    // current_period_end is weeks away; the grace must not follow it.
+    q(`UPDATE public.user_subscriptions SET past_due_since = now() - interval '2 days', current_period_start = now() - interval '2 days', current_period_end = now() + interval '28 days' WHERE user_id = '${uid}';`);
     const [renewalFailed] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
     if (renewalFailed !== 'professional') {
       out.push(`a renewal that failed 2 days ago already reads as "${renewalFailed}"; there is no grace`);
     }
-    q(`UPDATE public.user_subscriptions SET current_period_start = now() - interval '10 days', current_period_end = now() + interval '20 days' WHERE user_id = '${uid}';`);
+    q(`UPDATE public.user_subscriptions SET past_due_since = now() - interval '10 days', current_period_start = now() - interval '10 days', current_period_end = now() + interval '20 days' WHERE user_id = '${uid}';`);
     const [unpaidPeriod] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
     if (unpaidPeriod !== 'free') {
       out.push(
-        `a renewal that failed 10 days ago still reads as "${unpaidPeriod}"; past_due grace is counted from the end of the unpaid period, not the paid one`
+        `a renewal that failed 10 days ago still reads as "${unpaidPeriod}"; past_due grace is counted from the end of the unpaid period`
       );
     }
-    q(`UPDATE public.user_subscriptions SET current_period_start = NULL WHERE user_id = '${uid}';`);
 
-    q(`UPDATE public.user_subscriptions SET current_period_end = now() - interval '30 days' WHERE user_id = '${uid}';`);
+    // Stripe leaves it past_due and rolls into a second unpaid period: the
+    // stored current_period_start is now the end of an UNPAID period. The
+    // webhook's update does not touch past_due_since; the grace must not reopen.
+    q(`UPDATE public.user_subscriptions SET past_due_since = now() - interval '31 days', current_period_start = now() - interval '31 days', current_period_end = now() - interval '1 day' WHERE user_id = '${uid}';`);
+    q(`UPDATE public.user_subscriptions SET status = 'past_due', current_period_start = now() - interval '1 day', current_period_end = now() + interval '29 days' WHERE user_id = '${uid}';`);
+    const [rolledAgain] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
+    if (rolledAgain !== 'free') {
+      out.push(
+        `a subscription past_due for 31 days reads as "${rolledAgain}" after Stripe rolled it into another unpaid period; the grace reopens every period`
+      );
+    }
+    const [kept] = q(
+      `SELECT (past_due_since < now() - interval '30 days')::text FROM public.user_subscriptions WHERE user_id = '${uid}';`
+    );
+    if (kept !== 'true') {
+      out.push('a period roll while past_due moved past_due_since; it must keep the moment the row entered past_due');
+    }
+    q(`UPDATE public.user_subscriptions SET past_due_since = NULL WHERE user_id = '${uid}';`);
+    const [notCleared] = q(
+      `SELECT (past_due_since IS NOT NULL)::text FROM public.user_subscriptions WHERE user_id = '${uid}';`
+    );
+    if (notCleared !== 'true') {
+      out.push('a writer cleared past_due_since while the row stayed past_due, reopening the grace');
+    }
+
+    // Leaving past_due clears it; re-entering starts a new clock.
+    q(`UPDATE public.user_subscriptions SET status = 'active' WHERE user_id = '${uid}';`);
+    const [cleared] = q(
+      `SELECT (past_due_since IS NULL)::text FROM public.user_subscriptions WHERE user_id = '${uid}';`
+    );
+    if (cleared !== 'true') {
+      out.push('leaving past_due did not clear past_due_since');
+    }
+    q(`UPDATE public.user_subscriptions SET status = 'past_due', past_due_since = now() - interval '30 days' WHERE user_id = '${uid}';`);
+    const [restarted] = q(
+      `SELECT (past_due_since > now() - interval '1 minute')::text FROM public.user_subscriptions WHERE user_id = '${uid}';`
+    );
+    if (restarted !== 'true') {
+      out.push('entering past_due took the writer\'s past_due_since instead of now()');
+    }
+
+    q(`UPDATE public.user_subscriptions SET past_due_since = now() - interval '30 days', current_period_start = NULL, current_period_end = now() - interval '30 days' WHERE user_id = '${uid}';`);
     const [expired] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
     if (expired !== 'free') {
       out.push(`a subscription 30 days past due still reads as "${expired}"; the grace never ends`);

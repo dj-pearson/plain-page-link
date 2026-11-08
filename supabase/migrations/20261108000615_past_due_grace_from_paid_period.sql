@@ -1,25 +1,75 @@
--- US-615 (prd US-605): past-due grace runs from the end of the paid period.
+-- US-615 (prd US-605): past-due grace runs from when payment stopped, not
+-- from the end of the unpaid period.
 --
 -- 20260902000015 gave a past_due subscription its plan until
 -- current_period_end + 7 days, and said that was "seven days from the end of
 -- the paid period". It is not. When a renewal fails, Stripe has already moved
--- the subscription into the new period: current_period_start is the moment
--- the paid period ended and current_period_end is the end of the period that
--- has not been paid for. stripe-webhook stores both as Stripe reports them, so
--- the grace ran a whole billing period plus seven days -- about 37 days of paid
--- features without payment on a monthly plan, about a year on an annual one, if
--- the Stripe account leaves subscriptions past_due after its retries instead
--- of cancelling them.
+-- the subscription into the new period, so current_period_end is the end of
+-- the period that has not been paid for. The grace ran a whole billing period
+-- plus seven days, and for a Stripe account that leaves subscriptions past_due
+-- after its retries rather than cancelling them, it never ran out: every new
+-- period pushed current_period_end forward again.
 --
--- A past_due subscription is one whose renewal failed: create-checkout-session
--- changes plans with proration_behavior 'create_prorations', so a plan change
--- is billed on the next renewal invoice rather than mid-period, and a first
--- payment that fails leaves the subscription 'incomplete', not past_due. The
--- end of the last paid period is therefore current_period_start. A row with no
--- current_period_start recorded (older rows written before the webhook stored
--- it) falls back to current_period_end, the previous behaviour, rather than
--- losing the plan on a missing column.
+-- No Stripe period field answers "when did payment stop". current_period_start
+-- is the end of the paid period only after the FIRST failed renewal: a
+-- subscription left past_due keeps rolling into new periods (each one fires
+-- customer.subscription.updated, which stores the new start), so after the
+-- second unpaid renewal current_period_start is the end of an unpaid period
+-- and a start-anchored grace reopens for another seven days every period.
+-- Stripe's 'unpaid' is stored as past_due too (toStoredStatus) and rolls the
+-- same way.
 --
+-- So the row records the moment itself. user_subscriptions.past_due_since is
+-- set by trigger when status changes INTO past_due, kept while the row stays
+-- past_due however often the period rolls, and cleared when status leaves
+-- past_due. The webhook never writes it. resolve_user_plan anchors the grace on
+-- COALESCE(past_due_since, current_period_start, current_period_end); the
+-- fallbacks only matter for a row the trigger has not seen enter past_due.
+-- Existing past_due rows are backfilled from current_period_start, the best
+-- evidence available for them (exact unless their period has rolled more than
+-- once since the failure).
+
+ALTER TABLE public.user_subscriptions
+  ADD COLUMN IF NOT EXISTS past_due_since timestamptz;
+
+COMMENT ON COLUMN public.user_subscriptions.past_due_since IS
+  'US-605: when status last changed into past_due. Maintained by trigger (set on entering past_due, kept while it stays past_due, cleared on leaving); never written by the webhook. Anchors the past_due grace in resolve_user_plan.';
+
+CREATE OR REPLACE FUNCTION public.user_subscriptions_track_past_due()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp
+AS $function$
+BEGIN
+  IF NEW.status IS DISTINCT FROM 'past_due' THEN
+    NEW.past_due_since := NULL;
+  ELSIF TG_OP = 'INSERT' THEN
+    NEW.past_due_since := COALESCE(NEW.past_due_since, now());
+  ELSIF OLD.status IS DISTINCT FROM 'past_due' THEN
+    -- Entering past_due: the clock starts now, whatever the writer sent.
+    NEW.past_due_since := now();
+  ELSE
+    -- Staying past_due (a period roll, a retried invoice): keep the moment it
+    -- entered. A writer may move it explicitly but not clear it.
+    NEW.past_due_since := COALESCE(NEW.past_due_since, OLD.past_due_since, now());
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.user_subscriptions_track_past_due() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS user_subscriptions_track_past_due ON public.user_subscriptions;
+CREATE TRIGGER user_subscriptions_track_past_due
+  BEFORE INSERT OR UPDATE ON public.user_subscriptions
+  FOR EACH ROW EXECUTE FUNCTION public.user_subscriptions_track_past_due();
+
+-- Backfill rows already past_due. The UPDATE stays past_due, so the trigger
+-- keeps the value written here.
+UPDATE public.user_subscriptions
+   SET past_due_since = COALESCE(current_period_start, current_period_end, now())
+ WHERE status = 'past_due' AND past_due_since IS NULL;
+
 -- Body otherwise unchanged from 20260902000015. 20261028000003 renamed it to
 -- resolve_user_plan behind the caller-checked get_user_plan wrapper; grants
 -- are restated so the file stands on its own.
@@ -62,12 +112,12 @@ BEGIN
       )
 
       -- A failed renewal is a dunning problem, not an immediate downgrade:
-      -- seven days from the end of the last PAID period, which Stripe reports
-      -- as current_period_start once it has rolled into the unpaid one.
+      -- seven days from when the row went past_due. Not from a Stripe period
+      -- field: those keep rolling while the subscription stays past_due.
       OR (
         us.status = 'past_due'
-        AND COALESCE(us.current_period_start, us.current_period_end) IS NOT NULL
-        AND COALESCE(us.current_period_start, us.current_period_end) > now() - interval '7 days'
+        AND COALESCE(us.past_due_since, us.current_period_start, us.current_period_end) IS NOT NULL
+        AND COALESCE(us.past_due_since, us.current_period_start, us.current_period_end) > now() - interval '7 days'
       )
     )
   -- With more than one qualifying row, the one that runs longest wins rather
@@ -119,4 +169,4 @@ REVOKE EXECUTE ON FUNCTION public.resolve_user_plan(uuid) FROM PUBLIC, anon, aut
 GRANT EXECUTE ON FUNCTION public.resolve_user_plan(uuid) TO service_role;
 
 COMMENT ON FUNCTION public.resolve_user_plan(uuid) IS
-  'US-235/US-605: the plan an agent''s subscription entitles them to, for any id. A cancelled subscription keeps its plan until current_period_end; past_due keeps it for 7 days after the paid period ended (current_period_start). Not executable by the browser; get_user_plan is the checked entry point.';
+  'US-235/US-605: the plan an agent''s subscription entitles them to, for any id. A cancelled subscription keeps its plan until current_period_end; past_due keeps it for 7 days after the row went past_due (past_due_since, set by trigger). Not executable by the browser; get_user_plan is the checked entry point.';

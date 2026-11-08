@@ -22,10 +22,12 @@
  */
 
 /**
- * Days past the end of the last paid period that a past_due subscription
- * keeps its plan. When a renewal fails Stripe has already rolled into the
- * unpaid period, so that moment is current_period_start, not
- * current_period_end (US-605).
+ * Days after a subscription went past_due that it keeps its plan. Counted from
+ * user_subscriptions.past_due_since, which a trigger sets when the status
+ * changes into past_due and keeps while it stays there (US-605). Not from a
+ * Stripe period field: Stripe rolls a past_due subscription into new periods
+ * for as long as it is left past_due, so current_period_end runs ahead of the
+ * failure and, after the second unpaid renewal, so does current_period_start.
  */
 export const PAST_DUE_GRACE_DAYS = 7;
 
@@ -38,6 +40,7 @@ export interface StripeSubscriptionLike {
 /** The subset of a stored user_subscriptions row these decisions read. */
 export interface StoredSubscription {
   status: string | null;
+  past_due_since?: string | null;
   current_period_start?: string | null;
   current_period_end?: string | null;
 }
@@ -64,28 +67,30 @@ export function isEntitled(subscription: StoredSubscription, now: Date = new Dat
 
   if (status === 'active' || status === 'trialing') return true;
 
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end)
-    : null;
-  if (!periodEnd || Number.isNaN(periodEnd.getTime())) return false;
+  const periodEnd = parseDate(subscription.current_period_end);
 
   // Cancelled, but paid through the end of the period.
   if (status === 'canceled' || status === 'cancelled') {
-    return periodEnd.getTime() > now.getTime();
+    return periodEnd !== null && periodEnd.getTime() > now.getTime();
   }
 
   // A failed renewal is a dunning problem, not an immediate downgrade. The
-  // grace runs from the end of the paid period (current_period_start once
-  // Stripe has rolled into the unpaid one); a row without it falls back to
-  // current_period_end, as get_user_plan does.
+  // grace runs from when the row went past_due; a row without past_due_since
+  // falls back to current_period_start, then current_period_end, as
+  // get_user_plan does.
   if (status === 'past_due') {
-    const start = subscription.current_period_start
-      ? new Date(subscription.current_period_start)
-      : null;
-    const anchor = start && !Number.isNaN(start.getTime()) ? start : periodEnd;
+    const anchor =
+      parseDate(subscription.past_due_since) ?? parseDate(subscription.current_period_start) ?? periodEnd;
+    if (!anchor) return false;
     const graceEnds = anchor.getTime() + PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000;
     return graceEnds > now.getTime();
   }
 
   return false;
+}
+
+function parseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }

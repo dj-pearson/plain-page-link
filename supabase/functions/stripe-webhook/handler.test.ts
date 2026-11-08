@@ -229,9 +229,10 @@ describe('subscription and invoice events', () => {
     expect(d.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'agent@example.test' }));
   });
 
-  // US-605: get_user_plan anchors past_due grace on current_period_start, the
-  // end of the paid period once Stripe has rolled into the unpaid one, so the
-  // webhook must store Stripe's advanced period start for a past_due row.
+  // US-605: the webhook stores Stripe's advanced period as reported and never
+  // writes past_due_since; a trigger sets that when the status enters
+  // past_due, and get_user_plan anchors the grace on it (period fields are
+  // only the fallback for rows the trigger has not seen).
   it('invoice.payment_failed stores the advanced period, whose start is the end of the paid one', async () => {
     const { db, calls } = fakeDb();
     const paidPeriodEnd = 1_702_600_000;
@@ -240,11 +241,13 @@ describe('subscription and invoice events', () => {
       event('invoice.payment_failed', { id: 'in_2', subscription: 'sub_1', amount_due: 4900 }),
       { ...d, db: db as never, retrieveSubscription: vi.fn(async () => advanced as never) }
     );
-    expect(calls.find((c) => c.table === 'user_subscriptions' && c.op === 'update')?.payload).toMatchObject({
+    const payload = calls.find((c) => c.table === 'user_subscriptions' && c.op === 'update')?.payload;
+    expect(payload).toMatchObject({
       status: 'past_due',
       current_period_start: new Date(paidPeriodEnd * 1000).toISOString(),
       current_period_end: new Date((paidPeriodEnd + 30 * 86_400) * 1000).toISOString(),
     });
+    expect(payload).not.toHaveProperty('past_due_since');
   });
 
   it('invoice.payment_failed: a failed notification does not fail the event', async () => {
