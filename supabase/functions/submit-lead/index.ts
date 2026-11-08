@@ -7,6 +7,7 @@ import { encryptSecret } from '../_shared/encryption.ts'
 import { readSpamSignals, botReason, leadLookupHashes } from '../_shared/spam-guard.ts'
 import {
   buildEnrichment,
+  enrichmentUpdate,
   generateEnrichToken,
   hashEnrichToken,
   ENRICH_TOKEN_RE,
@@ -165,7 +166,7 @@ serve(async (req) => {
 
       const { data: target, error: targetError } = await supabase
         .from('leads')
-        .select('id, form_data')
+        .select('id, message, form_data')
         .eq('id', rawData.lead_id)
         .eq('update_token_hash', await hashEnrichToken(token))
         .gt('update_token_expires_at', new Date().toISOString())
@@ -176,8 +177,8 @@ serve(async (req) => {
       const { error: enrichError } = await supabase
         .from('leads')
         .update({
-          ...enrichment.columns,
-          form_data: { ...(target.form_data ?? {}), ...enrichment.formData },
+          // US-565: a step-two message is appended, never written over step one's.
+          ...enrichmentUpdate(target, enrichment),
           update_token_hash: null,
           update_token_expires_at: null,
           updated_at: new Date().toISOString(),
