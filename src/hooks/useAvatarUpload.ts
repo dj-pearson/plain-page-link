@@ -1,4 +1,5 @@
 import { useProfileImageUpload } from '@/hooks/useProfileImageUpload';
+import { AVATAR_SHRINK } from '@/lib/shrinkProfileImage';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB, the avatars bucket limit
 const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -18,6 +19,8 @@ export function useAvatarUpload() {
     label: 'profile picture',
     // The installed agent page's home-screen icon (US-481).
     appIcons: true,
+    // Stored downscaled: the public page draws it small (US-591).
+    shrink: AVATAR_SHRINK,
   });
 
   return { uploadAvatar: upload, uploading, acceptedTypes, maxSize };

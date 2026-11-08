@@ -1,4 +1,5 @@
 import { useProfileImageUpload } from '@/hooks/useProfileImageUpload';
+import { LOGO_SHRINK } from '@/lib/shrinkProfileImage';
 
 // The brokerage-logos bucket allows 2MB and no SVG (20260808000005, US-076):
 // the bucket is public, and an SVG served from our storage origin can run script.
@@ -18,6 +19,8 @@ export function useBrokerageLogoUpload() {
     accept: ACCEPTED_FILE_TYPES,
     maxBytes: MAX_FILE_SIZE,
     label: 'brokerage logo',
+    // Stored downscaled: the public page draws it small (US-591).
+    shrink: LOGO_SHRINK,
   });
 
   return { uploadLogo: upload, uploading, acceptedTypes, maxSize };

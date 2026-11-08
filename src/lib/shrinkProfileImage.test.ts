@@ -1,0 +1,156 @@
+/**
+ * US-591: avatars and brokerage logos are downscaled in the browser before
+ * they are stored, because the public profile is otherwise served the
+ * uploaded original (often several MB) for a 128px box.
+ */
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  AVATAR_SHRINK,
+  LOGO_SHRINK,
+  candidateTypes,
+  renameForType,
+  scaledSize,
+  shouldReplace,
+  shrinkProfileImage,
+} from './shrinkProfileImage';
+
+describe('scaledSize', () => {
+  it('fits the longest side to maxSide, keeping the aspect ratio', () => {
+    expect(scaledSize(4000, 3000, 800)).toEqual({ width: 800, height: 600 });
+    expect(scaledSize(3000, 4000, 800)).toEqual({ width: 600, height: 800 });
+  });
+
+  it('never upscales', () => {
+    expect(scaledSize(300, 200, 800)).toEqual({ width: 300, height: 200 });
+    expect(scaledSize(800, 800, 800)).toEqual({ width: 800, height: 800 });
+  });
+
+  it('keeps an extreme logo at least 1px tall', () => {
+    expect(scaledSize(10000, 5, 400)).toEqual({ width: 400, height: 1 });
+  });
+});
+
+describe('candidateTypes', () => {
+  it('lets a photo fall back to JPEG but keeps a logo transparent', () => {
+    expect(candidateTypes(true)).toEqual(['image/webp', 'image/jpeg']);
+    expect(candidateTypes(false)).toEqual(['image/webp']);
+    expect(AVATAR_SHRINK.opaque).toBe(true);
+    expect(LOGO_SHRINK.opaque).toBe(false);
+  });
+});
+
+describe('shouldReplace', () => {
+  const original = new Blob([new Uint8Array(1000)], { type: 'image/jpeg' });
+
+  it('takes a smaller blob of the requested type', () => {
+    const webp = new Blob([new Uint8Array(100)], { type: 'image/webp' });
+    expect(shouldReplace(original, webp, 'image/webp')).toBe(true);
+  });
+
+  it('refuses the PNG toBlob silently falls back to for an unsupported type', () => {
+    const png = new Blob([new Uint8Array(100)], { type: 'image/png' });
+    expect(shouldReplace(original, png, 'image/webp')).toBe(false);
+  });
+
+  it('keeps the original when the re-encode is not smaller', () => {
+    const big = new Blob([new Uint8Array(2000)], { type: 'image/webp' });
+    expect(shouldReplace(original, big, 'image/webp')).toBe(false);
+  });
+});
+
+describe('renameForType', () => {
+  it('swaps the extension to match the stored type', () => {
+    expect(renameForType('me.jpeg', 'image/webp')).toBe('me.webp');
+    expect(renameForType('logo.png', 'image/jpeg')).toBe('logo.jpg');
+    expect(renameForType('noext', 'image/webp')).toBe('noext.webp');
+  });
+});
+
+describe('shrinkProfileImage', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const bigPhoto = () => new File([new Uint8Array(50_000)], 'me.jpg', { type: 'image/jpeg' });
+
+  /** A canvas whose toBlob answers with `answer(type)`. */
+  function stubCanvas(answer: (type: string) => Blob | null) {
+    const drawImage = vi.fn();
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ({ fillRect: vi.fn(), drawImage }),
+      toBlob: (cb: (b: Blob | null) => void, type: string) => cb(answer(type)),
+    };
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation(((tag: string) =>
+      tag === 'canvas' ? canvas : realCreate(tag)) as typeof document.createElement);
+    return { canvas, drawImage };
+  }
+
+  function stubBitmap(width: number, height: number) {
+    const close = vi.fn();
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ width, height, close }))
+    );
+    return close;
+  }
+
+  it('returns the original where the browser cannot draw images', async () => {
+    vi.stubGlobal('createImageBitmap', undefined);
+    const file = bigPhoto();
+    expect(await shrinkProfileImage(file, AVATAR_SHRINK)).toBe(file);
+  });
+
+  it('stores a downscaled WebP named to match', async () => {
+    const close = stubBitmap(4000, 3000);
+    const { canvas, drawImage } = stubCanvas((type) => new Blob([new Uint8Array(4_000)], { type }));
+
+    const out = await shrinkProfileImage(bigPhoto(), AVATAR_SHRINK);
+
+    expect(out.type).toBe('image/webp');
+    expect(out.name).toBe('me.webp');
+    expect(out.size).toBe(4_000);
+    expect([canvas.width, canvas.height]).toEqual([800, 600]);
+    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 800, 600);
+    expect(close).toHaveBeenCalled();
+  });
+
+  it('falls back to JPEG for a photo where WebP cannot be encoded', async () => {
+    stubBitmap(4000, 3000);
+    stubCanvas((type) =>
+      type === 'image/webp'
+        ? new Blob([new Uint8Array(9_000)], { type: 'image/png' })
+        : new Blob([new Uint8Array(5_000)], { type })
+    );
+
+    const out = await shrinkProfileImage(bigPhoto(), AVATAR_SHRINK);
+    expect(out.type).toBe('image/jpeg');
+    expect(out.name).toBe('me.jpg');
+  });
+
+  it('keeps a logo as uploaded rather than flatten its transparency to JPEG', async () => {
+    stubBitmap(2000, 500);
+    stubCanvas((type) =>
+      type === 'image/webp'
+        ? new Blob([new Uint8Array(9_000)], { type: 'image/png' })
+        : new Blob([new Uint8Array(100)], { type })
+    );
+    const logo = new File([new Uint8Array(50_000)], 'logo.png', { type: 'image/png' });
+
+    expect(await shrinkProfileImage(logo, LOGO_SHRINK)).toBe(logo);
+  });
+
+  it('returns the original when decoding fails', async () => {
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => {
+        throw new Error('decode failed');
+      })
+    );
+    const file = bigPhoto();
+    expect(await shrinkProfileImage(file, AVATAR_SHRINK)).toBe(file);
+  });
+});
