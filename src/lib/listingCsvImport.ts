@@ -103,7 +103,7 @@ export function normalizeCsvHeader(header: string): string {
 
 /**
  * RFC 4180 records: quoted fields may hold commas, doubled quotes and line
- * breaks. A leading byte-order mark is dropped, and a record whose every field
+ * breaks. A quote inside an unquoted field is kept as a literal character. A leading byte-order mark is dropped, and a record whose every field
  * is blank (a trailing newline, a spacer row) is skipped.
  */
 export function parseCsvRecords(text: string): string[][] {
@@ -133,7 +133,10 @@ export function parseCsvRecords(text: string): string[][] {
       } else {
         field += char;
       }
-    } else if (char === '"') {
+    } else if (char === '"' && field === '') {
+      // Only a quote that opens the field starts quote mode. A stray one
+      // inside an unquoted field (12" tiles) is a literal; treating it as an
+      // opener would swallow every following row into this field.
       inQuotes = true;
     } else if (char === ',') {
       record.push(field);

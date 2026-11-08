@@ -38,6 +38,18 @@ describe('parseCsvRecords', () => {
     ]);
   });
 
+  it('keeps a stray quote inside an unquoted field literal and does not swallow later rows', () => {
+    const text =
+      'address,city,state,price,description\n' +
+      '1 Oak,Spr,IL,100,Has 12" tiles\n' +
+      '2 Elm,Spr,IL,200,ok\n' +
+      '3 Ash,Spr,IL,300,ok\n';
+    const rows = parseListingCsv(text);
+    expect(rows).toHaveLength(3);
+    expect(rows[0].description).toBe('Has 12" tiles');
+    expect(rows.map((r) => r.address)).toEqual(['1 Oak', '2 Elm', '3 Ash']);
+  });
+
   it('drops the byte-order mark Excel writes before the first header', () => {
     const rows = parseListingCsv('\uFEFFaddress,city,state,price\n1 Oak St,Springfield,IL,1');
     expect(rows[0].address).toBe('1 Oak St');
