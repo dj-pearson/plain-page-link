@@ -4369,7 +4369,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "This touches the leads lane (submit-lead, the lead detail); coordinate with that lane. (follow-up slice from US-263)"
+      "notes": "This touches the leads lane (submit-lead, the lead detail); coordinate with that lane. (follow-up slice from US-263) Slice 1 (visitor_id on leads + viewed listings on lead detail) done in round 13 as US-531."
     },
     {
       "id": "US-277",
@@ -4684,8 +4684,8 @@
         "planLimits tests are updated"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-270)"
+      "passes": true,
+      "notes": " (follow-up slice from US-270) DONE in round 13 as US-538."
     },
     {
       "id": "US-298",
@@ -6231,8 +6231,8 @@
         "Runs in CI without needing a login"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-395)"
+      "passes": true,
+      "notes": " (follow-up from US-395) DONE in round 13 as US-535."
     },
     {
       "id": "US-396",
@@ -6951,8 +6951,8 @@
         "No server-side job computes an agent's 'today' in UTC when a zone is stored"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-433)"
+      "passes": true,
+      "notes": " (follow-up from US-433) DONE in round 13 as US-537."
     },
     {
       "id": "US-434",
@@ -7393,8 +7393,8 @@
       "description": "Humans get the swap from React. Browsers that read the manifest before the bundle runs, and the crawler HTML from functions/_lib/profile-route.ts injectSocialTags, still carry index.html's /manifest.json. Rewrite the manifest link in injectSocialTags for profile responses.",
       "acceptanceCriteria": ["The crawler HTML for /:username links /:username/manifest.json"],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-460)"
+      "passes": true,
+      "notes": " (follow-up from US-460) DONE in round 13 as US-540."
     },
     {
       "id": "US-472",
@@ -8052,8 +8052,8 @@
         "A test covers a phone-only double submit"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-513)"
+      "passes": true,
+      "notes": " (follow-up from US-513) DONE in round 13 as US-532."
     },
     {
       "id": "US-514",
@@ -8100,8 +8100,8 @@
         "The preview cannot restyle the dashboard"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-514)"
+      "passes": true,
+      "notes": " (follow-up from US-514) DONE in round 13 as US-533."
     },
     {
       "id": "US-525",
@@ -8142,8 +8142,8 @@
         "With an assignee filter applied, the chip counts either match the filtered list or are clearly labelled as all leads"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-515)"
+      "passes": true,
+      "notes": " (follow-up from US-515) DONE in round 13 as US-534."
     },
     {
       "id": "US-516",
@@ -8265,8 +8265,8 @@
         "All interpolated text is escaped; tests cover markup in bio/address"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Reads extra columns over anon REST; stay within the anon column grants on profiles and listings. (follow-up from US-520)"
+      "passes": true,
+      "notes": "Reads extra columns over anon REST; stay within the anon column grants on profiles and listings. (follow-up from US-520) DONE in round 13 as US-539."
     },
     {
       "id": "US-530",
@@ -8297,6 +8297,347 @@
       "priority": 2,
       "passes": true,
       "notes": "I picked US-492 over US-471 and US-511. It has the most real user impact: every agent who uploaded a photo before US-481 still gets the logo on their installed page. US-471 only changes HTML served to crawlers (profile-route.ts returns next() for humans before the crawler check, and ProfileRoute already swaps the manifest link for humans). US-511 is a cleanup of dead code. I implemented US-492 in the browser, as prd.json describes, rather than as a server-side script, so nothing needed a dry run.\n\nFiles:\n- New: /home/user/plain-page-link/.claude/worktrees/wf_d37d93cf-675-10/src/lib/backfillAvatarAppIcons.ts. backfillAvatarAppIcons(userId, avatarUrl, deps) validates the URL with avatarAppIconUrls(avatarUrl, storageBase): our origin, the avatars bucket, and not an icon itself. It also requires the folder to equal userId. It sends a HEAD with cache no-store for the 512 icon; checking 512 alone is enough because storeAvatarAppIcons uploads 192 first and 512 second. A 404, or the 400 not_found that older storage-api versions return, counts as missing. Anything else (5xx, 401/403, network error) returns 'failed' and does no work. On missing, it downloads the photo and calls the store function. A module-level Set limits it to one attempt per photo per page load.\n- New: /home/user/plain-page-link/.claude/worktrees/wf_d37d93cf-675-10/src/hooks/useAvatarAppIconBackfill.ts. Runs the backfill 4s after mount, using supabaseConfig.url and storeAvatarAppIcons('avatars', ...).\n- Changed: /home/user/plain-page-link/.claude/worktrees/wf_d37d93cf-675-10/src/components/layout/DashboardLayout.tsx. Calls useAvatarAppIconBackfill(profile?.id, profile?.avatar_url), reading the profile from useAuthStore.\n- New tests: /home/user/plain-page-link/.claude/worktrees/wf_d37d93cf-675-10/src/lib/backfillAvatarAppIcons.test.ts, 8 cases: stores on 404, stores on legacy 400, present means no work, no user or photo means no work, foreign origin / other bucket / other folder / icon URL / Google photo are refused, 500/403/network fail without storing, unreadable photo or empty store result fails, and the once-per-load memo (with a retry after reset).\n\nNot tested in a real browser here: whether self-hosted storage CORS allows the GET of the photo (prd.json says it does). Storage answers HEAD on public objects with 200 per the owner decision of 2026-11-08.\n\nVERIFIED: npx tsc --noEmit: passes, no output.\nnpx vitest run src/lib/backfillAvatarAppIcons.test.ts src/lib/avatarAppIcon.test.ts functions/_tests/profile-manifest.test.ts: 3 files, 30 tests passed.\nnpx eslint on the 4 changed files: no warnings or errors.\nFull npx vitest run: 284 files passed; 2694 tests passed, 1 skipped. A React stack trace appears in the output, but every test passed. I did not trace which test prints it; round 11 recorded a known unhandled error from LazyModal.test.tsx.\nThe lint-staged pre-commit hook (eslint --fix, prettier) ran clean.\nNo migration, so verify:migrations does not apply.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-531",
+      "lane": "listings",
+      "round": 13,
+      "title": "A lead now shows the listings the visitor opened before getting in touch",
+      "description": "US-276 slice 1 (as US-531). Since US-263 the public page has logged a listing_view in analytics_events, keyed by the browser's client-generated visitor_id. But leads never carried that id, so the two could not be joined. Every day without it lost data for good. This change stores the id on new leads and shows \"Viewed N listings before contacting you\" on the lead detail, with the addresses and how long ago each was viewed.",
+      "acceptanceCriteria": [
+        "leads.visitor_id (uuid, nullable) exists and submit-lead stores it on new leads",
+        "A non-uuid visitor_id is dropped, not refused (the lead is still stored)",
+        "No visitor_id is stored for an open house kiosk sign-in (open_house_id set or lead_type open_house)",
+        "leadSubmission.submitLead and ContactBlock send getVisitorId(); the open house kiosk does not",
+        "LEAD_COLUMNS and the column grant include visitor_id; leadColumns.test holds them together",
+        "The lead detail shows 'Viewed N listings before contacting you' listing up to 5 addresses plus 'and N more', only counting views up to lead.created_at; it renders nothing without a visitor id, while loading, or on error"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Migration supabase/migrations/20261108000531_leads_visitor_id.sql:\n- adds leads.visitor_id uuid, with a column comment\n- adds a partial index idx_leads_user_visitor\n- adds a partial index on analytics_events (user_id, visitor_id, occurred_at DESC) WHERE event_type='listing_view', for the join\n- restates the browser column grant (20261108000452's list plus visitor_id; authenticated only, as before)\n\ntypes.ts: leads Row/Insert/Update gain visitor_id.\n\nsrc/lib/leadColumns.ts: LEAD_COLUMNS and LEAD_COLUMN_SET gain visitor_id.\n\nServer (submit-lead change kept to 3 lines for the leads lane):\n- supabase/functions/_shared/validation.ts: new leadVisitorId(). It returns a lowercased uuid, or undefined for a kiosk sign-in or a malformed value.\n- supabase/functions/submit-lead/index.ts: the import, the LeadData field, and one line in the sanitised leadData object (visitor_id: leadVisitorId(rawData)). The value reaches the insert through storedLead. The repeat-enquiry merge path is untouched.\n\nClient:\n- src/lib/leadSubmission.ts sends visitor_id: getVisitorId() ?? undefined.\n- src/components/pageBuilder/blocks/ContactBlock.tsx does the same.\n- useOpenHouses is deliberately unchanged, and the server also refuses a visitor id for kiosk sign-ins.\n\nLead detail:\n- src/lib/leadViewedListings.ts (pure): toViewedListings() dedupes per listing, puts the most recent first, drops views after created_at and skips malformed rows. viewedListingsHeadline() writes the line.\n- src/hooks/useLeadViewedListings.ts: queries analytics_events (target_id, target_label, occurred_at) filtered by user_id, visitor_id, event_type='listing_view' and occurred_at <= created_at, with limit 200. RLS 'Agents read their own interactions' already limits this to the owner and the plan's history window.\n- src/components/leads/LeadViewedListings.tsx is rendered in LeadDetailModal.tsx just after the 'Asked about' block. The heading matches the modal's existing h3 style. A caveat line says views on another device are not counted.\n\nsrc/test/fixtures/lead.ts gains visitor_id: null.\n\nlint-staged (eslint --fix and prettier) reformatted the new files at commit time.\n\nVERIFIED: - npx tsc --noEmit: exit 0, after adding visitor_id to src/test/fixtures/lead.ts.\n- npx vitest run on src/lib/leadViewedListings.test.ts, src/components/leads/ (includes the new LeadViewedListings.test.tsx and the LeadDetailModal suites), src/lib/leadSubmission.test.ts, supabase/functions/_shared/validation.test.ts and src/lib/leadColumns.test.ts: 9 files, 96 tests passed.\n- npm run verify:migrations: OK, 84 migration files structurally valid.\n- npx eslint on the changed files: 0 errors. The only warnings are 3 no-useless-escape at ContactBlock.tsx:67, which were already there before this change, plus 'file ignored' notices for supabase/functions files. No new warnings.\n- Full npx vitest run: 294 files passed; 2813 tests passed, 1 skipped.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261108000531_leads_visitor_id.sql (adds leads.visitor_id, two partial indexes, restates the leads column grant) | Redeploy the submit-lead edge function (functions.agentbio.net / Coolify build) so visitor_id is stored | Deploy the frontend so the forms send visitor_id and the lead detail shows viewed listings"
+    },
+    {
+      "id": "US-541",
+      "lane": "listings",
+      "round": 13,
+      "title": "US-276 slice 2: lead scoring uses the measured listing views",
+      "description": "lead-scoring's getEngagementScore listingViews / hasViewedMultipleListings (src/lib/lead-scoring.ts:134-145) are still never passed. Feed the count from useLeadViewedListings, or better a SECURITY DEFINER-free SQL count in the scoring path, into the score shown on the lead.",
+      "acceptanceCriteria": [
+        "Score for a lead whose visitor opened 3+ listings includes the listing-view points",
+        "Tests cover 0, 1, 3, 5 views"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Find where LeadScoringEngine/ml-lead-scoring is invoked for a lead and pass listingViews; keep it zero when visitor_id is null. (follow-up from US-531)"
+    },
+    {
+      "id": "US-542",
+      "lane": "listings",
+      "round": 13,
+      "title": "US-276 slice 3: viewed-listing rows link to the listing and show later browsing",
+      "description": "Rows in LeadViewedListings link to the listing (dashboard edit or the public /:username/listing/:id page), and a second line shows listings the lead opened after contacting (still browsing).",
+      "acceptanceCriteria": [
+        "Each row links to its listing when it still exists",
+        "Views after created_at are shown separately"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-531)"
+    },
+    {
+      "id": "US-543",
+      "lane": "listings",
+      "round": 13,
+      "title": "Fill visitor_id on a repeat enquiry folded into an earlier lead",
+      "description": "submit-lead's repeat-enquiry merge (US-220/US-513) does not set visitor_id on the earlier lead when that lead has none. Left out to avoid colliding with the leads lane this round.",
+      "acceptanceCriteria": [
+        "A folded repeat enquiry sets visitor_id on the earlier lead only when it was NULL"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Belongs in mergeRepeatEnquiry (supabase/functions/_shared/lead-repeat.ts). (follow-up from US-531)"
+    },
+    {
+      "id": "US-532",
+      "lane": "leads",
+      "round": 13,
+      "title": "Phone-only repeat enquiries are folded like email ones (US-522)",
+      "description": "A visitor who left only a phone number and submitted twice became two leads. That meant two notifications and two units of the agent's leads_per_month, because the 24h repeat fold matched on email_hash only. submit-lead now stores a keyed phone_hash and, when the enquiry has no email, folds on it.",
+      "acceptanceCriteria": [
+        "A migration adds leads.phone_hash and follows the column grant and revoke rules for leads. It is not in the authenticated column grant, and it explicitly REVOKEs SELECT (phone_hash) from PUBLIC, anon and authenticated.",
+        "submit-lead folds by email_hash, or by phone_hash when there is no email.",
+        "A test covers a phone-only double submit, with the number typed two ways."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The bug was in supabase/functions/submit-lead/index.ts:255-262 (before the change): emailHash was null for a phone-only lead, so the fold lookup was skipped.\n\nChanges:\n- supabase/migrations/20261108000532_leads_phone_lookup_hash.sql: ADD COLUMN phone_hash text, REVOKE SELECT (phone_hash) FROM PUBLIC, anon, authenticated, a partial index on (user_id, phone_hash, created_at DESC), and a column comment. No backfill, because the key is not in the database.\n- supabase/functions/_shared/spam-guard.ts: added normalisePhoneForLookup. It returns E.164 digits: a leading + is kept as dialled, 00 is read as an international prefix, a 10-digit number gets a 1 in front (North American), and anything under 7 or over 15 digits returns null.\n- spam-guard.ts also gains phoneLookupHash, an HMAC keyed under its own label 'lead-phone-lookup:v1:' so it can never be compared with the email hash, and leadLookupHashes, which returns {email_hash, phone_hash, fold}. The fold key is the email when one is given, otherwise the phone. emailLookupHash produces exactly the same output as before: same key label, same input.\n- submit-lead/index.ts:254-264,326-327 uses leadLookupHashes, runs the fold query on lookup.fold.column, and inserts both hashes.\n- src/integrations/supabase/types.ts gains phone_hash on leads Row, Insert and Update.\n- src/types/lead.ts: LeadReadRow omits phone_hash, so LEAD_COLUMN_SET and LEAD_COLUMNS stay in step with the grant.\n- src/test/fixtures/lead.ts: mockLeadRow gets phone_hash: null.\n- Tests: spam-guard.test.ts adds 9 tests (normalisation, hash stability and key dependence, phone-only double submit, email wins when given, a later phone-only enquiry finding a lead that gave email and phone, and no key). leadColumns.test.ts asserts phone_hash is neither selected nor granted.\n\nDesign choice: an enquiry that gives an email is never folded by phone, so two people at one household number writing from their own addresses stay separate leads. A later phone-only enquiry does fold into an earlier lead that carried that phone, even if that lead also had an email.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx vitest run on spam-guard.test.ts, leadColumns.test.ts and lead-repeat.test.ts: 3 files, 29 tests passed.\nnpm run verify:migrations: \"[migrations] OK — 84 migration files structurally valid.\"\nnpx eslint on the changed src files: 0 problems. The supabase/functions files are outside eslint's scope (it reports \"File ignored because of a matching ignore pattern\"), so no new warnings.\nFull npx vitest run: 292 files passed; 2802 tests passed, 1 skipped.\nThe pre-commit hook (lint-staged eslint --fix plus prettier) passed.\nverify:schema needs Postgres, which is not available here; CI will run it.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration 20261108000532_leads_phone_lookup_hash.sql BEFORE redeploying submit-lead. The new function inserts phone_hash, so if it is deployed first, every lead insert fails because the column does not exist. | Then redeploy the submit-lead edge function: the functions.agentbio.net Coolify app, which serves supabase/functions/ through edge-functions-server.ts. No new secrets; it uses the existing PII_ENCRYPTION_KEY."
+    },
+    {
+      "id": "US-533",
+      "lane": "profile",
+      "round": 13,
+      "title": "Agents writing custom CSS could not see what it does until they saved and opened their public page (US-524)",
+      "description": "The Theme page's Live Preview now shows the agent's custom CSS draft as they type. It uses the sanitised output, and renders it against a sample of the public page inside the same ProfileCustomCssScope the public page uses (the scope class plus the contain: paint boundary), so it cannot restyle the dashboard.",
+      "acceptanceCriteria": [
+        "Typing CSS updates the preview live, using the sanitised output (CustomCssEditor -> onPreviewCssChange -> ThemeLivePreview)",
+        "The preview cannot restyle the dashboard: every rule is scoped to .ab-custom-css and sits inside the paint-contained boundary (tested with getComputedStyle on an outside h1 and on body)",
+        "Plans without customThemes preview no custom CSS, which matches the public page",
+        "Agent rules win in the preview as they do on /:username: theme colours and fonts are custom properties read through classes, not inline styles"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Story chosen: US-524, the open profile-lane slice with the most user impact. Before this change an agent's CSS was invisible until they saved it and visited their public page. CustomCssEditor at HEAD only listed what was removed.\n\nChanges:\n- New file /home/user/plain-page-link/.claude/worktrees/wf_574d33f6-99c-3/src/components/theme/ThemeLivePreview.tsx. The Live Preview markup moved here out of Theme.tsx (the old inline preview was about 120 lines, roughly lines 528-640).\n  - It wraps the sample in ProfileCustomCssScope (src/components/profile/ProfileCustomCssScope.tsx), so the preview gets the same scope class and the same `contain: paint` boundary as FullProfilePage.tsx:436.\n  - The sample now uses the public page's elements: an h1 for the name (as ProfileHeader.tsx:116 does), h2 section headings, an `a`, and buttons. So `h1 {}` in the editor does in the preview what it does on the real page.\n  - Colours and fonts are now `--preview-*` custom properties read through Tailwind arbitrary classes. Before, they were inline styles, and inline styles would have beaten the agent's rules in the preview even though those rules win on the real page.\n  - The sample is aria-hidden and its buttons have tabIndex=-1. Before, it had three focusable buttons that did nothing.\n  - The gray gradient backdrop is now bg-muted, per the craft floor.\n- /home/user/plain-page-link/.claude/worktrees/wf_574d33f6-99c-3/src/components/theme/CustomCssEditor.tsx: new optional prop `onPreviewCssChange`. An effect sends it the sanitised draft (`entitled ? result.css : ''`). The help text now points at the Live Preview.\n- /home/user/plain-page-link/.claude/worktrees/wf_574d33f6-99c-3/src/pages/dashboard/Theme.tsx: holds `previewCss` state and renders `<ThemeLivePreview>`. The card description and the info line now mention custom CSS. The emoji were dropped from the info line.\n- Tests:\n  - New ThemeLivePreview.test.tsx with 6 tests. jsdom's cascade confirms the agent's CSS applies inside the sample but not to an outside h1 or to body. Other tests check that every rendered rule is scoped, that the paint boundary exists, that removed content is never rendered, that the sample has no inline style on its headings, and the aria-hidden and tabindex settings.\n  - CustomCssEditor.test.tsx: 2 new tests (the preview gets the sanitised draft; a plan without customThemes previews nothing).\n  - Theme.test.tsx: 1 new integration test (the draft reaches the preview before saving).\n\nNo migration and no edge function changes.\n\nVERIFIED: - `npx tsc --noEmit`: passes, no output.\n- `npx vitest run src/components/theme src/pages/dashboard/Theme.test.tsx src/components/profile/ProfileCustomCssScope.test.tsx`: 5 files, 24 tests passed.\n- Full `npx vitest run`: 293 files passed; 2801 tests passed and 1 skipped (2802). No 'Errors' line in the summary.\n- `npx eslint` on the 6 changed files: 0 errors and 6 warnings, all in Theme.tsx and all already there before this change. The HEAD version of Theme.tsx linted on its own also gives exactly 6 warnings, so this change adds none.\n- The lint-staged pre-commit hook (eslint --fix, prettier) passed.\n- `git branch -f loop/r13-profile HEAD` was run.\n\nREVIEW: approve\n\nOWNER ACTIONS: Deploy Cloudflare Pages (frontend only; no migrations, no edge functions)."
+    },
+    {
+      "id": "US-544",
+      "lane": "profile",
+      "round": 13,
+      "title": "Custom CSS: a fuller public-page sample in the preview",
+      "description": "The preview sample covers the header, buttons, a section heading and one card. Add representative links-list, testimonial and listing-grid markup, ideally by rendering the real profile components with fixture data, so selectors that target those sections can be checked before saving.",
+      "acceptanceCriteria": [
+        "The preview includes link, testimonial and listing markup that matches the public page",
+        "It still renders inside ProfileCustomCssScope with sanitised CSS only"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-533)"
+    },
+    {
+      "id": "US-534",
+      "lane": "uiux",
+      "round": 13,
+      "title": "Leads stats chips and the Needs-attention count ignore the assignee filter",
+      "description": "Closes US-526. lead_stats() now takes an optional p_assignee argument. When the owner filters the Leads list by a teammate or by Unassigned, or a member uses \"Assigned to me\", the status chips and the Needs-attention badge now match the list. Before, they counted every lead the owner had. When the argument is left out, lead_stats() counts exactly what it did before, so the Analytics numbers do not change.",
+      "acceptanceCriteria": [
+        "With ?assignee=<teammate> or ?assignee=unassigned, lead_stats is called with p_assignee set to that value. The chip counts and the Needs-attention badge cover the same rows as the list.",
+        "With ?assigned=me, lead_stats is called with p_assignee set to the caller's own id. It counts the caller's own leads plus leads assigned to them, which is the list's row set.",
+        "With no assignee filter, p_assignee is left out and the counts are unchanged (Analytics is unaffected).",
+        "A malformed p_assignee counts nothing; it does not raise a uuid cast error."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Problem: Leads.tsx:140 called useLeadStats({ slaHours }) without the assignee filter. lead_stats (20261108000495) filtered only on user_id = auth.uid(). The list itself, via useLeads.ts:73-81 leadsQuery, uses user_id = me OR assigned_to = me plus the assignee filter, so the two disagreed.\n\nChanges:\n- New migration supabase/migrations/20261108000534_lead_stats_assignee_filter.sql. It drops lead_stats(timestamptz, integer) and creates lead_stats(p_since, p_sla_hours, p_assignee text DEFAULT NULL). The old version is dropped because keeping it next to the new one would make PostgREST's named-argument calls ambiguous.\n  - NULL: user_id = auth.uid(), unchanged.\n  - 'unassigned': user_id = auth.uid() AND assigned_to IS NULL.\n  - Any other value: (user_id = me OR assigned_to = me) AND assigned_to::text = lower(p_assignee). This mirrors leadsQuery, and a malformed value simply matches nothing.\n  - The function stays SECURITY INVOKER with the pinned search_path. It keeps REVOKE from PUBLIC and anon, and GRANT to authenticated and service_role. The won filter is still IN ('converted','closed'), so wonStatusesSql.test.ts passes against this definition.\n- src/hooks/useLeadStats.ts: new `assignee` option. It is part of the query key and is passed as p_assignee. LEAD_DEPENDENT_KEYS invalidates by the 'lead-stats' prefix, so that still works.\n- src/pages/dashboard/Leads.tsx: passes `assignee: assignedToMe ? user.id : assigneeFilter`.\n- src/integrations/supabase/types.ts: lead_stats Args gains p_assignee. Checked: gen-supabase-types --check reports \"types.ts is up to date\" against the migrated database.\n- scripts/verify-schema.mjs: the lead_stats check now also hands 10 leads to another user and checks the counts per filter: that user 10, unassigned 110, malformed value 0, no argument 120, and the assignee's \"assigned to me\" 10 (read under RLS).\n- src/pages/dashboard/Leads.test.tsx: 5 new tests covering no filter, a teammate, unassigned, assigned=me, and the filtered Needs-attention count reaching the button's accessible name.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run src/pages/dashboard/Leads.test.tsx src/lib/wonStatusesSql.test.ts src/lib/leadStatus.test.ts`: 3 files, 53 tests passed.\n- Full `npx vitest run`: 292 files passed; 2797 tests passed, 1 skipped.\n- `npm run verify:migrations`: OK, 84 migration files structurally valid.\n- `npx eslint` on the changed files: no new problems. Leads.tsx has 1 warning at line 449 and scripts/verify-schema.mjs has 14 no-undef errors; I ran the same lint on the HEAD versions and they are already there. The pre-commit eslint and prettier pass also succeeded.\n- Local Postgres 16: ran the prelude, applied all migrations in one pass with ON_ERROR_STOP, then `node scripts/verify-schema.mjs`. The \"lead_stats counts every lead the caller owns\" check, including the new assignee assertions, passed, as did \"every rpc() call's named arguments exist\". One check failed and is unrelated (see otherFindings). `gen-supabase-types.mjs --check`: types.ts is up to date.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261108000534_lead_stats_assignee_filter.sql. It drops the old two-argument lead_stats and creates the three-argument one, so deploy the frontend at the same time or after. Older clients send only p_since and p_sla_hours, which the new function still accepts."
+    },
+    {
+      "id": "US-545",
+      "lane": "uiux",
+      "round": 13,
+      "title": "Leads stats chips also ignore the type filter and search",
+      "description": "With ?type=buyer or a name search applied, the chips and the Needs-attention badge still count every lead. lead_stats could take p_lead_type and p_search (name ilike), mirroring leadsQuery, or the chips could be labelled as all leads when those filters are on.",
+      "acceptanceCriteria": [
+        "With a type or search filter applied, the chip counts either match the list or are clearly labelled as all leads"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-534)"
+    },
+    {
+      "id": "US-546",
+      "lane": "uiux",
+      "round": 13,
+      "title": "Unfiltered Leads chips omit leads assigned to a member by another owner",
+      "description": "A team member's unfiltered list shows their own leads plus the leads assigned to them (user_id = me OR assigned_to = me). lead_stats with no assignee counts only their own, so a member's chips undercount. Analytics relies on the own-leads-only count, so this needs a separate flag rather than a change to the default.",
+      "acceptanceCriteria": [
+        "A member's unfiltered Leads chips include the leads assigned to them",
+        "Analytics totals are unchanged"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-534)"
+    },
+    {
+      "id": "US-535",
+      "lane": "performance",
+      "round": 13,
+      "title": "Dashboard routes had no weight budget in CI, so a bundle cut could quietly come back",
+      "description": "This is the first slice of US-402. The new check is scripts/check-dashboard-weight.mjs. It reads the Vite manifest and takes each agent dashboard route's static-import closure. It subtracts the entry closure and the DashboardLayout closure, then compares the gzipped remainder against a budget for that route. It covers all 17 dashboard pages that App.tsx lazy-loads, the layout itself (measured beyond the entry only), and the first open of LeadDetailModal (measured beyond Leads, which is the US-490 number). It also fails if any dashboard route statically reaches form-vendor, charts-vendor, three-vendor or markdown-vendor. The check runs in CI's bundle-size job with no browser and no login.",
+      "acceptanceCriteria": [
+        "A build-time check computes each dashboard route chunk's static closure beyond entry + DashboardLayout (gzip) and fails above a per-route budget",
+        "Runs in CI (bundle-size job) without needing a login",
+        "Routes are found by source path, with a fallback through dynamic chunks by name, so Rollup re-keying Leads/Listings as _Name-<hash>.js does not break it",
+        "A unit test fails if App.tsx lazy-loads a dashboard page that has no budget",
+        "The deployed build does not publish .vite/manifest.json (written only when BUILD_MANIFEST=true)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Why: US-402 was open. scripts/check-route-weight.mjs:50-55 only budgets four public routes, and check-bundle-size.mjs only guards the entry graph and FullProfilePage. Rounds 6-12 (US-395, US-412, US-431, US-476, US-498, US-506, US-516) each cut a dashboard route by hand, and nothing would fail if one of those gains came back.\n\nWhat changed:\n- scripts/check-dashboard-weight.mjs (new): DASHBOARD_ROUTES holds the budgets, set about 15% above what was measured 2026-11-08. ROUTE_MUST_NOT_INCLUDE lists the banned vendor chunks; form-vendor's allow list is empty because no dashboard route reaches it today. The pure helpers entryKey, resolveKey, staticClosure, weighBeyond and bannedIn are exported. resolveKey tries the exact src key first. Failing that, it looks among dynamically imported chunks for a unique chunk with that `name` and no src. That fallback is needed because in the real manifest Leads and Listings are keyed `_Leads-<hash>.js` / `_Listings-<hash>.js` with no src. If two chunks match, it throws rather than guess. `--update` prints the measured numbers.\n- scripts/check-dashboard-weight.d.mts (new): types for the test.\n- vite.config.ts: `manifest: BUILD_MANIFEST`, which is on only when BUILD_MANIFEST=true. Production deploys therefore do not publish /.vite/manifest.json.\n- .github/workflows/ci.yml: the bundle-size job's build sets BUILD_MANIFEST: 'true', and a new step runs `npm run dashboard-weight`.\n- package.json: new script \"dashboard-weight\".\n- src/dashboard-weight.test.ts (new, 10 tests): uses a synthetic manifest that includes the re-keyed `_Leads` case and a cycle back to index.html. Covers ambiguity refusal, subtracting the base closures, dialog-beyond-route, and the allow list. It also checks that every `import('./pages/dashboard/...')` in App.tsx has a budget and that every budgeted src exists.\n\nMeasured, KB gzip beyond entry + layout: Overview 36.5, Listings 38.1, Leads 30.6, Clients 20.3, OpenHouses 28.8, Profile 14.9, Theme 19.7, Links 15.1, Testimonials 13.1, Analytics 47.3, Settings 15.4, Subscription 8.5, ApiKeys 5.3, Team 9.6, DeleteAccount 3.6, WorkflowsList 14.3, WorkflowBuilder 16.8. LeadDetailModal is 26.2 beyond Leads, and DashboardLayout is 48.8 beyond the entry. Before this change no dashboard route had any budget. This story adds a guard, not a size cut, so the bundle is unchanged.\n\nNegative test: I added form-vendor to Clients' imports in the built manifest and re-ran. It reported FAIL at 43.7 KB against the 24 KB budget, plus \"Clients statically reaches form-vendor\". I then restored the manifest.\n\nVERIFIED: - `BUILD_MANIFEST=true VITE_SENTRY_DSN=... VITE_SUPABASE_URL=... npx vite build`: built in 21s and wrote dist/.vite/manifest.json.\n- `npm run dashboard-weight`: OK, 19 dashboard chunks within budget.\n- `npm run size-check`: OK, 282 chunks within budget, so the new check does not affect it.\n- `npx tsc --noEmit`: pass. `npx tsc --noEmit -p tsconfig.node.json`: pass (covers vite.config.ts).\n- `npx vitest run src/dashboard-weight.test.ts src/route-weight.test.ts`: 2 files, 18 tests passed.\n- `npx eslint scripts/check-dashboard-weight.mjs src/dashboard-weight.test.ts`: clean. CI lint covers src/ only, and the new file adds `/* global process, console */`.\n- Full `npx vitest run`: 293 files passed; 2802 tests passed, 1 skipped.\n- The lint-staged commit hook (eslint --fix plus prettier) ran clean.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-547",
+      "lane": "performance",
+      "round": 13,
+      "title": "Analytics dashboard route: 47.3 KB gzip beyond layout, the heaviest agent route",
+      "description": "The new check reports Analytics as the heaviest agent dashboard route. The biggest pieces are Analytics chunk 14.7, useLeadStats 7.1, date-vendor 6.3, exportUtils 2.4 (CSV export, only needed on click), useAnalytics 1.7 and UpgradeModal 1.3. Load exportUtils when export is clicked, load UpgradeModal through LazyModal, and see whether useLeadStats or date-fns are needed on first paint.",
+      "acceptanceCriteria": [
+        "npm run dashboard-weight shows Analytics reduced, with before and after numbers",
+        "The Analytics budget in scripts/check-dashboard-weight.mjs is lowered to match",
+        "Analytics tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Use `BUILD_MANIFEST=true npx vite build && npm run dashboard-weight --update`. (follow-up from US-535)"
+    },
+    {
+      "id": "US-548",
+      "lane": "performance",
+      "round": 13,
+      "title": "Measure the CSS each dashboard route adds",
+      "description": "The check weighs JS only. Route-level CSS in the manifest's `css` arrays is not counted yet.",
+      "acceptanceCriteria": ["CSS beyond entry + layout is reported per route and budgeted"],
+      "priority": 2,
+      "passes": false,
+      "notes": "Low priority. Tailwind ships almost all CSS in the entry stylesheet. (follow-up from US-535)"
+    },
+    {
+      "id": "US-536",
+      "lane": "security",
+      "round": 13,
+      "title": "Agent custom CSS could escape the profile scope and restyle the whole public page, including the compliance footer",
+      "description": "I reviewed the round-12 custom CSS sanitiser in src/lib/customCss.ts and found a clear bypass. The browser and the sanitiser disagree about where a CSS string ends. A browser ends a string at an unescaped line break (CSS Syntax 3 calls this a bad-string token). sanitizeCustomCss kept reading until the next matching quote.\n\nSo an agent could store this:\n\na { content: \"x<newline>} footer, [data-branding] { display: none !important } b { c: \"; }\n\nThe sanitiser treated all of it as one declaration and emitted it inside `.ab-custom-css a { ... }`. The browser instead closed that rule at the `}` and applied `footer, [data-branding] {...}` to the whole document, with no scope. That lets an agent hide the Equal Housing / licence footer and the AgentBio branding, and restyle the sticky bar and the modals. Hiding the branding matters for revenue because removing it is a plan feature.\n\nurl() exfiltration was still blocked, because the url() check scans the whole value, string contents included. position: fixed and other layout rules, however, were not checked inside the escaped text.\n\nFix: a line break (LF, CR, FF) inside a quoted string now counts as an unclosed quote, and the whole stylesheet is rejected. The check is in all three quote-tracking passes: stripComments, findTopLevel and findBlockEnd. Backslash escapes are already refused, so no legitimate string can contain a line break. The message the editor shows now adds \"(a quoted string must close on the same line)\".",
+      "acceptanceCriteria": [
+        "A quoted string broken by LF, CR, CRLF or FF (double or single quotes, in a declaration value, an attribute selector, or inside @media) rejects the whole stylesheet with the 'unclosed' message",
+        "Line breaks between declarations and inside comments are still accepted",
+        "Existing sanitiser, editor and scope tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Before the fix, the new test confirmed the bypass. The sanitiser returned `.ab-custom-css a { content: \"x\\n} footer, [data-branding] { display: none !important } b { c: \"; }`, which a browser parses with `footer, [data-branding]` as an unscoped top-level rule.\n\nChanges:\n- src/lib/customCss.ts: added STRING_BREAK = /[\\n\\r\\f]/ with a comment explaining the parser mismatch (about line 85). It is checked inside the in-quote branch of stripComments (~:95), findTopLevel (~:131) and findBlockEnd (~:153). The module header now documents the rule, and the Unbalanced message is clearer (~:411).\n- src/lib/customCss.test.ts: two new tests. One rejects strings broken by any of the four line-break forms, in a value, an attribute selector and inside @media. The other confirms that multi-line CSS and comments still pass. One existing probe, url('/\\n/evil...'), is still refused, but the stylesheet is now rejected as a whole, so that assertion moved out of the loop.\n\nProfile-lane note: I edited only the sanitiser, because the brief allows fixing a clear bypass. No migration is needed. Any CSS already stored that contains a newline inside a string will now render as nothing, which is the intended result.\n\nThe rest of the sanitiser review found no other bypass:\n- A quote inside an unquoted url() is refused, because SAFE_URL_PATH excludes quotes.\n- Braces inside parentheses leave the block body unbalanced, which rejects the whole stylesheet.\n- Selectors refuse {};@\\ and &.\n- @media and @supports conditions refuse url( and braces.\n- There is no same-origin open redirect that a same-origin url() could follow: functions/ and public/_redirects contain only internal redirects.\n\nUS-342, the open security slice, is still open. useListings.ts:78 and ListingsBlock.tsx:74 still use select('*'). I fixed the bypass first because it has more effect on users and on trust.\n\nVERIFIED: - npx vitest run src/lib/customCss.test.ts src/components/theme/CustomCssEditor.test.tsx src/components/profile/ProfileCustomCssScope.test.tsx src/hooks/usePublicProfile.rpc.test.tsx: 4 files, 43 tests passed. Before the fix, the new test failed as expected.\n- npx tsc --noEmit: passed.\n- npx eslint src/lib/customCss.ts src/lib/customCss.test.ts: clean, no warnings.\n- Full npx vitest run: 292 files passed; 2794 tests passed, 1 skipped.\n- No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-537",
+      "lane": "enterprise",
+      "round": 13,
+      "title": "New agents' morning email follows UTC because onboarding never asks for their time zone",
+      "description": "First slice of US-446. Step 2 of onboarding (\"Profile Basics\") now has a Time zone picker. It starts on the zone the agent already saved, otherwise on the zone their device reports. The zone is saved in its own update after the profile is saved. If the database refuses that zone name, the agent loses only the time zone setting. The rest of the profile and onboarding_completed_at are still saved, which avoids repeating the US-108 failure. The agent sees a toast saying the zone was not saved and that they can choose it in Settings. When the save works, the agent-timezone query cache is updated so Settings shows the new zone straight away.",
+      "acceptanceCriteria": [
+        "A new signup who finishes onboarding (or presses Skip Setup) with a time zone selected ends up with profiles.timezone set to it",
+        "The time zone is never part of the main onboarding profile update, so a zone the database refuses cannot stop onboarding_completed_at from being saved",
+        "If the time zone write fails, onboarding still completes and the agent is told the zone was not saved",
+        "The picker starts on the stored zone, then the device's zone, and if neither is known it shows 'Choose your time zone' and writes nothing"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence: progress.txt:5937 records that US-446 is still open: OnboardingWizardPage did not offer the zone, so agents who never save a notification setting stay on the UTC edition. profiles.timezone is checked by the validate_profile_timezone trigger (supabase/migrations/20261107000433_profile_timezone.sql), which raises check_violation for any name missing from pg_timezone_names. The browser's tz data can be newer than the database's, so the zone must not go in the same statement as onboarding_completed_at. That is why it gets its own update.\n\nChanges:\n- src/components/onboarding/OnboardingWizard.tsx: added ProfileBasics.timeZone, a new exported helper initialOnboardingTimeZone(stored, detected), and a native <select id=\"onboarding-timezone\"> with a label, a hint and a 44px minimum height on step 2. It uses listTimeZones and timeZoneLabel from src/lib/timeZone.ts. userProfile now accepts timezone.\n- src/lib/onboardingProfile.ts: added onboardingTimeZoneToSave(chosen, stored). It returns null when the value is empty, not a valid zone, or already stored.\n- src/pages/onboarding/OnboardingWizardPage.tsx: after updateProfile, it runs `supabase.from('profiles').update({ timezone }).eq('id', user.id)`. On error it calls logger.warn and shows a destructive toast; on success it calls setQueryData(agentTimeZoneKey). It takes the stored zone from profile?.timezone (the useAuthStore profile is read through get_own_profile).\n- Tests: OnboardingWizard.test.ts (initialOnboardingTimeZone), onboardingProfile.test.ts (onboardingTimeZoneToSave, and a check that buildOnboardingProfileUpdate never includes timezone), OnboardingWizardPage.test.tsx (the zone is saved separately and after updateProfile; a refused zone still completes onboarding and shows the toast).\n\nSecond acceptance criterion of US-446: the server-side jobs already compute the agent's local day. editionWindows in supabase/functions/scheduled-maintenance/digests.ts:271 works it out per zone. The only UTC \"today\" left in that file is dueCutoffDay (digests.ts:114), which serves the UTC edition for agents with no zone. I made no server change. The client-side audit of localDate.ts and the open-house form is left as a next slice.\n\nVERIFIED: - `npx tsc --noEmit`: passed with no output.\n- `npx vitest run src/pages/onboarding src/components/onboarding src/lib/onboardingProfile.test.ts src/test/a11y src/components/settings/TimeZoneSetting.test.tsx`: 5 files, 45 tests passed.\n- Full `npx vitest run`: 292 files passed; 2801 tests passed, 1 skipped.\n- `npx eslint` on the 6 changed files: 0 errors, 1 warning. The warning is react/no-unescaped-entities at OnboardingWizard.tsx:830 on an apostrophe that was already there, not in my diff, so no new warnings.\n- `npx prettier --write` was run on the changed files, and the lint-staged hook ran eslint --fix and prettier on commit.\n- No migration, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: None new. Frontend only. Migration 20261107000433_profile_timezone.sql (US-433) must already be applied, or the separate timezone write fails; onboarding still completes and only the zone is lost."
+    },
+    {
+      "id": "US-549",
+      "lane": "enterprise",
+      "round": 13,
+      "title": "Use the stored time zone for client-side 'today' (task due dates, open-house form)",
+      "description": "src/lib/localDate.ts todayCalendarDate and the open-house form in src/components/openHouses/OpenHouseFormDialog.tsx use the device clock. When profiles.timezone is stored and differs from the device's zone (for example an agent travelling), due-date prefills and open-house times can disagree with the server's digest windows. Decide which zone wins on the client, then use useAgentTimeZone where the date is shared with server jobs.",
+      "acceptanceCriteria": [
+        "Task due-date prefill and the digest's 'due today' agree for an agent whose device zone differs from their stored zone",
+        "The open-house form states which zone its times are in"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "The server side already uses the stored zone (digests.ts editionWindows). (follow-up from US-537)"
+    },
+    {
+      "id": "US-550",
+      "lane": "enterprise",
+      "round": 13,
+      "title": "Offer the time zone to agents who finished onboarding before US-537",
+      "description": "Existing agents with profiles.timezone NULL never see the onboarding picker. Show a one-time dashboard prompt, 'Your morning email follows UTC — use <detected zone>?', that saves with one tap.",
+      "acceptanceCriteria": [
+        "An agent with no stored zone sees the prompt once and can save the detected zone in one tap",
+        "Dismissing it does not bring it back on every load"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-537)"
+    },
+    {
+      "id": "US-538",
+      "lane": "marketing",
+      "round": 13,
+      "title": "The dashboard no longer meters or lists plan quotas for features that do not exist",
+      "description": "US-297. Before this change, the plan usage card showed an \"automated emails\" meter, so a Free agent saw a locked meter and an upgrade nudge for workflow emails that never send. The downgrade confirmation also listed \"0 automated texts a month\", market reports, CMA reports, staged photos and video tours, and no plan delivers any of them. All six quotas are now marked as not shipping. They stay off the meters, off the nudges and off the downgrade list until the feature exists.",
+      "acceptanceCriteria": [
+        "METERED_KEYS no longer includes emails_per_month, and a test holds METERED_KEYS to exactly the shipped limits other than analytics_days",
+        "LIMIT_META marks emails, sms, market_reports, cma_reports, virtual_staging_photos and video_tours with ships: false, and a test pins exactly that set",
+        "The downgrade dialog (limitsAfterChange) leaves out unshipped quotas, and a test checks that the list says nothing about email, texts, reports, staging or video",
+        "The database still meters these quotas; only what the agent is shown changes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The changes are in src/lib/planLimits.ts. LimitMeta gets an optional `ships` flag, with a comment saying to flip it in the same change that ships the feature (for emails, US-136). The six unbuilt quotas get `ships: false`, and a new exported `limitShips(key)` reads the flag. emails_per_month is removed from METERED_KEYS. In src/components/dashboard/PlanChangeConfirmDialog.tsx, limitsAfterChange skips any key where limitShips is false. Before this, it walked every LIMIT_META key, so a downgrade to Free listed six features that do not exist. This matches what src/lib/planCardCopy.ts already keeps off the pricing cards.\n\nI checked the other places a quota reaches the agent. PlanLimitNotice is only ever given shipped keys (listings, contacts, open_houses_per_month, leads_per_month, links, testimonials, workflows). PlanUsageCard builds its meters and nudges only from METERED_KEYS.\n\nTests: src/lib/planLimits.test.ts has a new describe block, 'unshipped quotas stay off the dashboard', with 3 tests. src/components/dashboard/PlanChangeConfirmDialog.test.tsx is new, with 2 tests.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx eslint on the 4 changed files: no output (0 warnings, 0 errors).\nnpx vitest run on src/lib/planLimits.test.ts, src/components/dashboard/PlanChangeConfirmDialog.test.tsx, src/components/PlanLimitNotice.test.tsx, src/lib/planCardCopy.test.ts, src/pages/Pricing.test.tsx and src/pages/dashboard/Overview.test.tsx: 6 files, 49 tests passed.\nFull npx vitest run: 293 files passed; 2797 tests passed, 1 skipped. It also printed a React stack trace, which looks like the act/unhandled-rejection noise already noted in progress.txt; I did not trace it further.\nNo migration was added, so verify:migrations was not run.\nThe lint-staged pre-commit hook (eslint --fix, prettier) passed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-539",
+      "lane": "seo",
+      "round": 13,
+      "title": "AI answer engines only saw a heading and one paragraph on an agent's page (US-529)",
+      "description": "The crawler response for /:username, which GPTBot, ClaudeBot, PerplexityBot and the other bots have received since US-520, replaced #root with just `<main><h1>title</h1><p>description</p></main>` (functions/_lib/social-meta.ts injectSocialTags). The body now also carries:\n- the bio\n- role and brokerage\n- license number and state\n- service areas\n- up to 12 visible listings, each linking to /:username/listing/:id. Available homes come before sold ones, in the page's sort_order.\n- tel:/mailto: contact links, only while show_contact_buttons is not false\n\nThe listing page body now has the status and facts line, the description, and \"Listed by <agent link>, role at brokerage\".",
+      "acceptanceCriteria": [
+        "A crawler response for /:username includes the service cities, the brokerage and up to 12 visible listings, each linking to /:username/listing/:id",
+        "Listings hidden by show_listings or show_sold_properties never appear. Drafts and off-market homes never appear. Each row is held to selectListingForPage.",
+        "A failed settings read withholds the listings and the contact links. A failed listings read still serves the rest of the body.",
+        "Contact links appear only while show_contact_buttons is not false. tel: hrefs carry digits only, and mailto: is used only for a plausible address with no ?, & or quotes.",
+        "All interpolated text is escaped. Tests cover markup in the bio, name, cities, license, address and listing id.",
+        "The is_published check is unchanged. The /listing/:id route makes no extra gallery read."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Changes:\n- functions/_lib/social-meta.ts:\n  - injectSocialTags takes an optional `body`. Without one it falls back to summaryBody, the old heading and paragraph.\n  - New pure builders buildProfileBody and buildListingBody.\n  - New BodyListing type and PROFILE_BODY_LISTING_LIMIT = 12.\n  - Status labels come from src/lib/listingStatus (listingStatusLabel / isPublicListingStatus), so there is still only one status vocabulary.\n  - ProfileMeta gains optional license_number, license_state, phone and email_display. anon already holds SELECT on all four (migration 20260808000002 line 158).\n- functions/_lib/profile-route.ts:\n  - PROFILE_COLUMNS adds the four columns above.\n  - New fetchProfileBodyOptions reads two things:\n    - listings: id, status, address, city, state, price, beds, baths, sqft, filtered to user_id and status in (active, pending, under_contract, sold), ordered sort_order, created_at desc, id, limit 40.\n    - user_settings: show_listings, show_sold_properties, show_contact_buttons. These are the five-column anon grant from 20260902000009.\n  - Every row goes through selectListingForPage, then selectAvailableListings plus selectSoldListings, so the order matches the page.\n  - The read runs in parallel with next(), so a crawler waits no extra round trip.\n  - Only the profile path does this read. The listing path uses buildListingBody on the listing it already fetched.\n  - The 404 for a hidden or gone listing keeps the old summary body.\n\nVerification: route tests stub fetch, and the existing visibility tests (US-382, US-416) are unchanged and still pass.\n\nVERIFIED: - `npx tsc --noEmit`: passes. tsconfig includes functions/.\n- `npx vitest run functions/`: 48 files, 642 tests passed, before and after the prettier reformat from lint-staged.\n  - 15 new tests:\n    - 7 in social-meta.test.ts: escaping in profile and listing bodies, the 12-listing cap, tel:/mailto: sanitising, contact gating, no repeated bio.\n    - 8 in username-route.test.ts: full body content, scoped reads without photos, show_listings off, show_sold_properties off, settings read failure, listings read failure, show_contact_buttons off, and the listing page body making a single listings read.\n  - One existing assertion (US-242) was loosened from the exact old body to its opening plus a well-formed `<main>…</main>` inside #root.\n- Full `npx vitest run`: 292 files passed; 2807 tests passed, 1 skipped.\n- `npx eslint` on the 4 changed files: only \"File ignored because no matching configuration was supplied\". functions/ is outside the eslint config, so the CI warning count is unchanged. The lint-staged eslint --fix and prettier run passed at commit.\n- No migration.\n\nREVIEW: approve\n\nOWNER ACTIONS: Deploy Cloudflare Pages: the change is in Pages Functions (functions/_lib/profile-route.ts, functions/_lib/social-meta.ts). There is no migration, no edge function change and no secret."
+    },
+    {
+      "id": "US-551",
+      "lane": "seo",
+      "round": 13,
+      "title": "Add listings to the profile's crawler JSON-LD",
+      "description": "The profile's RealEstateAgent JSON-LD from buildProfileTags still names no homes. The bot body now has the visible listing set, so it could add makesOffer or an ItemList of the same listings, linked by @id to each /listing/:id page. Pass the filtered list into buildProfileTags.",
+      "acceptanceCriteria": [
+        "The crawler JSON-LD for /:username lists the same visible listings as the body, with @id or url pointing at each listing page",
+        "Hidden listings never appear"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "The data is already fetched in fetchProfileBodyOptions. Only the profile path needs it. (follow-up from US-539)"
+    },
+    {
+      "id": "US-552",
+      "lane": "seo",
+      "round": 13,
+      "title": "Give the legacy ?listing= link the profile body when the listing is hidden",
+      "description": "/:username?listing=<hidden id> is the profile page (it answers 200), but it still gets only the heading and paragraph, because the gallery read is skipped whenever a listingId is present.",
+      "acceptanceCriteria": [
+        "/jane?listing=<hidden> serves buildProfileBody",
+        "Hidden listings are still never named"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-539)"
+    },
+    {
+      "id": "US-540",
+      "lane": "mobile",
+      "round": 13,
+      "title": "Crawler HTML for an agent's page pointed at the AgentBio dashboard's web app manifest (US-471)",
+      "description": "The response sent to crawlers for /:username and /:username/listing/:id still linked /manifest.json from index.html. That is the AgentBio dashboard app, with start_url /dashboard. In the browser, useProfileManifest switches the link once React runs, but React never runs on the crawler HTML. Now the crawler response links /:username/manifest.json, exactly once. This also covers the 404 for a withdrawn or hidden listing.",
+      "acceptanceCriteria": [
+        "The crawler HTML for /:username links /:username/manifest.json and no other manifest",
+        "The crawler HTML for /:username/listing/:id links the agent's manifest, including the 404 for a withdrawn listing",
+        "Duplicate or oddly-quoted manifest links collapse to one; a document with none gets one before </head>; other links that mention manifest.json (e.g. preload) are untouched"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "I picked US-471: of the two open mobile stories it has the higher priority (2; US-511 is 3). New exported helper linkProfileManifest(html, username) in functions/_lib/profile-route.ts (around line 185). It removes every <link rel=manifest> (matching any attribute order or quoting) and puts back one link, built with profileManifestPath from functions/_lib/profile-manifest.ts, in the first link's place. If the document has no manifest link, it inserts one before </head>. It runs on both crawler outputs of serveProfileRoute: the 200 profile/listing response (~line 338) and the listing-not-found 404 (~line 329), after injectSocialTags. The human path (next()) is unchanged. Tests: a new file, functions/_tests/link-profile-manifest.test.ts, has 6 unit cases. functions/_tests/username-route.test.ts has 2 new route-level tests: the profile page against the real prerendered-index fixture, which contains <link rel=\"manifest\" href=\"/manifest.json\">, and the listing page plus the withdrawn-listing 404. The commit was made in the worktree and loop/r13-mobile was force-set to it. Nothing was pushed, and prd.json and progress.txt were not edited.\n\nVERIFIED: npx tsc --noEmit: exit 0 (tsconfig includes functions/). npx vitest run functions/: 49 files, 635 tests passed. Full npx vitest run: 293 files passed, 2800 tests passed, 1 skipped. npx eslint on the 3 changed files: 0 errors, 3 'File ignored because no matching configuration' warnings, because eslint does not cover functions/. The lint-staged hook (eslint --fix plus prettier) also passed on commit. There is no migration, so I did not run verify:migrations.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-553",
+      "lane": "mobile",
+      "round": 13,
+      "title": "Human HTML for /:username names the agent's manifest before the bundle runs",
+      "description": "The other half of US-471's description. For humans, serveProfileRoute returns next() untouched, so the HTML a browser parses first still links /manifest.json until useProfileManifest swaps it. Chrome on Android can check install eligibility (beforeinstallprompt) against the dashboard manifest before React runs. The Pages Function already runs for these requests, so it could apply linkProfileManifest to the index.html body for humans without any database lookup. Drop content-length and the asset ETag, because the body changes. Keep the 301 and reserved-segment behaviour.",
+      "acceptanceCriteria": [
+        "A human GET /jane returns HTML whose only manifest link is /jane/manifest.json",
+        "No Supabase request is made on the human path",
+        "Existing 'does not divert a human' tests are updated to assert body identity apart from the manifest link"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Weigh the extra body read on every human profile view; HTMLRewriter would stream it but is not testable without a Workers runtime (see the injectSocialTags comment). (follow-up from US-540)"
     }
   ]
 }

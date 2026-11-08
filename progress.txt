@@ -5948,3 +5948,83 @@ Other findings:
 - [seo] Full vitest run reports 'Errors 1 error' even though every test passes. The likely cause is the LazyModal unhandled rejection already noted in progress.txt (profile lane), but I did not confirm it.
 - [mobile] src/lib/storeAvatarAppIcons.ts uploads the icons with cacheControl '3600'. Before this change, the first HEAD for a missing icon could have been cached as a 404 by a CDN in front of storage. I used cache: 'no-store' on the client HEAD, but the Pages Function's findAvatarIcons HEAD (functions/_lib/profile-manifest.ts:132) still goes through storage's default caching. If self-hosted storage sits behind a caching proxy that caches 404s, the manifest may lag the backfill by that TTL.
 - [mobile] src/hooks/useAvatarAppIconBackfill.ts relies on useAuthStore's persisted profile. If an agent replaces their photo on another device, the backfill checks the stale avatar_url until the store refreshes the profile on the next initialize. The cost is one extra HEAD and no wrong writes, because the icon names derive from the photo.
+
+---
+
+## Continuous improvement loop — round 13 — 2026-11-08 (US-531 to US-540 done)
+
+Ten lanes, all approved with no fix-ups. Closed US-297, US-402, US-446, US-471, US-522, US-524, US-526, US-529; first slice of US-276. Security also closed a scope escape in the round-12 custom CSS sanitiser.
+One merge conflict: seo (body injection) and mobile (per-profile manifest link) both edited profile-route's responses; resolved by doing both.
+Final: tsc clean (app + node config), 2886 unit tests pass (from 2792), verify:migrations OK (86 files), vite build OK, eslint 563 warnings.
+
+- US-531 [listings] A lead now shows the listings the visitor opened before getting in touch
+- US-532 [leads] Phone-only repeat enquiries are folded like email ones (US-522)
+- US-533 [profile] Agents writing custom CSS could not see what it does until they saved and opened their public page (US-524)
+- US-534 [uiux] Leads stats chips and the Needs-attention count ignore the assignee filter
+- US-535 [performance] Dashboard routes had no weight budget in CI, so a bundle cut could quietly come back
+- US-536 [security] Agent custom CSS could escape the profile scope and restyle the whole public page, including the compliance footer
+- US-537 [enterprise] New agents' morning email follows UTC because onboarding never asks for their time zone
+- US-538 [marketing] The dashboard no longer meters or lists plan quotas for features that do not exist
+- US-539 [seo] AI answer engines only saw a heading and one paragraph on an agent's page (US-529)
+- US-540 [mobile] Crawler HTML for an agent's page pointed at the AgentBio dashboard's web app manifest (US-471)
+
+Owner actions:
+- US-531: Apply migration supabase/migrations/20261108000531_leads_visitor_id.sql (adds leads.visitor_id, two partial indexes, restates the leads column grant)
+- US-531: Redeploy the submit-lead edge function (functions.agentbio.net / Coolify build) so visitor_id is stored
+- US-531: Deploy the frontend so the forms send visitor_id and the lead detail shows viewed listings
+- US-532: Apply migration 20261108000532_leads_phone_lookup_hash.sql BEFORE redeploying submit-lead. The new function inserts phone_hash, so if it is deployed first, every lead insert fails because the column does not exist.
+- US-532: Then redeploy the submit-lead edge function: the functions.agentbio.net Coolify app, which serves supabase/functions/ through edge-functions-server.ts. No new secrets; it uses the existing PII_ENCRYPTION_KEY.
+- US-533: Deploy Cloudflare Pages (frontend only; no migrations, no edge functions).
+- US-534: Apply migration supabase/migrations/20261108000534_lead_stats_assignee_filter.sql. It drops the old two-argument lead_stats and creates the three-argument one, so deploy the frontend at the same time or after. Older clients send only p_since and p_sla_hours, which the new function still accepts.
+- US-537: None new. Frontend only. Migration 20261107000433_profile_timezone.sql (US-433) must already be applied, or the separate timezone write fails; onboarding still completes and only the zone is lost.
+- US-539: Deploy Cloudflare Pages: the change is in Pages Functions (functions/_lib/profile-route.ts, functions/_lib/social-meta.ts). There is no migration, no edge function change and no secret.
+
+Opened:
+- US-541 [listings] US-276 slice 2: lead scoring uses the measured listing views
+- US-542 [listings] US-276 slice 3: viewed-listing rows link to the listing and show later browsing
+- US-543 [listings] Fill visitor_id on a repeat enquiry folded into an earlier lead
+- US-544 [profile] Custom CSS: a fuller public-page sample in the preview
+- US-545 [uiux] Leads stats chips also ignore the type filter and search
+- US-546 [uiux] Unfiltered Leads chips omit leads assigned to a member by another owner
+- US-547 [performance] Analytics dashboard route: 47.3 KB gzip beyond layout, the heaviest agent route
+- US-548 [performance] Measure the CSS each dashboard route adds
+- US-549 [enterprise] Use the stored time zone for client-side 'today' (task due dates, open-house form)
+- US-550 [enterprise] Offer the time zone to agents who finished onboarding before US-537
+- US-551 [seo] Add listings to the profile's crawler JSON-LD
+- US-552 [seo] Give the legacy ?listing= link the profile body when the listing is hidden
+- US-553 [mobile] Human HTML for /:username names the agent's manifest before the bundle runs
+
+Other findings:
+- [listings] The visitor_id is client-supplied, so a visitor who knows another browser's id could attach that browser's views to their lead. Low impact (it misleads only the agent's own view); the UI caveat says the counts are indicative.
+- [listings] The task brief's finding is still open: EditListingModal Cancel during an in-flight save discards immediately (race) (src/components/listings/EditListingModal.tsx handleSubmit / onClose). Not taken this round in favour of the open US-276 slice.
+- [listings] CLAUDE.md says anon and authenticated hold SELECT on leads columns, but migration 20261108000452 (and now 20261108000531) grants authenticated only. The doc is slightly out of date.
+- [listings] leads.email_hash and update_token_hash are in the browser-readable column grant. update_token_hash is a hash of a single-use, 30-minute token, so the exposure is limited; it may still be worth narrowing (security lane).
+- [leads] authenticated still holds table-wide INSERT/UPDATE on leads (20261101000016 comment, lines 17-19), so an agent can write email_hash or phone_hash on their own leads. The only effect is on how their own leads fold, so this is low risk; a column-level UPDATE grant would close it.
+- [leads] Leads captured before this migration (and before 20260930000003 for email) have no hash, so a repeat enquiry against them is never folded. The key lives outside the database, so a backfill would have to run as a service-role edge job that decrypts and hashes.
+- [leads] Numbers written in national format outside North America (e.g. UK 020 ...) match only their own spelling, not their +44 form. That is acceptable for the US user base, but a per-agent default country would fix it.
+- [leads] US-463 (delete the LegacyLead types) is still open and is a clean small slice for the next round.
+- [profile] US-525 is still open and small: src/types/theme.ts:39 and :64 still declare custom_css on the theme-settings types.
+- [profile] US-486 is still open and small: index.html:82 sets theme-color to #0ea5e9, while public/manifest.json:9 sets theme_color to #2563eb.
+- [profile] The pre-commit lint-staged hook printed 'Backed up original state in git stash (89944f1)'. The stash is shared across worktrees, so parallel lanes committing at the same moment could interfere (already noted last round).
+- [profile] On narrow phones the Live Preview sits above the CustomCssEditor on the Theme page, so an agent has to scroll up to see the result. A sticky or side-by-side layout on wide screens would be a uiux-lane polish.
+- [uiux] scripts/verify-schema.mjs check 'every table referenced in code exists' fails locally on two fake table names in supabase/functions/_shared/resend-webhook.test.ts ('0123456789abcdefghijklmn' and 'nmlkjihgfedcba9876543210'). The test strings are read as .from() table names. This was already the case on the loop branch and is unrelated to this change; the verify-schema CI job will flag it.
+- [uiux] lint-staged's pre-commit hook still writes a backup entry into the shared git stash ('Backed up original state in git stash (9fd1dff)'), as noted in earlier rounds.
+- [uiux] US-505 (bulk reassign) and US-420 (second team, which needs an owner decision) are still open in the uiux lane.
+- [performance] src/components/layout/DashboardLayout.tsx: the layout adds 48.8 KB gzip beyond the entry, and ui-vendor (all of @radix-ui, about 35 KB) is most of it, so every dashboard route pays for every Radix primitive. This was already noted at progress.txt:5546. It is now visible and budgeted in dashboard-weight, but splitting it is a separate measured change.
+- [performance] scripts/check-route-weight.mjs and scripts/check-bundle-size.mjs give 64 eslint no-undef errors when linted directly. They are outside `npm run lint` (src/ only), so CI does not see them. A one-line `/* global process, console */` in each, as the new script has, would clear them.
+- [performance] The shared scratchpad dist-before directory held a stale build from an earlier session (vite does not empty an outDir outside the project root). One-off measurement scripts that list dist/assets by file name can then count chunks twice. The new check reads the manifest, so it is not affected.
+- [security] The lint-staged pre-commit hook writes a backup into the shared git stash on every commit ('Backed up original state in git stash (228c71a)'). Parallel lane worktrees committing at the same moment share that stash.
+- [security] supabase/functions/generate-social-post/index.ts:54 and src/hooks/useLinks.ts:37 still use .select('*') on listings and links. This is the same pattern as US-342.
+- [security] src/lib/customCss.ts: the sanitiser accepts a same-origin url() to any path. That is safe today, because functions/ and public/_redirects have no open redirect. If a redirector endpoint such as /r?url= is ever added, an attribute selector combined with url() could leak values from the visitor's lead form, since React mirrors the value attribute of controlled inputs. A test that checks the redirect rules, or a narrower same-origin path allow-list such as /img/ or /assets/, would close that off for good.
+- [enterprise] src/integrations/supabase/types.ts may still differ from the schema for get_own_profile Returns.timezone (progress.txt:5708); types:check in CI would flag it. Not touched here.
+- [enterprise] US-528: the TimeZoneSetting copy at src/components/settings/TimeZoneSetting.tsx:55 says '7am unless you change it', which is wrong if an operator sets DIGEST_LOCAL_HOUR. For that reason the new onboarding hint names no hour.
+- [enterprise] OnboardingWizard.tsx:830 has an unescaped apostrophe (react/no-unescaped-entities) that was already there. It counts toward the CI eslint warning cap.
+- [marketing] src/lib/planLimits.ts LIMIT_META.workflows is still metered and nudged as 'active follow-up workflows'. Turning a workflow on works, but its email steps do not send (US-224, US-136). Whether the dashboard should keep selling workflows as an upgrade reason is a product call, so I left it.
+- [marketing] Pricing.tsx and planCardCopy.ts each keep their own copy of which quotas are not shipped, separate from the new LIMIT_META.ships. planCardCopy could read limitShips so there is one source of truth.
+- [marketing] The lint-staged pre-commit hook writes a backup entry into the git stash, which all worktrees share (this commit created stash entry efc95e4).
+- [seo] functions/ is outside the eslint configuration: `npx eslint functions/...` reports 'File ignored because no matching configuration was supplied', so Pages Functions code gets no lint in CI. Only lint-staged's eslint --fix touches it at commit.
+- [seo] functions/_lib/profile-route.ts: the crawler response sets cache-control 'public, s-maxage=300' and sends no 'Vary: User-Agent'. This was already in progress.txt. More profile data in the bot body, including contact links, raises the cost if a Cloudflare cache rule is ever added.
+- [seo] The profile body shows email_display and phone to crawlers when show_contact_buttons is on. That matches what the page shows to people and what FullProfilePage.tsx:236 already puts in JSON-LD. If the owner wants addresses kept away from scrapers, the mailto line can be dropped without touching anything else.
+- [seo] US-530 (the named AI bot groups in robots.txt not inheriting Disallow: /api/) and US-509/US-370 (dead FAQ sets and the unused PageSEO/SchemaMarkup components) are still small, self-contained seo-lane slices.
+- [mobile] US-511 is still open: src/hooks/useOfflineStorage.ts and src/lib/offline-storage.ts plus the idb dependency. It is a clean deletion story for the next mobile round.
+- [mobile] The crawler HTML still carries index.html's <meta name="apple-mobile-web-app-title" content="AgentBio"> and apple-touch-icon /Icon.png (index.html:73,87). In the browser, useProfileManifest lifts or swaps these. Only crawlers see the crawler HTML, so the impact is low, but it is inconsistent with the agent's manifest.
