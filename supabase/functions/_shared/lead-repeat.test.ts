@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeRepeatEnquiry, MERGED_MESSAGE_MAX, MESSAGE_SEPARATOR } from './lead-repeat.ts';
+import { mergeRepeatEnquiry, MERGED_MESSAGE_MAX, MESSAGE_SEPARATOR, REPEAT_MESSAGE_NOTE } from './lead-repeat.ts';
 
 const LISTING_A = '11111111-1111-4111-8111-111111111111';
 const LISTING_B = '22222222-2222-4222-8222-222222222222';
@@ -16,8 +16,24 @@ describe('mergeRepeatEnquiry (US-513)', () => {
     expect(activity).toMatchObject({
       activity_type: 'form_submission',
       title: 'Enquired again',
-      content: 'Also, is 40 Oak Ave still available?',
+      content: REPEAT_MESSAGE_NOTE,
     });
+  });
+
+  it('never copies the visitor\'s words onto the timeline, which is not lock-gated', () => {
+    // A locked lead hides leads.message; lead_activities.content is shown on
+    // every lead. Contact details typed into the message must not reach it.
+    const incoming = 'Call me on 555-0142 or jo@example.com';
+    const { update, activity } = mergeRepeatEnquiry(
+      { message: 'Is 12 Main St available?', listing_id: null, form_data: null },
+      { message: incoming, form_data: { phone_note: '555-0142' } }
+    );
+    expect(update.message).toContain(incoming);
+    expect(activity).not.toBeNull();
+    const serialized = JSON.stringify(activity);
+    expect(serialized).not.toContain('555-0142');
+    expect(serialized).not.toContain('jo@example.com');
+    expect(activity?.content).toBe(`${REPEAT_MESSAGE_NOTE}\n\nUpdated answers: phone_note`);
   });
 
   it('logs nothing and changes nothing for an identical resubmission', () => {
@@ -49,7 +65,7 @@ describe('mergeRepeatEnquiry (US-513)', () => {
       { message: 'Thanks' }
     );
     expect(update.message).toBe(`Is it available? Thanks${MESSAGE_SEPARATOR}Thanks`);
-    expect(activity?.content).toBe('Thanks');
+    expect(activity?.content).toBe(REPEAT_MESSAGE_NOTE);
   });
 
   it('keeps the earlier message when the repeat has none', () => {
@@ -66,7 +82,7 @@ describe('mergeRepeatEnquiry (US-513)', () => {
     expect(update.message).toBe('Hi');
   });
 
-  it('bounds the stored history but puts the full new message on the timeline', () => {
+  it('bounds the stored history without cutting the earlier words', () => {
     const earlierMessage = 'a'.repeat(MERGED_MESSAGE_MAX - 10);
     const incoming = 'b'.repeat(1500);
     const { update, activity } = mergeRepeatEnquiry(
@@ -76,7 +92,7 @@ describe('mergeRepeatEnquiry (US-513)', () => {
     expect(update.message).toHaveLength(MERGED_MESSAGE_MAX);
     expect(update.message?.startsWith(earlierMessage)).toBe(true);
     expect(update.message?.endsWith('…')).toBe(true);
-    expect(activity?.content).toBe(incoming);
+    expect(activity?.content).toBe(REPEAT_MESSAGE_NOTE);
   });
 
   it('keeps the listing the lead arrived with and names the new one on the timeline', () => {

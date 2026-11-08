@@ -17,8 +17,16 @@
  * This decides what the fold writes: the messages are kept together, a listing
  * is filled in only when the lead has none, and anything the visitor added is
  * recorded on the lead's timeline as a system row (form_submission), so the
- * agent can see that they came back and what they said. A byte-identical
- * resubmission adds nothing and logs nothing.
+ * agent can see that they came back. A byte-identical resubmission adds
+ * nothing and logs nothing.
+ *
+ * The timeline row never carries the visitor's words, only that they sent
+ * another message. The words live on leads.message, which the dashboard hides
+ * on a locked lead (past the leads_per_month allowance), as the notification
+ * email does. lead_activities.content has no such gate, and a lead can become
+ * locked after the fold (a downgrade lowers the allowance), so copying the
+ * message there would let an agent read a locked lead's enquiry, contact
+ * details included, without upgrading.
  *
  * Whether the agent should also be emailed about a repeat is US-418's open
  * product question; this module deliberately does not decide it.
@@ -29,6 +37,9 @@ export const MERGED_MESSAGE_MAX = 5000;
 
 /** Placed between the earlier message and a later one in leads.message. */
 export const MESSAGE_SEPARATOR = '\n\n---\n';
+
+/** What the timeline row says in place of the new message's text. */
+export const REPEAT_MESSAGE_NOTE = 'Sent another message';
 
 export interface EarlierLead {
   message: string | null;
@@ -88,8 +99,7 @@ export function mergeRepeatEnquiry(earlier: EarlierLead, incoming: RepeatEnquiry
       message = incomingMessage;
     } else {
       const combined = `${earlierMessage}${MESSAGE_SEPARATOR}${incomingMessage}`;
-      // Over the cap the stored copy is cut, never the earlier words; the
-      // timeline row below always carries the full new message.
+      // Over the cap the stored copy is cut, never the earlier words.
       message =
         combined.length > MERGED_MESSAGE_MAX ? `${combined.slice(0, MERGED_MESSAGE_MAX - 1)}…` : combined;
     }
@@ -114,7 +124,8 @@ export function mergeRepeatEnquiry(earlier: EarlierLead, incoming: RepeatEnquiry
   }
 
   const lines: string[] = [];
-  if (messageIsNew) lines.push(incomingMessage);
+  // Not the text itself: see the header — the timeline is not lock-gated.
+  if (messageIsNew) lines.push(REPEAT_MESSAGE_NOTE);
   if (listingIsNew) {
     const address = clean(incoming.listing_address);
     lines.push(address ? `Asked about ${address}` : 'Asked about another listing');
