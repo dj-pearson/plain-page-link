@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { getAuthenticatedUser, isServiceRoleRequest } from '../_shared/service-auth.ts';
+import { requireAdminOrServiceRole } from '../_shared/auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
 import { getFunctionsUrl } from '../_shared/env.ts';
@@ -57,36 +57,21 @@ export default async (req: Request) => {
   }
 
   try {
-    // Parse request body with error handling
-    let requestBody: Record<string, unknown>;
-    try {
-      const bodyText = await req.text();
-      console.log(`[generate-article] Request body length: ${bodyText.length} chars`);
-      requestBody = bodyText ? JSON.parse(bodyText) : {};
-    } catch (parseError) {
-      console.error('[generate-article] Failed to parse request body:', parseError);
-      return errorResponse('Invalid JSON in request body', 'REQUEST_VALIDATION_FAILED', req);
-    }
-
-    const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = requestBody;
-
     const CLAUDE_API_KEY = Deno.env.get("CLAUDE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    // Detailed environment variable validation for debugging
-    const missingEnvVars: string[] = [];
-    if (!CLAUDE_API_KEY) missingEnvVars.push('CLAUDE_API_KEY');
-    if (!SUPABASE_URL) missingEnvVars.push('SUPABASE_URL');
-    if (!SUPABASE_SERVICE_ROLE_KEY) missingEnvVars.push('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (missingEnvVars.length > 0) {
-      console.error(`[generate-article] Missing environment variables: ${missingEnvVars.join(', ')}`);
-      return errorResponse(`Missing required environment variables: ${missingEnvVars.join(', ')}`, 'INTERNAL_SERVER_ERROR', req, 500);
+    // The gate below needs the database, so these two are checked before it;
+    // the Claude key is checked after it, so an anonymous caller cannot probe
+    // the server's configuration.
+    const missingDbEnv = [
+      !SUPABASE_URL && 'SUPABASE_URL',
+      !SUPABASE_SERVICE_ROLE_KEY && 'SUPABASE_SERVICE_ROLE_KEY',
+    ].filter(Boolean).join(', ');
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error(`[generate-article] Missing environment variables: ${missingDbEnv}`);
+      return errorResponse(`Missing required environment variables: ${missingDbEnv}`, 'INTERNAL_SERVER_ERROR', req, 500);
     }
-
-    // Never log any portion of the service-role key (it is the RLS-bypass master secret).
-    console.log(`[generate-article] Environment validated. Service Role Key present: ${!!SUPABASE_SERVICE_ROLE_KEY}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
@@ -95,30 +80,21 @@ export default async (req: Request) => {
       }
     });
 
-    // Authenticate: accept EITHER a service-role request (Make.com/server) OR a
-    // valid user JWT. Do NOT proceed on failure — getAuthenticatedUser returns
-    // null both for service-role and for unauthenticated callers, so a bare
-    // anon-key request (which satisfies verify_jwt) must be rejected explicitly.
-    let userId: string | null = null;
-    const serviceRole = isServiceRoleRequest(req);
+    // US-614: an admin (the blog screens) or the service role (Make.com, the
+    // scheduler) — nobody else. This inserts into `articles` with status
+    // 'published' on the company blog and hands the article to the social
+    // fan-out. It used to accept ANY signed-in account, so a free signup could
+    // publish whatever its `topic`/`customInstructions` steered the model to
+    // write, on agentbio.net, consume the admin's queued suggestions and
+    // keywords, and spend the Claude budget doing it. The gate runs before the
+    // body is read; its 401/403 reaches the caller via handleUnexpectedError.
+    const admin = await requireAdminOrServiceRole(req, supabase);
+    const userId: string | null = admin?.id ?? null;
 
-    if (serviceRole) {
-      console.log('[generate-article] Authenticated via service role key');
-    } else {
-      userId = await getAuthenticatedUser(req, supabase);
-      if (!userId) {
-        return errorResponse(
-          'Authentication required',
-          'UNAUTHORIZED',
-          req,
-          401
-        );
-      }
-      console.log('[generate-article] User authenticated with ID:', userId);
-
-      // Rate-limit this expensive AI generation per user so a single account
+    if (admin) {
+      // Rate-limit this expensive AI generation per admin so one session
       // can't run up the model bill. Service-role automation is exempt.
-      const rateLimit = await checkRateLimitDb(supabase, `user:${userId}`, 'generate-article', {
+      const rateLimit = await checkRateLimitDb(supabase, `user:${admin.id}`, 'generate-article', {
         maxRequests: 10,
         windowSeconds: 60,
         // Fail closed: if the limiter is unavailable there is nothing between
@@ -135,6 +111,24 @@ export default async (req: Request) => {
         );
       }
     }
+
+    if (!CLAUDE_API_KEY) {
+      console.error('[generate-article] Missing environment variables: CLAUDE_API_KEY');
+      return errorResponse('Missing required environment variables: CLAUDE_API_KEY', 'INTERNAL_SERVER_ERROR', req, 500);
+    }
+
+    // Parse request body with error handling
+    let requestBody: Record<string, unknown>;
+    try {
+      const bodyText = await req.text();
+      console.log(`[generate-article] Request body length: ${bodyText.length} chars`);
+      requestBody = bodyText ? JSON.parse(bodyText) : {};
+    } catch (parseError) {
+      console.error('[generate-article] Failed to parse request body:', parseError);
+      return errorResponse('Invalid JSON in request body', 'REQUEST_VALIDATION_FAILED', req);
+    }
+
+    const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = requestBody;
 
     // Priority order: 1) Queued suggestions, 2) Unused keywords, 3) AI suggestions
     let selectedTopic: string = (topic as string) || '';
