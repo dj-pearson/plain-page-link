@@ -16,7 +16,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PRICING_PLANS } from '@/config/pricing-plans';
-import { COMPETITORS } from '@/config/competitors';
+import {
+  CHECK_THEIR_SITE,
+  COMPETITORS,
+  NOT_REAL_ESTATE,
+  competitorCell,
+  type ComparisonFeature,
+  type CompetitorId,
+} from '@/config/competitors';
 
 const ROOT = join(__dirname, '..');
 
@@ -95,6 +102,36 @@ describe('comparison pages', () => {
       expect(found).toEqual([]);
     });
   }
+
+  for (const page of COMPARISON_PAGES) {
+    it(`${page} fills no competitor cell with a literal (US-507)`, () => {
+      // `beacons="Generic Contact Form"`, `later={false}`, `linktree: 'Basic'`:
+      // each was a claim about another product that nothing recorded checking.
+      // A competitor cell must be an expression that reads src/config/competitors.ts.
+      const text = read(page);
+      const literalCell = /\b(linktree|beacons|later)(?:=\{?|\s*:\s*)\s*(['"`]|true\b|false\b)/g;
+      expect(text.match(literalCell) ?? []).toEqual([]);
+    });
+
+    it(`${page} explains how to read the competitor column`, () => {
+      expect(read(page)).toMatch(/COMPETITOR_CELLS_NOTE/);
+    });
+  }
+
+  it('a competitor cell is never a cross, and an unrecorded feature says to check (US-507)', () => {
+    const ids = Object.keys(COMPETITORS) as CompetitorId[];
+    for (const id of ids) {
+      for (const [feature, cell] of Object.entries(COMPETITORS[id].features)) {
+        const rendered = competitorCell(id, feature as ComparisonFeature);
+        expect(rendered, `${id}.${feature}`).toBe(cell === 'offered' ? true : NOT_REAL_ESTATE);
+      }
+    }
+    // Nothing is recorded about Linktree's testimonials or Later's branding.
+    expect(competitorCell('linktree', 'testimonials')).toBe(CHECK_THEIR_SITE);
+    expect(competitorCell('later', 'customBranding')).toBe(CHECK_THEIR_SITE);
+    expect(competitorCell('beacons', 'listingGalleries')).toBe(NOT_REAL_ESTATE);
+    expect(competitorCell('later', 'socialScheduling')).toBe(true);
+  });
 
   it('every page that names a competitor shows when its facts were checked', () => {
     for (const page of COMPARISON_PAGES) {

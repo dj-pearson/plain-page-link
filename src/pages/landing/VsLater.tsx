@@ -8,7 +8,12 @@ import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { PRICING_PLANS, linkAllowanceSummary } from '@/config/pricing-plans';
 import { publisherOrganization } from '@/config/site-entities';
-import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
+import {
+  COMPETITORS,
+  COMPETITORS_VERIFIED_LABEL,
+  COMPETITOR_CELLS_NOTE,
+  competitorCell,
+} from '@/config/competitors';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
 
 /**
@@ -286,7 +291,7 @@ export default function VsLater() {
                 later.com
               </a>{' '}
               on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices, which change and vary
-              by region.
+              by region. {COMPETITOR_CELLS_NOTE}
             </p>
 
             <div className="glass-panel overflow-hidden">
@@ -300,35 +305,43 @@ export default function VsLater() {
                     </tr>
                   </thead>
                   <tbody>
-                    <ComparisonRow feature="Link in Bio Page" agentbio={true} later={true} />
+                    <ComparisonRow
+                      feature="Link in Bio Page"
+                      agentbio={true}
+                      later={competitorCell('later', 'linkInBioPage')}
+                    />
                     <ComparisonRow
                       feature="Link Buttons"
                       agentbio={linkAllowanceSummary()}
-                      later={true}
+                      later={competitorCell('later', 'linkButtons')}
                     />
-                    <ComparisonRow feature="Custom Branding" agentbio={true} later="Limited" />
+                    <ComparisonRow
+                      feature="Custom Branding"
+                      agentbio={true}
+                      later={competitorCell('later', 'customBranding')}
+                    />
                     <ComparisonRow
                       feature="Property Listing Cards"
                       agentbio={true}
-                      later={false}
+                      later={competitorCell('later', 'listingGalleries')}
                       description="Showcase listings with photos, prices, and details"
                     />
                     <ComparisonRow
                       feature="Lead Capture Forms"
                       agentbio={true}
-                      later={false}
+                      later={competitorCell('later', 'realEstateLeadForms')}
                       description="Built-in buyer/seller qualification forms"
                     />
                     <ComparisonRow
                       feature="Leads Sent to Your CRM"
                       agentbio="Via Zapier"
-                      later={false}
+                      later={competitorCell('later', 'leadsToCrm')}
                       description="Each new lead is posted to your Zapier webhook; CSV export on paid plans"
                     />
                     <ComparisonRow
                       feature="Calendar Booking"
                       agentbio={true}
-                      later={false}
+                      later={competitorCell('later', 'calendarBooking')}
                       description="Your Calendly booking page, opened from your profile"
                     />
                     {/* A "Real Estate Templates: Pre-designed pages for agents" row
@@ -339,7 +352,7 @@ export default function VsLater() {
                     <ComparisonRow
                       feature="Client Reviews"
                       agentbio={true}
-                      later={false}
+                      later={competitorCell('later', 'testimonials')}
                       description="Star-rated reviews clients submit from your review page"
                     />
                     {/* A "Lead Magnets/Downloads" row stood here; AgentBio has no
@@ -350,34 +363,46 @@ export default function VsLater() {
                     <ComparisonRow
                       feature="Analytics"
                       agentbio={true}
-                      later={true}
+                      later={competitorCell('later', 'analyticsDashboard')}
                       description="AgentBio: page views, link clicks, most-viewed listings and lead sources"
                     />
-                    <ComparisonRow feature="Mobile Optimization" agentbio={true} later={true} />
+                    <ComparisonRow
+                      feature="Mobile Optimization"
+                      agentbio={true}
+                      later={competitorCell('later', 'mobileOptimization')}
+                    />
                     <ComparisonRow
                       feature="Social Media Scheduling"
                       agentbio={false}
-                      later={true}
+                      later={competitorCell('later', 'socialScheduling')}
                       description="Plan and auto-post Instagram content"
                     />
                     <ComparisonRow
                       feature="Visual Content Calendar"
                       agentbio={false}
-                      later={true}
+                      later={competitorCell('later', 'contentCalendar')}
                     />
                     <ComparisonRow
                       feature="Post Scheduling (Instagram)"
                       agentbio={false}
-                      later={true}
+                      later={competitorCell('later', 'instagramScheduling')}
                     />
                     <ComparisonRow
                       feature="Media Library"
                       agentbio={false}
-                      later={true}
+                      later={competitorCell('later', 'mediaLibrary')}
                       description="Store and organize content for scheduling"
                     />
-                    <ComparisonRow feature="Hashtag Suggestions" agentbio={false} later={true} />
-                    <ComparisonRow feature="Best Time to Post" agentbio={false} later={true} />
+                    <ComparisonRow
+                      feature="Hashtag Suggestions"
+                      agentbio={false}
+                      later={competitorCell('later', 'hashtagSuggestions')}
+                    />
+                    <ComparisonRow
+                      feature="Best Time to Post"
+                      agentbio={false}
+                      later={competitorCell('later', 'bestTimeToPost')}
+                    />
                     {/* Was agentbio="$19" later="$25-$80". $19 is not one of our
                         plans (0, 29, 49, 99, 299 in pricing-plans.ts) and the same
                         page said $29 lower down; Later's figure was unsourced and

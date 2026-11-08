@@ -9,7 +9,12 @@ import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
 import { PRICING_PLANS, linkAllowanceSummary } from '@/config/pricing-plans';
-import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
+import {
+  COMPETITORS,
+  COMPETITORS_VERIFIED_LABEL,
+  COMPETITOR_CELLS_NOTE,
+  competitorCell,
+} from '@/config/competitors';
 
 /*
  * Every AgentBio figure on this page comes from PRICING_PLANS, and nothing
@@ -190,7 +195,7 @@ export default function VsBeacons() {
                   beacons.ai
                 </a>{' '}
                 on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices, which change; check
-                theirs against ours rather than taking a number from us.
+                theirs against ours rather than taking a number from us. {COMPETITOR_CELLS_NOTE}
               </p>
             </header>
 
@@ -228,37 +233,37 @@ export default function VsBeacons() {
                   <ComparisonRow
                     feature="Property Listing Galleries"
                     agentbio={true}
-                    beacons={false}
+                    beacons={competitorCell('beacons', 'listingGalleries')}
                     description="Showcase active & sold listings with photos, prices, beds/baths"
                   />
                   <ComparisonRow
                     feature="Listing Disclosures"
                     agentbio={true}
-                    beacons={false}
+                    beacons={competitorCell('beacons', 'listingDisclosures')}
                     description="Equal Housing logo, license number display, MLS number on each listing"
                   />
                   <ComparisonRow
                     feature="Real Estate Lead Forms"
                     agentbio="Buyer, Seller, Valuation"
-                    beacons="Generic Contact Form"
+                    beacons={competitorCell('beacons', 'realEstateLeadForms')}
                     description="Pre-qualification questions specific to real estate"
                   />
                   <ComparisonRow
                     feature="Showing Appointment Booking"
                     agentbio={true}
-                    beacons={false}
+                    beacons={competitorCell('beacons', 'calendarBooking')}
                     description="Your Calendly booking page, opened from your profile for showings"
                   />
                   <ComparisonRow
                     feature="Testimonials Display"
                     agentbio="Star ratings"
-                    beacons={false}
+                    beacons={competitorCell('beacons', 'testimonials')}
                     description="Client reviews with star ratings, submitted from your own review page"
                   />
                   <ComparisonRow
                     feature="Property Analytics"
                     agentbio={true}
-                    beacons={false}
+                    beacons={competitorCell('beacons', 'realEstateAnalytics')}
                     description="Which listings visitors open most, with views and visitors for each"
                   />
 
@@ -274,25 +279,25 @@ export default function VsBeacons() {
                   <ComparisonRow
                     feature="Link Buttons"
                     agentbio={AGENTBIO_LINKS_CELL}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'linkButtons')}
                     description="Links to your other pages and profiles"
                   />
                   <ComparisonRow
                     feature="Custom Branding"
                     agentbio={true}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'customBranding')}
                     description="Colors, fonts, logo customization"
                   />
                   <ComparisonRow
                     feature="Mobile Optimization"
                     agentbio={true}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'mobileOptimization')}
                     description="Responsive design for all devices"
                   />
                   <ComparisonRow
                     feature="Analytics Dashboard"
                     agentbio={true}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'analyticsDashboard')}
                     description="Traffic, clicks, and engagement metrics"
                   />
 
@@ -308,25 +313,25 @@ export default function VsBeacons() {
                   <ComparisonRow
                     feature="Email Marketing"
                     agentbio={false}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'emailMarketing')}
                     description="Built-in email campaigns (not needed for agents with CRM)"
                   />
                   <ComparisonRow
                     feature="Online Store"
                     agentbio={false}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'onlineStore')}
                     description="Sell digital products (not relevant for real estate)"
                   />
                   <ComparisonRow
                     feature="Media Kit Generator"
                     agentbio={false}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'mediaKit')}
                     description="For influencer brand partnerships (not needed for agents)"
                   />
                   <ComparisonRow
                     feature="Tipping / Donations"
                     agentbio={false}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'tipping')}
                     description="Accept fan donations (not applicable to real estate)"
                   />
 

@@ -8,7 +8,12 @@ import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { PRICING_PLANS } from '@/config/pricing-plans';
-import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
+import {
+  COMPETITORS,
+  COMPETITORS_VERIFIED_LABEL,
+  COMPETITOR_CELLS_NOTE,
+  competitorCell,
+} from '@/config/competitors';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
 
 const FAQ_ENTRIES: FaqEntry[] = [
@@ -135,7 +140,7 @@ export default function VsLinktree() {
                 </a>{' '}
                 on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices: they are shown in
                 local currency and vary by region, so check theirs against ours rather than taking a
-                number from us.
+                number from us. {COMPETITOR_CELLS_NOTE}
               </p>
             </header>
 
@@ -163,75 +168,75 @@ export default function VsLinktree() {
                     {
                       feature: 'Property Listing Galleries',
                       agentbio: true,
-                      linktree: false,
+                      linktree: competitorCell('linktree', 'listingGalleries'),
                       description:
                         'Display properties with photos, pricing, beds/baths, MLS numbers',
                     },
                     {
                       feature: 'Lead Capture Forms',
                       agentbio: 'Buyer, Seller, Home Valuation',
-                      linktree: 'Basic contact only',
+                      linktree: competitorCell('linktree', 'realEstateLeadForms'),
                       description: 'Specialized forms to qualify leads by type',
                     },
                     {
                       feature: 'Calendar Booking',
                       agentbio: 'Calendly on your page',
-                      linktree: 'External link only',
+                      linktree: competitorCell('linktree', 'calendarBooking'),
                       description:
                         'Your Calendly booking page opens from your profile for showings',
                     },
                     {
                       feature: 'Testimonials Display',
                       agentbio: true,
-                      linktree: false,
+                      linktree: competitorCell('linktree', 'testimonials'),
                       description: 'Showcase client reviews and success stories',
                     },
                     {
                       feature: 'Sold Properties Showcase',
                       agentbio: true,
-                      linktree: false,
+                      linktree: competitorCell('linktree', 'soldShowcase'),
                       description: 'Display past sales as social proof',
                     },
                     {
                       feature: 'Real Estate Analytics',
                       agentbio: true,
-                      linktree: false,
+                      linktree: competitorCell('linktree', 'realEstateAnalytics'),
                       description: 'Track which listings get most views and generate leads',
                     },
                     {
                       feature: 'Lead Scoring',
                       agentbio: 'Hot/Warm/Cold',
-                      linktree: false,
+                      linktree: competitorCell('linktree', 'leadScoring'),
                       description: 'Prioritize leads based on engagement',
                     },
                     {
                       feature: 'Listing Disclosures',
                       agentbio: true,
-                      linktree: false,
+                      linktree: competitorCell('linktree', 'listingDisclosures'),
                       description: 'Equal Housing logo, license number, MLS # on each listing',
                     },
                     {
                       feature: 'Virtual Tour Integration',
                       agentbio: true,
-                      linktree: false,
+                      linktree: competitorCell('linktree', 'virtualTours'),
                       description: 'Embed Matterport and 3D tours',
                     },
                     {
                       feature: 'Mobile Optimization',
-                      agentbio: 'Real estate focused',
-                      linktree: 'Generic',
+                      agentbio: true,
+                      linktree: competitorCell('linktree', 'mobileOptimization'),
                       description: 'Optimized for property browsing on mobile',
                     },
                     {
                       feature: 'QR Code Generation',
                       agentbio: true,
-                      linktree: true,
+                      linktree: competitorCell('linktree', 'qrCodes'),
                       description: 'Create QR codes for yard signs and marketing',
                     },
                     {
                       feature: 'Custom Branding',
-                      agentbio: 'Full customization',
-                      linktree: 'Limited',
+                      agentbio: true,
+                      linktree: competitorCell('linktree', 'customBranding'),
                       description: 'Match your brokerage or personal brand',
                     },
                     {
