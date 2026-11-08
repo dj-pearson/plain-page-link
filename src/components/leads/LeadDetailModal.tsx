@@ -82,6 +82,7 @@ import { describeLeadOrigin } from '@/lib/leadAttribution';
 import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButton';
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
 import { LeadListingCard } from '@/components/leads/LeadListingCard';
+import { LeadViewedListings } from '@/components/leads/LeadViewedListings';
 import { LeadAssigneeControl } from '@/components/leads/LeadAssigneeControl';
 import { describeLeadAnswers } from '@/lib/leadFormSchema';
 import { isAgentAuthoredActivityType } from '@/lib/leadActivityTypes';
@@ -620,6 +621,9 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               />
             </div>
           )}
+
+          {/* The listings this visitor opened first (US-531). */}
+          <LeadViewedListings lead={lead} />
 
           {/* What they told you (US-264). Every answer the form collected,
               columns and form_data alike; this used to show source, address

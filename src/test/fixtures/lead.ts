@@ -22,6 +22,7 @@ export const mockLead: Lead = {
   email_hash: null,
   update_token_hash: null,
   update_token_expires_at: null,
+  visitor_id: null,
 
   assigned_to: null,
   listing_id: null,

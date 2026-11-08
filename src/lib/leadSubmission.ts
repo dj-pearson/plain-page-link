@@ -20,7 +20,7 @@ import { callEdgeFunction } from '@/lib/edgeFunctions';
 import { getLeadAttribution } from '@/lib/attribution';
 import { logger } from '@/lib/logger';
 import type { SpamSignals } from '@/hooks/useSpamGuard';
-import { trackFormSubmit } from '@/lib/analyticsEvents';
+import { getVisitorId, trackFormSubmit } from '@/lib/analyticsEvents';
 
 /** Lead types accepted by the edge function's validateLeadData(). */
 export type LeadType = 'buyer' | 'seller' | 'valuation' | 'contact';
@@ -139,7 +139,10 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
     // The function answers { success, data: { lead_id, update_token } } and
     // callEdgeFunction unwraps `data`. This read `leadId`, which the server has
     // never sent, so no caller ever got the id back (found in US-228).
-    const result = await callEdgeFunction<{ lead_id?: string | null; update_token?: string | null }>('submit-lead', {
+    const result = await callEdgeFunction<{
+      lead_id?: string | null;
+      update_token?: string | null;
+    }>('submit-lead', {
       body: {
         user_id: leadData.agentId,
         lead_type: leadData.leadType,
@@ -156,6 +159,9 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
         // lead in the table has four NULLs where its attribution belongs
         // (US-188).
         ...getLeadAttribution(),
+        // The id this browser's listing_view events carry, so the lead detail
+        // can show which homes the visitor opened before asking (US-531).
+        visitor_id: getVisitorId() ?? undefined,
         ...columns,
         form_data: Object.keys(formData).length > 0 ? formData : undefined,
         ...leadData.spam,
@@ -202,7 +208,10 @@ export async function enrichLead(
     return { success: true, leadId };
   } catch (error) {
     logger.error('Lead enrichment failed', error as Error);
-    return { success: false, error: error instanceof Error ? error.message : 'Could not save those details.' };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Could not save those details.',
+    };
   }
 }
 
@@ -214,6 +223,10 @@ export async function enrichLead(
  * counted. Successful submissions now go to analytics_events as form_submit;
  * failures are the visitor's problem to retry, not a funnel stage.
  */
-export function trackFormSubmission(agentId: string | undefined, formType: string, success: boolean) {
+export function trackFormSubmission(
+  agentId: string | undefined,
+  formType: string,
+  success: boolean
+) {
   if (success) void trackFormSubmit(agentId, formType);
 }

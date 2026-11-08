@@ -23,6 +23,7 @@ import { useSpamGuard } from '@/hooks/useSpamGuard';
 import { HoneypotField } from '@/components/forms/HoneypotField';
 import { getLeadAttribution } from '@/lib/attribution';
 import { edgeFunctions } from '@/lib/edgeFunctions';
+import { getVisitorId } from '@/lib/analyticsEvents';
 
 interface ContactBlockProps {
   config: ContactBlockConfig;
@@ -111,6 +112,8 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
         // device was already sent from here, with its own copy of the
         // user-agent test; the campaign it came from was not (US-188).
         ...getLeadAttribution(),
+        // Joins the lead to this browser's listing views (US-531).
+        visitor_id: getVisitorId() ?? undefined,
         ...signals(),
       };
 

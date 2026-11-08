@@ -2790,6 +2790,7 @@ export type Database = {
           utm_campaign: string | null;
           utm_medium: string | null;
           utm_source: string | null;
+          visitor_id: string | null;
         };
         Insert: {
           assigned_to?: string | null;
@@ -2823,6 +2824,7 @@ export type Database = {
           utm_campaign?: string | null;
           utm_medium?: string | null;
           utm_source?: string | null;
+          visitor_id?: string | null;
         };
         Update: {
           assigned_to?: string | null;
@@ -2856,6 +2858,7 @@ export type Database = {
           utm_campaign?: string | null;
           utm_medium?: string | null;
           utm_source?: string | null;
+          visitor_id?: string | null;
         };
         Relationships: [
           {
