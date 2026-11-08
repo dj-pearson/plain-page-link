@@ -43,7 +43,11 @@ export const SEO_CONFIG = {
   // so twitter:site named a different account on every page (US-178).
   twitterHandle: X_HANDLE,
   locale: 'en_US',
-  themeColor: '#0ea5e9',
+  // One brand theme colour for the browser chrome: index.html, this, the
+  // dashboard manifest and the per-agent manifest must agree, or the installed
+  // PWA's title bar changes colour as React mounts (US-486). Held together by
+  // src/config/theme-color.test.ts.
+  themeColor: '#2563eb',
 
   // Organization info for schema
   organization: {

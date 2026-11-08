@@ -89,6 +89,7 @@ export function buildProfileManifest(
     scope: page,
     display: 'standalone',
     background_color: '#ffffff',
+    // SEO_CONFIG.themeColor; src/config/theme-color.test.ts holds them equal.
     theme_color: '#2563eb',
     // The agent's photo first. Chrome takes the icon nearest the size it
     // wants and, at equal sizes, the first one listed — so the photo wins at

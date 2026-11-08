@@ -1,7 +1,7 @@
 import { Helmet } from 'react-helmet-async';
 import { X_HANDLE } from '@/config/social-profiles';
 import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
-import { getBaseUrl } from '@/config/seo.config';
+import { getBaseUrl, SEO_CONFIG } from '@/config/seo.config';
 import { buildStructuredData } from '@/lib/structured-data-graph';
 
 interface SEOHeadProps {
@@ -168,7 +168,7 @@ export const SEOHead = ({
       <meta name="twitter:image:alt" content={fullTitle} />
 
       {/* Additional SEO Tags */}
-      <meta name="theme-color" content="#0ea5e9" />
+      <meta name="theme-color" content={SEO_CONFIG.themeColor} />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
