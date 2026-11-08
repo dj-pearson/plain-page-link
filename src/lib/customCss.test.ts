@@ -1,5 +1,16 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CUSTOM_CSS_MAX_LENGTH, sanitizeCustomCss } from './customCss';
+import { CUSTOM_CSS_MAX_LENGTH, CUSTOM_KEYFRAMES_PREFIX, sanitizeCustomCss } from './customCss';
+
+const ROOT = resolve(__dirname, '../..');
+
+function sourceFiles(path: string): string[] {
+  if (statSync(path).isDirectory()) {
+    return readdirSync(path).flatMap((entry) => sourceFiles(join(path, entry)));
+  }
+  return /\.(css|tsx?)$/.test(path) && !/customCss(\.test)?\.ts$/.test(path) ? [path] : [];
+}
 
 const S = '.ab-custom-css';
 
@@ -39,10 +50,116 @@ describe('sanitizeCustomCss', () => {
     const { css, removed } = sanitizeCustomCss(
       '@import url("https://evil.test/x.css"); @charset "utf-8"; @font-face { font-family: x; src: url(https://evil.test/f.woff) } @keyframes spin { to { opacity: 0 } } p { color: red }'
     );
-    expect(css).toBe(`${S} p { color: red; }`);
-    expect(removed).toEqual(
-      expect.arrayContaining(['@import', '@charset', '@font-face', '@keyframes'])
-    );
+    expect(css).toBe(`@keyframes ab-u-spin { to { opacity: 0; } }\n${S} p { color: red; }`);
+    expect(removed).toEqual(expect.arrayContaining(['@import', '@charset', '@font-face']));
+    expect(removed).not.toContain('@keyframes');
+  });
+
+  describe('@keyframes (US-523)', () => {
+    it('keeps keyframes under the agent prefix and renames animation-name to match', () => {
+      const { css, removed } = sanitizeCustomCss(
+        '.card { animation-name: fade } @keyframes fade { from { opacity: 0 } 50%, 75.5% { opacity: .5 } to { opacity: 1 } }'
+      );
+      expect(css).toBe(
+        `${S} .card { animation-name: ab-u-fade; }\n` +
+          '@keyframes ab-u-fade { from { opacity: 0; } 50%, 75.5% { opacity: .5; } to { opacity: 1; } }'
+      );
+      expect(removed).toEqual([]);
+    });
+
+    it('renames the name inside the animation shorthand, keeping timing functions whole', () => {
+      const { css } = sanitizeCustomCss(
+        '@keyframes rise { to { transform: translateY(-4px) } } a { animation: rise 2s cubic-bezier(0.2, 0, 0, 1) infinite, other 1s }'
+      );
+      expect(css).toContain(
+        `${S} a { animation: ab-u-rise 2s cubic-bezier(0.2, 0, 0, 1) infinite, other 1s; }`
+      );
+      expect(
+        sanitizeCustomCss(
+          '@-webkit-keyframes w { to { opacity: 0 } } b { -webkit-animation-name: w }'
+        ).css
+      ).toBe(
+        `@keyframes ab-u-w { to { opacity: 0; } }\n${S} b { -webkit-animation-name: ab-u-w; }`
+      );
+    });
+
+    it("never emits an unprefixed keyframe, so the app's own animations cannot be redefined", () => {
+      const { css } = sanitizeCustomCss(
+        '@keyframes pulse { to { opacity: 0 } } @keyframes float { to { opacity: 0 } } @media (min-width: 1px) { @keyframes spin { to { opacity: 0 } } }'
+      );
+      const names = [...css.matchAll(/@keyframes\s+([^\s{]+)/g)].map((m) => m[1]);
+      expect(names).toEqual(['ab-u-pulse', 'ab-u-float', 'ab-u-spin']);
+    });
+
+    it('refuses animations on the container, where a keyframe could move it', () => {
+      const { css, removed } = sanitizeCustomCss(
+        '@keyframes move { to { transform: translateY(900px) } } body { animation: move 1s forwards; color: red } :root { -webkit-animation-name: move } body a { animation-name: move }'
+      );
+      expect(css).toBe(
+        '@keyframes ab-u-move { to { transform: translateY(900px); } }\n' +
+          `${S} { color: red; }\n${S} a { animation-name: ab-u-move; }`
+      );
+      expect(removed).toEqual(
+        expect.arrayContaining([
+          'animation on the page container (html, body, :root)',
+          '-webkit-animation-name on the page container (html, body, :root)',
+        ])
+      );
+    });
+
+    it('leaves a reference to a keyframe the agent did not define alone', () => {
+      expect(sanitizeCustomCss('a { animation: spin 1s linear infinite }').css).toBe(
+        `${S} a { animation: spin 1s linear infinite; }`
+      );
+    });
+
+    it('treats shorthand keywords as keywords even when a keyframe shares the name', () => {
+      const { css } = sanitizeCustomCss(
+        '@keyframes ease { to { opacity: 0 } } a { animation: ease 1s; animation-name: ease }'
+      );
+      expect(css).toContain(`${S} a { animation: ease 1s; animation-name: ab-u-ease; }`);
+    });
+
+    it('refuses reserved, quoted or malformed keyframe names and selectors', () => {
+      for (const input of [
+        '@keyframes none { to { opacity: 0 } }',
+        '@keyframes inherit { to { opacity: 0 } }',
+        '@keyframes "quoted" { to { opacity: 0 } }',
+        '@keyframes a b { to { opacity: 0 } }',
+        '@keyframes { to { opacity: 0 } }',
+      ]) {
+        const { css, removed } = sanitizeCustomCss(input);
+        expect(css).toBe('');
+        expect(removed.join(' ')).toContain('@keyframes with the name');
+      }
+      const bad = sanitizeCustomCss('@keyframes k { body { opacity: 0 } to { opacity: 1 } }');
+      expect(bad.css).toBe('@keyframes ab-u-k { to { opacity: 1; } }');
+      expect(bad.removed.join(' ')).toContain('keyframe selector');
+    });
+
+    it('no app stylesheet defines a keyframe in the agent namespace', () => {
+      const offenders = [
+        ...sourceFiles(join(ROOT, 'src')),
+        join(ROOT, 'tailwind.config.ts'),
+      ].filter((file) => {
+        const text = readFileSync(file, 'utf8');
+        return (
+          text.includes(`@keyframes ${CUSTOM_KEYFRAMES_PREFIX}`) ||
+          text.includes(`'${CUSTOM_KEYFRAMES_PREFIX}`) ||
+          text.includes(`"${CUSTOM_KEYFRAMES_PREFIX}`)
+        );
+      });
+      expect(offenders).toEqual([]);
+    });
+
+    it('applies the declaration filters inside keyframes', () => {
+      const { css, removed } = sanitizeCustomCss(
+        '@keyframes k { to { background: url(https://tracker.test/p.gif); color: red } }'
+      );
+      expect(css).toBe('@keyframes ab-u-k { to { color: red; } }');
+      expect(removed).toContain('url() pointing at another site');
+      expect(sanitizeCustomCss('@keyframes k { to { color: red; } } }').css).toBe('');
+    });
   });
 
   it('keeps @media and @supports, scoping the rules inside', () => {
