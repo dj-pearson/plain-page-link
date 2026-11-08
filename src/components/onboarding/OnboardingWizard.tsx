@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Check,
   ArrowRight,
@@ -13,6 +13,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import type { TablesInsert } from '@/integrations/supabase/types';
+import {
+  detectBrowserTimeZone,
+  isValidTimeZone,
+  listTimeZones,
+  timeZoneLabel,
+} from '@/lib/timeZone';
 
 /**
  * OnboardingWizard Component
@@ -71,6 +77,11 @@ interface ProfileBasics {
   bio: string;
   phone: string;
   location: string;
+  /**
+   * US-446: an IANA zone, prefilled from the stored one or this device's, or
+   * '' when neither is known. The morning email and "due today" follow it.
+   */
+  timeZone: string;
 }
 
 /**
@@ -167,7 +178,11 @@ interface OnboardingWizardProps {
   isSaving?: boolean;
   /** Why the last save failed, shown inline next to the button that retries it. */
   saveError?: string | null;
-  userProfile?: { full_name?: string | null; username?: string | null } | null;
+  userProfile?: {
+    full_name?: string | null;
+    username?: string | null;
+    timezone?: string | null;
+  } | null;
 }
 
 export function OnboardingWizard({
@@ -191,6 +206,7 @@ export function OnboardingWizard({
       bio: '',
       phone: '',
       location: '',
+      timeZone: initialOnboardingTimeZone(userProfile?.timezone),
     },
     firstListing: {
       photo: null as File | null,
@@ -443,6 +459,18 @@ function StepChooseTemplate({
   );
 }
 
+/**
+ * US-446: the zone the wizard starts on — the one already saved, else this
+ * device's, else '' (nothing chosen, so nothing is written).
+ */
+export function initialOnboardingTimeZone(
+  stored: string | null | undefined,
+  detected: string | null = detectBrowserTimeZone()
+): string {
+  if (isValidTimeZone(stored)) return stored;
+  return detected ?? '';
+}
+
 function StepProfileBasics({
   data,
   onChange,
@@ -450,6 +478,12 @@ function StepProfileBasics({
   data: ProfileBasics;
   onChange: (data: ProfileBasics) => void;
 }) {
+  const zones = useMemo(() => listTimeZones([data.timeZone]), [data.timeZone]);
+  const zoneLabels = useMemo(() => {
+    const now = new Date();
+    return new Map(zones.map((zone) => [zone, timeZoneLabel(zone, now)]));
+  }, [zones]);
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -567,6 +601,30 @@ function StepProfileBasics({
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="onboarding-timezone" className="block text-sm font-medium mb-2">
+            Time zone
+          </label>
+          <select
+            id="onboarding-timezone"
+            value={data.timeZone}
+            onChange={(e) => onChange({ ...data, timeZone: e.target.value })}
+            aria-describedby="onboarding-timezone-hint"
+            className="w-full min-h-[44px] px-4 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+          >
+            {data.timeZone === '' && <option value="">Choose your time zone</option>}
+            {zones.map((zone) => (
+              <option key={zone} value={zone}>
+                {zoneLabels.get(zone)}
+              </option>
+            ))}
+          </select>
+          <p id="onboarding-timezone-hint" className="mt-1 text-xs text-gray-500">
+            Your morning email arrives in your own morning, and follow-ups fall due by your own day.
+            You can change it later in Settings.
+          </p>
         </div>
       </div>
     </div>

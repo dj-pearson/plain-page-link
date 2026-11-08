@@ -18,6 +18,7 @@
  * into the wizard.
  */
 import type { Profile } from '@/types/profile';
+import { isValidTimeZone } from '@/lib/timeZone';
 
 export interface OnboardingProfileInput {
   fullName?: string;
@@ -71,4 +72,22 @@ export function buildOnboardingProfileUpdate(input: OnboardingProfileInput): Par
   updates.onboarding_completed_at = input.completedAt ?? new Date().toISOString();
 
   return updates;
+}
+
+/**
+ * US-446: the time zone onboarding should write, or null to write nothing.
+ *
+ * Agents who never opened Settings or saved a notification setting stayed on
+ * the UTC edition of the morning email. Onboarding now offers the detected
+ * zone. It is written in its own update, never folded into
+ * buildOnboardingProfileUpdate: validate_profile_timezone refuses a name the
+ * database's tz data does not know, and a refusal there must not take
+ * onboarding_completed_at and the rest of the profile down with it (US-108).
+ */
+export function onboardingTimeZoneToSave(
+  chosen: string | null | undefined,
+  stored: string | null | undefined
+): string | null {
+  if (!isValidTimeZone(chosen)) return null;
+  return chosen === stored ? null : chosen;
 }
