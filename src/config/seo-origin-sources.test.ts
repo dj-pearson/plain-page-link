@@ -31,6 +31,10 @@ const SEO_LAYER = [
   'src/pages/features',
   'src/pages/landing',
   'src/pages/public/Landing.tsx',
+  // An agent's page and its listing pages canonicalise to the configured
+  // origin too (US-595): nothing serves a profile from a custom domain.
+  'src/pages/public/FullProfilePage.tsx',
+  'src/pages/public/ListingPage.tsx',
   'src/pages/tools',
 ];
 
@@ -46,14 +50,13 @@ const SEO_LAYER = [
 /**
  * Where the visitor's host is the right answer.
  *
- * A tenant's page-builder page and public profile may be served from that
- * agent's own custom_domain, and there a self-referencing canonical on the
+ * A tenant's page-builder page may be served from that agent's own
+ * custom_domain, and there a self-referencing canonical on the
  * visitor's host is correct rather than wrong.
  */
 const ALLOWED = new Map([
   ['src/lib/seo.ts', 'the /p/{slug} builders: a tenant page can live on a custom domain'],
   ['src/lib/utils.ts', 'defines getSafeOrigin itself'],
-  ['src/pages/public/FullProfilePage.tsx', 'a profile can live on a custom domain'],
 ]);
 
 function walk(target: string, files: string[] = []): string[] {

@@ -40,7 +40,7 @@ import { isUnpublishedPreview } from '@/lib/profilePublishing';
 import { selectAvailableListings, selectListingForPage } from '@/lib/publicListingVisibility';
 import { listingJsonLdNodes } from '@/lib/listingJsonLd';
 import { needsCanonicalRedirect, normalizeUsername } from '@/lib/username';
-import { getSafeOrigin } from '@/lib/utils';
+import { getBaseUrl } from '@/config/seo.config';
 import type { PublicProfileListing } from '@/types';
 
 // Mounted, and fetched, only while open (US-244).
@@ -125,7 +125,9 @@ export default function ListingPage() {
   const { profile } = data;
   const agentName = profile.full_name || profile.username;
   const profilePath = `/${encodeURIComponent(profile.username)}`;
-  const origin = getSafeOrigin();
+  // The configured origin, not the visitor's host (US-595), the same rule as
+  // FullProfilePage and the crawler HTML.
+  const origin = getBaseUrl();
   const profileUrl = `${origin}${profilePath}`;
 
   // Sold and withdrawn homes come off a profile; an old link to one should land

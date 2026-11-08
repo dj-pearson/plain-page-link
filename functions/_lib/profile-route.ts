@@ -20,6 +20,7 @@ import {
   type ProfileMeta,
 } from './social-meta';
 import { profileManifestPath } from './profile-manifest';
+import { siteOrigin } from './site-origin';
 import { needsCanonicalRedirect, normalizeUsername } from '../../src/lib/username';
 import {
   selectAvailableListings,
@@ -33,6 +34,8 @@ export interface Env {
   VITE_SUPABASE_ANON_KEY?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
+  /** The site's canonical origin (US-595); see site-origin.ts. */
+  VITE_APP_URL?: string;
   /** Cloudflare Pages' static-asset binding, used to read dist/404.html. */
   ASSETS?: { fetch: (request: Request) => Promise<Response> };
 }
@@ -387,7 +390,10 @@ export async function serveProfileRoute(
     return notFoundResponse(context);
   }
 
-  const origin = new URL(request.url).origin;
+  // The canonical origin, not the host that served this request (US-595): on
+  // the *.pages.dev alias, the request origin made every agent's page claim to
+  // be the original there too.
+  const origin = siteOrigin(env);
   let tags = buildProfileTags(profile, origin);
   // Undefined means injectSocialTags' heading-and-summary body.
   let body: string | undefined;
