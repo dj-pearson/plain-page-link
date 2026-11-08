@@ -77,6 +77,10 @@ describe('no select("*") on listings in the files US-342 named', () => {
         /\.from\(['"]listings['"]\)\s*(\/\/[^\n]*\s*)*\.select\(\s*['"]\*['"]/
       );
       expect(src).not.toMatch(/\.from\(['"]listings['"]\)\s*(\/\/[^\n]*\s*)*\.select\(\s*\)/);
+      // Any bare select() or select('*') anywhere in the file, including one
+      // chained after .insert(...) or .update(...).eq(...): PostgREST reads a
+      // bare select() as '*', which a column-level grant would refuse.
+      expect(src).not.toMatch(/\.select\(\s*(['"]\*['"])?\s*\)/);
     }
   );
 });

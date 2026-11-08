@@ -146,7 +146,8 @@ export function useListings() {
           user_id: user.id,
           ...listingData,
         })
-        .select()
+        // Named columns, not a bare select() (= '*'): see OWNER_LISTING_COLUMNS.
+        .select(OWNER_LISTING_COLUMNS)
         .single();
 
       if (error) {
@@ -187,7 +188,8 @@ export function useListings() {
         .update(updates)
         .eq('id', id)
         .eq('user_id', user.id)
-        .select()
+        // Named columns, not a bare select() (= '*'): see OWNER_LISTING_COLUMNS.
+        .select(OWNER_LISTING_COLUMNS)
         .single();
 
       if (error) throw error;
