@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { getCanonicalUrl } from '@/config/seo.config';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { Link } from 'react-router-dom';
 import { BarChart3, Eye, MousePointer, TrendingUp, Share2, Check } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
@@ -24,9 +25,17 @@ export default function Analytics() {
   // Generate FAQ schema for AI search optimization
   const faqSchema = generateFAQSchema(FEATURE_FAQS.analytics);
 
+  const canonicalUrl = getCanonicalUrl('/features/analytics');
+
+  // Named by the canonical URL, the id SEOHead merges its speakable block
+  // into, so the page is one WebPage node rather than two anonymous halves
+  // (US-480).
   const pageSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
+    '@id': canonicalUrl,
+    url: canonicalUrl,
+    isPartOf: { '@id': websiteId(getBaseUrl()) },
     name: 'Real Estate Analytics & Insights - AgentBio',
     description:
       'Track which listings get the most views, where leads come from, and which properties generate inquiries. Data-driven insights for real estate agents.',
@@ -47,7 +56,7 @@ export default function Analytics() {
           'lead source tracking',
           'Instagram traffic analytics',
         ]}
-        canonicalUrl={getCanonicalUrl('/features/analytics')}
+        canonicalUrl={canonicalUrl}
         schema={schema}
         aiSearchOptimized={true}
         speakableSelectors={['h1', 'h2', '.glass-body']}

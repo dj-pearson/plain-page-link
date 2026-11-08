@@ -6,16 +6,25 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
-import { getCanonicalUrl } from '@/config/seo.config';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { generateFAQSchema, generateCombinedSchema, FEATURE_FAQS } from '@/lib/faq-schema';
 
 export default function LeadCapture() {
   // Generate FAQ schema for AI search optimization
   const faqSchema = generateFAQSchema(FEATURE_FAQS.leadCapture);
 
+  const canonicalUrl = getCanonicalUrl('/features/lead-capture');
+
+  // Named by the canonical URL, the id SEOHead merges its speakable block
+  // into, so the page is one WebPage node rather than two anonymous halves
+  // (US-480).
   const pageSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
+    '@id': canonicalUrl,
+    url: canonicalUrl,
+    isPartOf: { '@id': websiteId(getBaseUrl()) },
     name: 'Lead Capture Forms for Real Estate Agents - AgentBio',
     description:
       'Capture qualified buyer and seller leads with pre-built forms. Buyer inquiries, seller leads, and home valuation requests—all optimized for real estate.',
@@ -53,7 +62,7 @@ export default function LeadCapture() {
           'home valuation request',
           'real estate lead generation',
         ]}
-        canonicalUrl={getCanonicalUrl('/features/lead-capture')}
+        canonicalUrl={canonicalUrl}
         schema={schema}
         aiSearchOptimized={true}
         speakableSelectors={['h1', 'h2', '.glass-body']}
