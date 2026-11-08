@@ -67,3 +67,83 @@ export function normalizeAssigneeFilter(raw: string | null | undefined): Assigne
   if (raw === 'unassigned') return 'unassigned';
   return UUID_RE.test(raw) ? raw.toLowerCase() : null;
 }
+
+/**
+ * Bulk "Assign to…" on the Leads list (US-573, closes US-505).
+ *
+ * Only a lead's owner can change assigned_to (the leads UPDATE policy's WITH
+ * CHECK), so a selection that mixes the owner's leads with leads another agent
+ * assigned to them can move only the owner's. Those are reported, not hidden.
+ */
+export interface BulkAssignPlan {
+  /** Ids to send. An id no longer loaded is sent; the server decides. */
+  toUpdate: string[];
+  /** Selected leads owned by someone else: the viewer cannot hand them on. */
+  notOwned: number;
+  /** The viewer's leads already held by the chosen person. */
+  unchanged: number;
+}
+
+export function planBulkAssign(
+  selectedIds: Iterable<string>,
+  loaded: readonly { id: string; user_id: string; assigned_to: string | null }[],
+  viewerId: string,
+  next: string | null
+): BulkAssignPlan {
+  const byId = new Map(loaded.map((l) => [l.id, l]));
+  const plan: BulkAssignPlan = { toUpdate: [], notOwned: 0, unchanged: 0 };
+  for (const id of selectedIds) {
+    const lead = byId.get(id);
+    if (!lead) {
+      plan.toUpdate.push(id);
+    } else if (lead.user_id !== viewerId) {
+      plan.notOwned += 1;
+    } else if ((lead.assigned_to ?? null) === next) {
+      plan.unchanged += 1;
+    } else {
+      plan.toUpdate.push(id);
+    }
+  }
+  return plan;
+}
+
+const leadsWord = (n: number) => `${n} lead${n === 1 ? '' : 's'}`;
+
+/**
+ * What the toast says after a bulk assign. `updated` is how many of the ids
+ * sent the server reports as changed; the rest were deleted meanwhile or are
+ * not the viewer's. `partial` is true when anything selected did not end up
+ * with the chosen person.
+ */
+export function summarizeBulkAssign(
+  plan: BulkAssignPlan,
+  updated: number,
+  target: string | null
+): { title: string; description: string; partial: boolean } {
+  const missed = Math.max(0, plan.toUpdate.length - updated);
+  const done = updated + plan.unchanged;
+  const verb = done === 1 ? 'is' : 'are';
+  const parts = [
+    target
+      ? `${leadsWord(done)} ${verb} now assigned to ${target}.`
+      : `${leadsWord(done)} ${verb} now unassigned.`,
+  ];
+  if (plan.notOwned > 0) {
+    parts.push(
+      `${leadsWord(plan.notOwned)} not changed: only a lead’s owner can reassign it, and ${
+        plan.notOwned === 1 ? 'that one belongs' : 'those belong'
+      } to another agent.`
+    );
+  }
+  if (missed > 0) {
+    parts.push(
+      `${leadsWord(missed)} could not be changed; ${missed === 1 ? 'it was' : 'they were'} deleted or ${missed === 1 ? 'is' : 'are'} no longer yours.`
+    );
+  }
+  const partial = plan.notOwned > 0 || missed > 0;
+  return {
+    title: partial ? 'Some leads were not reassigned' : 'Leads reassigned',
+    description: parts.join(' '),
+    partial,
+  };
+}
