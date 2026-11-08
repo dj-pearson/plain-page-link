@@ -2,12 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  buildExportDocument,
   collectSections,
   ExportIncompleteError,
+  layoutSectionKeys,
   maskLoginAttempt,
   readAllRows,
   sectionCounts,
   SECTIONS,
+  writeExportDocument,
+  type CollectedSections,
   type ExportReader,
   type ReadResult,
   type Row,
@@ -221,5 +225,103 @@ describe('maskLoginAttempt', () => {
   it('reports a fingerprint as present without returning it', () => {
     expect(maskLoginAttempt({ id: '1', device_fingerprint: 'abc' }).device_fingerprint).toBe('[PRESENT]');
     expect(maskLoginAttempt({ id: '2', device_fingerprint: null }).device_fingerprint).toBeNull();
+  });
+});
+
+describe('writeExportDocument (US-576)', () => {
+  const NOW = new Date('2026-11-08T09:00:00.000Z');
+  const subject = { id: 'u', email: 'ann@example.com', created_at: '2026-01-01T00:00:00Z', last_sign_in_at: null };
+  const decrypt = async (v: string | null) => (v ? v.replace('enc:', 'plain:') : v);
+
+  /** A row for every section, with nesting and characters JSON has to escape. */
+  const tables = (): Record<string, Row[]> => {
+    const t: Record<string, Row[]> = {};
+    for (const spec of SECTIONS) t[spec.table] = spec.single ? [{ id: `${spec.key}-1` }] : rowsOf(3);
+    t.profiles = [{ id: 'u', bio: 'Line one\nline "two"', specialties: ['luxury', { nested: [1, null] }] }];
+    t.user_settings = [];
+    t.leads = Array.from({ length: 25 }, (_, i) => ({
+      id: String(i),
+      name: `Lead ${i}`,
+      encrypted_email: `enc:${i}@example.com`,
+      encrypted_phone: i % 2 ? null : `enc:555-${i}`,
+      form_data: { answers: [{ q: 'Budget?', a: '$1M\t+' }] },
+    }));
+    t.contacts = [];
+    t.login_attempts = [
+      { id: 'a1', device_fingerprint: 'fp' },
+      { id: 'a2', device_fingerprint: null },
+    ];
+    t.notifications = rowsOf(12);
+    return t;
+  };
+
+  /** CollectedSections as collectSections returns them, built directly so key order is fixed. */
+  const collectedFrom = (t: Record<string, Row[]>, maxRows = Infinity): CollectedSections => {
+    const collected: CollectedSections = { rows: {}, singles: {}, truncated: [] };
+    for (const spec of SECTIONS.filter((s) => !s.single)) {
+      const all = t[spec.table] ?? [];
+      collected.rows[spec.key] = all.slice(0, maxRows);
+      if (all.length >= maxRows) collected.truncated.push(spec.key);
+    }
+    for (const spec of SECTIONS.filter((s) => s.single)) collected.singles[spec.key] = t[spec.table]?.[0] ?? null;
+    collected.truncated.sort();
+    return collected;
+  };
+
+  it('writes exactly the bytes of the in-memory document, pretty-printed', async () => {
+    const t = tables();
+    const { reader } = fakeReader(t);
+    const written = await writeExportDocument(reader, subject, decrypt, NOW, 10);
+    const expected = await buildExportDocument(subject, collectedFrom(t), decrypt, NOW);
+    expect(written.chunks.join('')).toBe(JSON.stringify(expected, null, 2));
+    expect(written.counts).toEqual(sectionCounts(collectedFrom(t)));
+
+    const doc = JSON.parse(written.chunks.join(''));
+    expect(doc.leads[0]).toMatchObject({ email: 'plain:0@example.com', phone: 'plain:555-0' });
+    expect(doc.leads[0]).not.toHaveProperty('encrypted_email');
+    expect(doc.security.loginAttempts[0].device_fingerprint).toBe('[PRESENT]');
+  });
+
+  it('matches the in-memory document for truncated sections too', async () => {
+    const t = tables();
+    const { reader } = fakeReader(t);
+    const written = await writeExportDocument(reader, subject, decrypt, NOW, 4, 10);
+    const expected = await buildExportDocument(subject, collectedFrom(t, 10), decrypt, NOW);
+    expect(written.chunks.join('')).toBe(JSON.stringify(expected, null, 2));
+    expect(written.truncated).toEqual(['leads', 'notifications']);
+  });
+
+  it('reads one page at a time, never two sections at once', async () => {
+    const base = fakeReader(tables()).reader;
+    let inFlight = 0;
+    let peak = 0;
+    const track = <T,>(read: () => PromiseLike<T>): Promise<T> => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      return new Promise<T>((resolve) => setTimeout(() => resolve(read()), 0)).finally(() => {
+        inFlight -= 1;
+      });
+    };
+    const reader: ExportReader = {
+      page: (spec, userId, from, to) => track(() => base.page(spec, userId, from, to)),
+      one: (spec, userId) => track(() => base.one(spec, userId)),
+    };
+    await writeExportDocument(reader, subject, decrypt, NOW, 10);
+    expect(peak).toBe(1);
+  });
+
+  it('fails, naming every section it could not read, instead of writing a partial document', async () => {
+    const { reader } = fakeReader(tables(), (spec, from) =>
+      (spec.table === 'leads' && from === 10) || spec.table === 'user_settings' ? 'timeout' : null
+    );
+    const error = await writeExportDocument(reader, subject, decrypt, NOW, 10).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ExportIncompleteError);
+    expect((error as ExportIncompleteError).failed.map((f) => f.section)).toEqual(['settings', 'leads']);
+  });
+
+  it('writes every section exactly once', () => {
+    const keys = layoutSectionKeys();
+    expect([...keys].sort()).toEqual(SECTIONS.map((s) => s.key).sort());
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });

@@ -21,7 +21,7 @@ import {
   type HeldExport,
   type QueuedExport,
 } from './gdpr-export-queue.ts';
-import { ExportIncompleteError, type CollectedSections } from './gdpr-export.ts';
+import type { ExportReader, ReadResult, Row, SectionSpec } from './gdpr-export.ts';
 
 const NOW = new Date('2026-11-07T12:00:00.000Z');
 const SITE = 'https://agentbio.net';
@@ -37,15 +37,26 @@ function request(overrides: Partial<QueuedExport> = {}): QueuedExport {
   };
 }
 
-const COLLECTED: CollectedSections = {
-  rows: {
-    leads: [{ id: 'l1', name: 'Ann', encrypted_email: 'enc:v1:ann', encrypted_phone: null }],
-    contacts: [],
-    listings: [{ id: 'x1' }],
-  },
-  singles: { profile: { id: 'user-1', username: 'ann' } },
-  truncated: [],
+/** Rows per section key; every other section is empty. */
+const TABLES: Record<string, Row[]> = {
+  leads: [{ id: 'l1', name: 'Ann', encrypted_email: 'enc:v1:ann', encrypted_phone: null }],
+  listings: [{ id: 'x1' }],
+  profile: [{ id: 'user-1', username: 'ann' }],
 };
+
+/** A reader over TABLES; `fail` names a read that errors. */
+function tableReader(fail: (spec: SectionSpec, userId: string) => string | null = () => null) {
+  const result = <T>(spec: SectionSpec, userId: string, data: T): Promise<ReadResult<T>> => {
+    const message = fail(spec, userId);
+    return Promise.resolve(message ? { data: null, error: { message } } : { data, error: null });
+  };
+  return {
+    page: vi.fn((spec: SectionSpec, userId: string, from: number, to: number) =>
+      result(spec, userId, (TABLES[spec.key] ?? []).slice(from, to + 1))
+    ),
+    one: vi.fn((spec: SectionSpec, userId: string) => result(spec, userId, TABLES[spec.key]?.[0] ?? null)),
+  } satisfies ExportReader;
+}
 
 function fakeStore(queued: QueuedExport[], overrides: Partial<ExportQueueStore> = {}) {
   const uploads = new Map<string, string>();
@@ -53,9 +64,9 @@ function fakeStore(queued: QueuedExport[], overrides: Partial<ExportQueueStore> 
     listQueued: vi.fn(async () => queued),
     claim: vi.fn(async () => true),
     getSubject: vi.fn(async (id: string) => ({ id, email: 'ann@example.com', created_at: '2026-01-01T00:00:00Z' })),
-    collect: vi.fn(async () => COLLECTED),
+    reader: tableReader(),
     decrypt: vi.fn(async (v: string | null) => (v ? v.replace('enc:v1:', 'plain:') : v)),
-    upload: vi.fn(async (path: string, json: string) => void uploads.set(path, json)),
+    upload: vi.fn(async (path: string, chunks: string[]) => void uploads.set(path, chunks.join(''))),
     signedUrl: vi.fn(async (path: string) => `https://api.example/storage/v1/object/sign/gdpr-exports/${path}?token=t`),
     complete: vi.fn(async () => undefined),
     release: vi.fn(async () => undefined),
@@ -92,7 +103,15 @@ describe('processExportQueue', () => {
     const expiresAt = new Date(NOW.getTime() + EXPORT_LINK_TTL_SECONDS * 1000).toISOString();
     // file_url holds the path, never the signed link.
     expect(store.complete).toHaveBeenCalledWith('req-1', path, expiresAt, NOW.toISOString());
-    expect(store.audit).toHaveBeenCalledWith('user-1', 'success', expect.objectContaining({ request_id: 'req-1' }));
+    expect(store.audit).toHaveBeenCalledWith(
+      'user-1',
+      'success',
+      expect.objectContaining({
+        request_id: 'req-1',
+        records_exported: expect.objectContaining({ leads: 1, listings: 1, profile: 1, settings: 0 }),
+        truncated: [],
+      })
+    );
   });
 
   it('asks only for pending requests and processing ones claimed before the stale cutoff', async () => {
@@ -105,15 +124,14 @@ describe('processExportQueue', () => {
     const { store } = fakeStore([request()], { claim: vi.fn(async () => false) });
     const report = await processExportQueue(store, { now: NOW, siteUrl: SITE });
     expect(report.skipped).toBe(1);
-    expect(store.collect).not.toHaveBeenCalled();
+    expect(store.reader.page).not.toHaveBeenCalled();
+    expect(store.reader.one).not.toHaveBeenCalled();
     expect(store.complete).not.toHaveBeenCalled();
   });
 
   it('puts a request back in the queue, with the reason, when a section cannot be read', async () => {
     const { store } = fakeStore([request()], {
-      collect: vi.fn(async () => {
-        throw new ExportIncompleteError([{ section: 'leads', message: 'timeout' }]);
-      }),
+      reader: tableReader((spec) => (spec.key === 'leads' ? 'timeout' : null)),
     });
     const report = await processExportQueue(store, { now: NOW, siteUrl: SITE });
     expect(report).toMatchObject({ completed: 0, retried: 1, failed: 0 });
@@ -150,17 +168,12 @@ describe('processExportQueue', () => {
     const report = await processExportQueue(store, { now: NOW, siteUrl: SITE });
     expect(report.failed).toBe(1);
     expect(store.fail).toHaveBeenCalledWith('req-1', 'The account no longer exists.', NOW.toISOString());
-    expect(store.collect).not.toHaveBeenCalled();
+    expect(store.reader.page).not.toHaveBeenCalled();
   });
 
   it('keeps going after one request fails', async () => {
-    let calls = 0;
     const { store } = fakeStore([request(), request({ id: 'req-2', userId: 'user-2' })], {
-      collect: vi.fn(async () => {
-        calls += 1;
-        if (calls === 1) throw new Error('boom');
-        return COLLECTED;
-      }),
+      reader: tableReader((_spec, userId) => (userId === 'user-1' ? 'boom' : null)),
     });
     const report = await processExportQueue(store, { now: NOW, siteUrl: SITE });
     expect(report).toMatchObject({ completed: 1, retried: 1 });
