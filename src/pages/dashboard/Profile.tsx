@@ -9,6 +9,7 @@ import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SkeletonProfile } from '@/components/ui/skeleton';
 import { planLimitKeyFromError, UPGRADE_PATH } from '@/lib/planLimits';
+import { urlSchemeErrorFrom } from '@/lib/urlSchemeErrors';
 
 function emptyForm() {
   return {
@@ -117,6 +118,12 @@ function describeSaveError(error: unknown): SaveError {
   if (planLimitKeyFromError(error)) {
     // The trigger's message is written for the agent (20260923000002).
     return { message: message || 'Your plan does not include this change.', planLimit: true };
+  }
+  // US-456: the database refuses a social/website/Calendly value that is not
+  // an https:// address; say which field, not the constraint name.
+  const urlError = urlSchemeErrorFrom(error);
+  if (urlError) {
+    return { message: `Your profile was not saved: ${urlError.message}`, planLimit: false };
   }
   return {
     message: message

@@ -9331,6 +9331,7 @@ export type Database = {
           specialties: Json;
           theme: string;
           tiktok_url: string;
+          timezone: string;
           title: string;
           updated_at: string;
           username: string;
@@ -9417,6 +9418,7 @@ export type Database = {
         Args: { p_device_fingerprint: string; p_user_id: string };
         Returns: boolean;
       };
+      is_external_agent_url: { Args: { p_url: string }; Returns: boolean };
       is_field_encrypted: {
         Args: { p_field_name: string; p_table_name: string };
         Returns: boolean;
@@ -9425,6 +9427,7 @@ export type Database = {
         Args: { credential_id: string };
         Returns: boolean;
       };
+      is_link_agent_url: { Args: { p_url: string }; Returns: boolean };
       is_mfa_locked: { Args: { p_user_id: string }; Returns: boolean };
       is_team_admin: {
         Args: { p_team_id: string; p_user_id: string };
@@ -9569,6 +9572,7 @@ export type Database = {
         };
         Returns: string;
       };
+      normalize_agent_url: { Args: { p_url: string }; Returns: string };
       plan_limit: { Args: { _key: string; _user_id: string }; Returns: number };
       plan_limit_label: { Args: { _key: string }; Returns: string };
       plan_usage: {

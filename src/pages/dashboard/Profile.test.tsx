@@ -216,6 +216,22 @@ describe('Profile editor', () => {
       );
     });
 
+    it('names the field when the database refuses a URL (US-456)', async () => {
+      mutateAsync.mockRejectedValue({
+        code: '23514',
+        message:
+          'new row for relation "profiles" violates check constraint "profiles_calendly_url_scheme"',
+      });
+      const { container } = renderWithProviders(<Profile />);
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(
+        'Your profile was not saved: Your Calendly link must be a full web address starting with https://.'
+      );
+      expect(alert).not.toHaveTextContent('check constraint');
+    });
+
     it('shows the real reason for any other failure', async () => {
       mutateAsync.mockRejectedValue({ message: 'value too long for type character varying(160)' });
       const { container } = renderWithProviders(<Profile />);
