@@ -37,6 +37,7 @@ import {
   outputPathForRoute,
   type PrerenderRoute,
 } from '../src/config/prerender-routes';
+import { legalPageLastmod } from '../src/config/legal-dates';
 import {
   answerAuthorLookup,
   authorsById,
@@ -597,7 +598,10 @@ async function writeSitemap(results: Rendered[], articles: Article[]): Promise<v
       const slug = r.route.kind === 'article' ? r.route.path.replace('/blog/', '') : null;
       return {
         path: r.route.path,
-        lastmod: slug ? (updatedBySlug.get(slug) ?? null) : null,
+        // Articles carry articles.updated_at; the legal pages carry the date
+        // their text last changed (src/config/legal-dates.ts). Every other
+        // static route has no truthful date, so it gets none.
+        lastmod: slug ? (updatedBySlug.get(slug) ?? null) : legalPageLastmod(r.route.path),
         ...weightFor(r.route.kind, r.route.path),
       };
     })

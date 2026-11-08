@@ -215,6 +215,9 @@ function isKnownImage(url) {
   return knownSizeFor(url) !== null;
 }
 
+/** YYYY-MM-DD, optionally followed by a time and zone (schema.org Date / DateTime). */
+export const ISO_8601_DATE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
 export function auditStructuredData(route, html) {
   const problems = [];
   const { blocks, problems: parseProblems } = readJsonLd(html);
@@ -278,6 +281,18 @@ export function auditStructuredData(route, html) {
               `${type} names its author "${name}", which is a role rather than a person`
             );
           }
+        }
+      }
+
+      // A date schema.org consumers cannot read (US-459). Four legal pages set
+      // dateModified to new Date().toLocaleDateString(): "11/8/2026" in one
+      // browser, "08/11/2026" in another, and the build date in the prerender.
+      // schema.org Date/DateTime values are ISO 8601.
+      for (const field of ['datePublished', 'dateModified']) {
+        const value = node[field];
+        if (value === undefined || value === null) continue;
+        if (typeof value !== 'string' || !ISO_8601_DATE.test(value)) {
+          problems.push(`${type} ${field} "${String(value)}" is not an ISO 8601 date`);
         }
       }
 

@@ -3,9 +3,11 @@ import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { websiteId } from '@/config/site-entities';
+import { LEGAL_PAGE_DATES, formatLegalDate } from '@/config/legal-dates';
 
 export default function DMCAPolicy() {
-  const lastUpdated = new Date().toLocaleDateString();
+  const dates = LEGAL_PAGE_DATES.dmca;
+  const lastUpdated = formatLegalDate(dates.modified);
 
   const schema = {
     '@context': 'https://schema.org',
@@ -22,8 +24,8 @@ export default function DMCAPolicy() {
       '@type': 'Thing',
       name: 'DMCA Policy',
     },
-    datePublished: '2024-01-01',
-    dateModified: lastUpdated,
+    datePublished: dates.published,
+    dateModified: dates.modified,
     inLanguage: 'en-US',
   };
 
@@ -50,7 +52,9 @@ export default function DMCAPolicy() {
           <h1 className="text-4xl font-bold mb-8">DMCA Copyright Policy</h1>
 
           <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
-            <p className="text-muted-foreground mb-6">Last updated: {lastUpdated}</p>
+            <p className="text-muted-foreground mb-6">
+              Last updated: <time dateTime={dates.modified}>{lastUpdated}</time>
+            </p>
 
             <section>
               <h2 className="text-2xl font-semibold mb-4">1. Introduction</h2>

@@ -628,6 +628,49 @@ describe('article authorship', () => {
   });
 });
 
+describe('structured-data dates (US-459)', () => {
+  const page = (dates: Record<string, unknown>) =>
+    `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+    `<link rel="canonical" href="https://agentbio.net/terms"/>` +
+    `<meta property="og:image" content="https://agentbio.net/Cover.png"/>` +
+    `<script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: 'Terms',
+      ...dates,
+    })}</script>` +
+    `</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`;
+
+  const problemsFor = (dates: Record<string, unknown>) =>
+    auditStructuredData('/terms', page(dates)).map((p) => p.problem);
+
+  it('rejects the locale-formatted render-time date four legal pages shipped', () => {
+    expect(problemsFor({ datePublished: '2024-01-01', dateModified: '11/8/2026' })).toEqual([
+      'WebPage dateModified "11/8/2026" is not an ISO 8601 date',
+    ]);
+  });
+
+  it('rejects a display-formatted date in dateModified', () => {
+    expect(problemsFor({ dateModified: 'May 17, 2026' })).toEqual([
+      'WebPage dateModified "May 17, 2026" is not an ISO 8601 date',
+    ]);
+  });
+
+  it('accepts a date, and a timestamp as PostgREST returns one', () => {
+    expect(
+      problemsFor({
+        datePublished: '2026-07-23',
+        dateModified: '2026-07-23T18:04:11.123456+00:00',
+      })
+    ).toEqual([]);
+    expect(problemsFor({ dateModified: '2026-07-23T18:04:11Z' })).toEqual([]);
+  });
+
+  it('says nothing when a page states no date', () => {
+    expect(problemsFor({})).toEqual([]);
+  });
+});
+
 /**
  * Proof that the US-185 answer rule has teeth.
  *
