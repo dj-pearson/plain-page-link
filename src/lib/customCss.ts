@@ -17,8 +17,14 @@
  *     can be positioned or painted over the footer below it.) Rules on the
  *     container itself also lose position, transform, margin, inset, z-index
  *     and contain declarations.
+ *   - Keyframe names are global, so `@keyframes` is renamed into the agent's
+ *     own namespace (US-523): `@keyframes fade` becomes `@keyframes ab-u-fade`,
+ *     and `animation` / `animation-name` values that name it are rewritten to
+ *     match. Every keyframe rule emitted carries the prefix, so the agent can
+ *     never redefine one of the app's own animations (`pulse`, `float`, …).
  *   - Nothing is fetched from another origin: `@import`, `@font-face` and every
- *     at-rule other than `@media`, `@supports` and `@container` are dropped, and
+ *     at-rule other than `@media`, `@supports`, `@container` and `@keyframes`
+ *     are dropped, and
  *     so is any declaration using `url()` (other than a same-origin path made of
  *     plain path characters — no whitespace, which the URL parser strips),
  *     `image-set()`, `src()`, `element()`, `expression()`, `javascript:`,
@@ -53,6 +59,60 @@ export interface SanitizedCustomCss {
 }
 
 const ALLOWED_GROUP_AT_RULES = new Set(['media', 'supports', 'container']);
+
+/**
+ * Prefix for every keyframe name in agent CSS. No app stylesheet may define a
+ * keyframe starting with it (customCss.test.ts holds that).
+ */
+export const CUSTOM_KEYFRAMES_PREFIX = 'ab-u-';
+
+const KEYFRAMES_AT_RULES = new Set(['keyframes', '-webkit-keyframes']);
+
+/** A plain CSS identifier; quoted keyframe names are not accepted. */
+const KEYFRAMES_NAME = /^-?[A-Za-z_][A-Za-z0-9_-]*$/;
+
+/** Names a <keyframes-name> may not take (CSS-wide keywords, `none`, `default`). */
+const RESERVED_KEYFRAMES_NAMES = new Set([
+  'none',
+  'default',
+  'initial',
+  'inherit',
+  'unset',
+  'revert',
+  'revert-layer',
+]);
+
+/**
+ * Keywords the `animation` shorthand reads as one of its other longhands. A
+ * browser resolves such a token as the keyword first, so it is never renamed.
+ */
+const ANIMATION_SHORTHAND_KEYWORDS = new Set([
+  'linear',
+  'ease',
+  'ease-in',
+  'ease-out',
+  'ease-in-out',
+  'step-start',
+  'step-end',
+  'infinite',
+  'normal',
+  'reverse',
+  'alternate',
+  'alternate-reverse',
+  'forwards',
+  'backwards',
+  'both',
+  'running',
+  'paused',
+  'auto',
+  'replace',
+  'add',
+  'accumulate',
+  ...RESERVED_KEYFRAMES_NAMES,
+]);
+
+/** A keyframe selector list: `from`, `to`, percentages, comma-separated. */
+const KEYFRAME_SELECTOR = /^(?:from|to|\d+(?:\.\d+)?%|\.\d+%)$/i;
 
 /** Values that load something, run something, or are commonly used to hide one of those. */
 const FORBIDDEN_VALUE_PATTERNS: Array<[RegExp, string]> = [
@@ -233,10 +293,12 @@ function targetsContainer(scoped: string): boolean {
  * Declarations that would move the container, lift it over its neighbours or
  * switch off its containment. The outer wrapper's `contain: paint` already
  * clips the result; these are refused on the container as well so the agent's
- * page cannot even try to sit on top of the compliance footer.
+ * page cannot even try to sit on top of the compliance footer. Animations are
+ * refused on the container too: a keyframe may set transform, margin or
+ * z-index, which would put back exactly what this list takes away (US-523).
  */
 const CONTAINER_LAYOUT_PROPERTY =
-  /^(?:contain|content-visibility|container|container-type|position|inset(?:-.*)?|top|right|bottom|left|z-index|isolation|transform(?:-.*)?|translate|rotate|scale|zoom|float|margin(?:-.*)?|offset(?:-.*)?)$/;
+  /^(?:(?:-webkit-)?animation(?:-.*)?|contain|content-visibility|container|container-type|position|inset(?:-.*)?|top|right|bottom|left|z-index|isolation|transform(?:-.*)?|translate|rotate|scale|zoom|float|margin(?:-.*)?|offset(?:-.*)?)$/;
 
 function scopeSelector(selector: string): string | null {
   const s = selector.trim().replace(/\s+/g, ' ');
@@ -263,7 +325,61 @@ function scopeSelector(selector: string): string | null {
   return `${SCOPE} ${s}`;
 }
 
-function sanitizeDeclarations(body: string, removed: Set<string>, onContainer = false): string {
+/** Split on whitespace at depth 0 outside strings, so `cubic-bezier(0, 0, 1, 1)` stays whole. */
+function splitTopLevelWhitespace(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let current = '';
+  for (const ch of text) {
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '(' || ch === '[') depth += 1;
+    else if (ch === ')' || ch === ']') depth -= 1;
+    if (!quote && depth === 0 && /\s/.test(ch)) {
+      if (current) parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+/**
+ * Rename references to the agent's own keyframes inside `animation` /
+ * `animation-name`. A name the agent did not define is left alone: it can only
+ * play an existing animation inside the scoped container, never redefine one.
+ */
+function rewriteAnimationValue(prop: string, value: string, defined: Set<string>): string {
+  if (!defined.size) return value;
+  const bare = prop.replace(/^-webkit-/, '');
+  if (bare !== 'animation' && bare !== 'animation-name') return value;
+  const shorthand = bare === 'animation';
+  return splitTopLevel(value, ',')
+    .map((item) => {
+      const tokens = splitTopLevelWhitespace(item.trim());
+      let renamed = false;
+      return tokens
+        .map((token) => {
+          if (renamed || !defined.has(token)) return token;
+          if (shorthand && ANIMATION_SHORTHAND_KEYWORDS.has(token.toLowerCase())) return token;
+          renamed = true;
+          return `${CUSTOM_KEYFRAMES_PREFIX}${token}`;
+        })
+        .join(' ');
+    })
+    .join(', ');
+}
+
+function sanitizeDeclarations(
+  body: string,
+  removed: Set<string>,
+  onContainer = false,
+  keyframes: Set<string> = new Set()
+): string {
   const kept: string[] = [];
   for (const raw of splitTopLevel(body, ';')) {
     const decl = raw.trim();
@@ -301,12 +417,69 @@ function sanitizeDeclarations(body: string, removed: Set<string>, onContainer = 
       removed.add('position: fixed / sticky');
       continue;
     }
-    kept.push(`${lowerProp.startsWith('--') ? prop : lowerProp}: ${value};`);
+    const finalValue = rewriteAnimationValue(lowerProp, value, keyframes);
+    kept.push(`${lowerProp.startsWith('--') ? prop : lowerProp}: ${finalValue};`);
   }
   return kept.join(' ');
 }
 
-function sanitizeRules(text: string, removed: Set<string>): string[] {
+/** The body of an `@keyframes` rule: only keyframe selectors with plain declarations. */
+function sanitizeKeyframesBody(text: string, removed: Set<string>): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    while (i < text.length && /[\s;]/.test(text[i])) i += 1;
+    if (i >= text.length) break;
+    const stop = findTopLevel(text, i, '{;}');
+    if (stop === -1) {
+      removed.add('an incomplete rule at the end');
+      break;
+    }
+    if (text[stop] === '}') throw new Unbalanced();
+    const prelude = text.slice(i, stop).trim();
+    if (text[stop] === ';') {
+      removed.add('a declaration outside any keyframe');
+      i = stop + 1;
+      continue;
+    }
+    const end = findBlockEnd(text, stop);
+    const body = text.slice(stop + 1, end);
+    i = end + 1;
+    const selectors = splitTopLevel(prelude, ',').map((sel) => sel.trim());
+    if (!selectors.every((sel) => KEYFRAME_SELECTOR.test(sel))) {
+      removed.add(`the keyframe selector "${prelude.slice(0, 60)}"`);
+      continue;
+    }
+    if (findTopLevel(body, 0, '{') !== -1) {
+      removed.add('nested rules');
+      continue;
+    }
+    // A keyframe is not the container, and its names are never rewritten here
+    // (an animation property is ignored inside @keyframes anyway).
+    const declarations = sanitizeDeclarations(body, removed);
+    if (declarations)
+      out.push(`${selectors.map((s) => s.toLowerCase()).join(', ')} { ${declarations} }`);
+  }
+  return out;
+}
+
+/**
+ * Keyframe names the agent defines anywhere in the stylesheet, so a reference
+ * can be renamed even when it comes before the definition.
+ */
+function collectKeyframeNames(text: string): Set<string> {
+  const names = new Set<string>();
+  for (const m of text.matchAll(/@(?:-webkit-)?keyframes\s+(-?[A-Za-z_][A-Za-z0-9_-]*)/gi)) {
+    if (!RESERVED_KEYFRAMES_NAMES.has(m[1].toLowerCase())) names.add(m[1]);
+  }
+  return names;
+}
+
+function sanitizeRules(
+  text: string,
+  removed: Set<string>,
+  keyframes: Set<string> = new Set()
+): string[] {
   const out: string[] = [];
   let i = 0;
   while (i < text.length) {
@@ -341,6 +514,20 @@ function sanitizeRules(text: string, removed: Set<string>): string[] {
     if (prelude.startsWith('@')) {
       const name = /^@([\w-]+)/.exec(prelude)?.[1]?.toLowerCase() ?? 'unknown';
       const condition = prelude.slice(name.length + 1).trim();
+      if (KEYFRAMES_AT_RULES.has(name)) {
+        if (
+          !KEYFRAMES_NAME.test(condition) ||
+          RESERVED_KEYFRAMES_NAMES.has(condition.toLowerCase())
+        ) {
+          removed.add(`@keyframes with the name "${condition.slice(0, 60)}"`);
+          continue;
+        }
+        const frames = sanitizeKeyframesBody(body, removed);
+        if (frames.length) {
+          out.push(`@keyframes ${CUSTOM_KEYFRAMES_PREFIX}${condition} { ${frames.join(' ')} }`);
+        }
+        continue;
+      }
       if (!ALLOWED_GROUP_AT_RULES.has(name)) {
         removed.add(`@${name}`);
         continue;
@@ -352,7 +539,7 @@ function sanitizeRules(text: string, removed: Set<string>): string[] {
         removed.add(`an @${name} condition that is not allowed`);
         continue;
       }
-      const inner = sanitizeRules(body, removed);
+      const inner = sanitizeRules(body, removed, keyframes);
       if (inner.length) out.push(`@${name} ${condition} { ${inner.join(' ')} }`);
       continue;
     }
@@ -371,7 +558,12 @@ function sanitizeRules(text: string, removed: Set<string>): string[] {
       .filter((sel): sel is string => sel !== null);
     if (!selectors.length) continue;
 
-    const declarations = sanitizeDeclarations(body, removed, selectors.some(targetsContainer));
+    const declarations = sanitizeDeclarations(
+      body,
+      removed,
+      selectors.some(targetsContainer),
+      keyframes
+    );
     if (!declarations) continue;
     out.push(`${selectors.join(', ')} { ${declarations} }`);
   }
@@ -401,7 +593,8 @@ export function sanitizeCustomCss(input: string | null | undefined): SanitizedCu
   }
 
   try {
-    const rules = sanitizeRules(stripComments(text), removed);
+    const stripped = stripComments(text);
+    const rules = sanitizeRules(stripped, removed, collectKeyframeNames(stripped));
     return { css: rules.join('\n'), removed: [...removed] };
   } catch (error) {
     if (error instanceof Unbalanced) {
