@@ -73,9 +73,11 @@ export function extractApiKey(req: Request): string | null {
 
 /**
  * Whether a stored key may authenticate at `now`. Fails closed: a revoked key,
- * a key switched off by `is_active = false` (rows revoked before US-377 carry
- * only that), an expired key, and a key whose expiry cannot be parsed are all
- * refused.
+ * a key switched off by `is_active = false`, an expired key, and a key whose
+ * expiry cannot be parsed are all refused. Keys revoked before US-377 carried
+ * revoked_at with is_active = true; migration 20261108000499 backfilled them
+ * and a CHECK (api_keys_revoked_is_inactive) now keeps the two in step, but
+ * both are still checked here so neither column alone is trusted.
  */
 export function isApiKeyUsable(row: ApiKeyRow, now: Date = new Date()): boolean {
   if (row.revoked_at) return false;

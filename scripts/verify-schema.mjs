@@ -3035,6 +3035,71 @@ check('api keys cannot be minted, un-revoked or deleted by their owner', () => {
 });
 
 // ---------------------------------------------------------------------------
+// US-499 (US-384): a revoked api key is never is_active. Keys revoked before
+//   US-377 had revoked_at set and is_active = true; the partial indexes, the
+//   GDPR export and any single-column reader disagreed with revocation.
+// ---------------------------------------------------------------------------
+check('a revoked api key is never is_active', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000499a01';
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    const [bad] = q(
+      `SELECT count(*) FROM public.api_keys WHERE revoked_at IS NOT NULL AND is_active IS TRUE;`
+    );
+    if (bad !== '0') out.push(`${bad} api_keys rows have revoked_at set and is_active = true`);
+
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'us499@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.api_keys (user_id, name, key_hash, key_prefix)
+         VALUES ('${agent}', 'us499', 'hash_us499', 'ab_us499');`);
+
+    // Even the service role cannot revoke a key and leave it active.
+    if (
+      !refused(() =>
+        q(`SET ROLE service_role;
+           UPDATE public.api_keys SET revoked_at = now() WHERE key_hash = 'hash_us499';`)
+      )
+    )
+      out.push('a key could be revoked while is_active stayed true');
+    if (
+      !refused(() =>
+        q(`SET ROLE service_role;
+           INSERT INTO public.api_keys (user_id, name, key_hash, key_prefix, revoked_at)
+             VALUES ('${agent}', 'us499b', 'hash_us499b', 'ab_us49b', now());`)
+      )
+    )
+      out.push('a key could be inserted revoked but active');
+
+    // The api-keys function's revoke (both columns) still works.
+    q(`SET ROLE service_role;
+       UPDATE public.api_keys SET revoked_at = now(), is_active = false WHERE key_hash = 'hash_us499';`);
+    const [row] = q(
+      `SELECT (revoked_at IS NOT NULL) || '|' || is_active FROM public.api_keys WHERE key_hash = 'hash_us499';`
+    );
+    if (row !== 'true|false') out.push(`the function's revoke left the key as ${row}`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.api_keys WHERE user_id = '${agent}';
+         DELETE FROM public.profiles WHERE id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // US-413 (US-367): user_mfa_settings and user_sessions are written by edge
 //   functions only. With an aal1 JWT (a password is enough) the owner UPDATE
 //   policies let anyone switch a legacy second factor off, plant backup codes,

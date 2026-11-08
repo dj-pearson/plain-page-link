@@ -5,6 +5,8 @@
  * revocation did before US-377 — fails here.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import {
   API_KEY_PREFIX,
@@ -207,5 +209,34 @@ describe('flexibleAuth', () => {
   it('returns null with no credentials at all', async () => {
     const { client } = fakeClient({});
     expect(await flexibleAuth(req({}), client)).toBeNull();
+  });
+});
+
+describe('revoked keys are never is_active (US-499)', () => {
+  const migration = readFileSync(
+    join(__dirname, '../../migrations/20261108000499_api_keys_revoked_is_inactive.sql'),
+    'utf8'
+  ).replace(/--.*$/gm, '');
+  const revokeFn = readFileSync(join(__dirname, '../api-keys/index.ts'), 'utf8');
+
+  it('backfills is_active = false on every key that already has revoked_at', () => {
+    expect(migration).toMatch(
+      /UPDATE\s+public\.api_keys\s+SET\s+is_active\s*=\s*false\s+WHERE\s+revoked_at\s+IS\s+NOT\s+NULL/i
+    );
+  });
+
+  it('adds a CHECK so a revoked key cannot stay active', () => {
+    expect(migration).toMatch(
+      /ADD\s+CONSTRAINT\s+api_keys_revoked_is_inactive\s+CHECK\s*\(\s*revoked_at\s+IS\s+NULL\s+OR\s+is_active\s*=\s*false\s*\)/i
+    );
+    // The backfill must run before the constraint is added, or the ALTER fails
+    // on the very rows it exists to fix.
+    expect(migration.search(/UPDATE\s+public\.api_keys/i)).toBeLessThan(
+      migration.search(/ADD\s+CONSTRAINT/i)
+    );
+  });
+
+  it("the api-keys function's revoke sets both columns, so it satisfies the CHECK", () => {
+    expect(revokeFn).toMatch(/\.update\(\{\s*revoked_at:[^}]*is_active:\s*false\s*\}\)/);
   });
 });
