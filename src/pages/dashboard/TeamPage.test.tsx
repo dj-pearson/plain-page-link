@@ -129,12 +129,15 @@ describe('TeamPage', () => {
 
   it('asks for confirmation, naming the member, before removing them', async () => {
     invoke.mockResolvedValue({ data: { removed: true }, error: null });
-    renderWithProviders(<TeamPage />);
+    const { queryClient } = renderWithProviders(<TeamPage />);
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
 
     expect(screen.queryByRole('button', { name: 'Remove owner@acme.test' })).toBeNull();
     await userEvent.click(await screen.findByRole('button', { name: 'Remove jo@acme.test' }));
     expect(invoke).not.toHaveBeenCalled();
     expect(await screen.findByText('Remove jo@acme.test?')).toBeInTheDocument();
+    // US-475: removal unassigns their leads, and the dialog says so.
+    expect(screen.getByText(/leads assigned to them, which become unassigned/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(invoke).not.toHaveBeenCalled();
@@ -149,6 +152,7 @@ describe('TeamPage', () => {
     await waitFor(() =>
       expect(toast).toHaveBeenCalledWith({ title: 'jo@acme.test was removed from the team' })
     );
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['leads'] });
   });
 
   it('reports a failed removal', async () => {
@@ -293,11 +297,14 @@ describe('TeamPage', () => {
       ];
       results.team_members = [{ data: [OWNER, AGENT, ME_MEMBER], error: null }];
       invoke.mockResolvedValue({ data: { left: true }, error: null });
-      renderWithProviders(<TeamPage />);
+      const { queryClient } = renderWithProviders(<TeamPage />);
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
 
       await userEvent.click(await screen.findByRole('button', { name: 'Leave Acme Realty' }));
       expect(invoke).not.toHaveBeenCalled();
       expect(await screen.findByText('Leave Acme Realty?')).toBeInTheDocument();
+      // US-475: leaving unassigns the leads they held, and the dialog says so.
+      expect(screen.getByText(/any of its leads assigned\s+to you/)).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Stay' }));
       expect(invoke).not.toHaveBeenCalled();
@@ -308,6 +315,7 @@ describe('TeamPage', () => {
         expect(invoke).toHaveBeenCalledWith('teams', { body: { action: 'leave', teamId: 't1' } })
       );
       await waitFor(() => expect(toast).toHaveBeenCalledWith({ title: 'You left Acme Realty' }));
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['leads'] });
       expect(await screen.findByText(/create your team/i)).toBeInTheDocument();
     });
 

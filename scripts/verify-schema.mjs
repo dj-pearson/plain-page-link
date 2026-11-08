@@ -770,6 +770,21 @@ check('zip routing rules match against the property address', () => {
       `SELECT is_active::text FROM public.lead_routing_rules WHERE team_id = '${team}' AND name = 'Schema check zip';`
     );
     if (stillActive !== 'false') out.push("a departed member's routing rule was not paused when they left");
+    // US-475 (US-465): the leads the zip rule already gave them (cases 1 and
+    // 2) are unassigned, so the assignee policies no longer let them in. The
+    // round-robin member's leads (cases 3 and 4) are left alone.
+    if (assignee(leadOf(1)) !== '' || assignee(leadOf(2)) !== '') {
+      out.push('a departed member kept leads assigned to them, so they can still read them');
+    }
+    if (assignee(leadOf(3)) !== roundRobin || assignee(leadOf(4)) !== roundRobin) {
+      out.push("a member's departure unassigned leads belonging to a teammate who stayed");
+    }
+    const [unassignAudit] = q(
+      `SELECT count(*)::text FROM public.audit_logs
+        WHERE action = 'team_member_leads_unassigned' AND resource_id = '${team}'
+          AND details->>'leads_unassigned' = '2';`
+    );
+    if (unassignAudit !== '1') out.push("unassigning a departed member's leads left no audit row");
     q(`UPDATE public.lead_routing_rules SET is_active = true WHERE team_id = '${team}';`);
     q(`DELETE FROM public.team_round_robin WHERE team_id = '${team}';`);
     q(`

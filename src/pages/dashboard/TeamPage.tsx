@@ -249,6 +249,8 @@ export default function TeamPage() {
       queryClient.invalidateQueries({ queryKey: ['team-members', team?.id] });
       // US-454: removal pauses the member's routing rules server-side.
       queryClient.invalidateQueries({ queryKey: ['lead-routing-rules', team?.id] });
+      // US-475: it also unassigns the leads they held, so the Leads list must re-read.
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
       toast({ title: `${memberLabel(member)} was removed from the team` });
     },
     onError: (e, member) =>
@@ -297,6 +299,9 @@ export default function TeamPage() {
     onSuccess: (_data, teamLeft) => {
       queryClient.removeQueries({ queryKey: ['team-members', teamLeft.id] });
       queryClient.invalidateQueries({ queryKey: ['my-team', user?.id] });
+      // US-475: the leads assigned to the leaver are unassigned server-side.
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-assigned-count', user?.id] });
       toast({ title: `You left ${teamLeft.name}` });
     },
     onError: (e, teamToLeave) =>
@@ -556,8 +561,9 @@ export default function TeamPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Leave {team.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              You lose access to the team’s roster and routing, and your seat is freed. To come
-              back, the owner or an admin has to invite you again.
+              You lose access to the team’s roster and routing, and to any of its leads assigned to
+              you; they go back to the owner unassigned. Your seat is freed. To come back, the owner
+              or an admin has to invite you again.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -589,7 +595,7 @@ export default function TeamPage() {
             <AlertDialogDescription>
               {removeTarget && !removeTarget.accepted_at
                 ? 'Their invitation will be cancelled and the link they were emailed will stop working.'
-                : `They lose access to ${team.name} and their seat is freed. You can invite them again later.`}
+                : `They lose access to ${team.name} and to the leads assigned to them, which become unassigned. Their seat is freed, and you can invite them again later.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
