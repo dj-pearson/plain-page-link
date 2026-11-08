@@ -4,7 +4,8 @@
  * What the agent types is stored as typed; what visitors get is what
  * sanitizeCustomCss keeps, and the editor shows the difference as they type:
  * every removal is listed in plain words before they save, so nothing is
- * silently dropped. Plans without customThemes see what the feature does and
+ * silently dropped, and the Theme page's Live Preview renders the sanitised
+ * result as they type (US-533). Plans without customThemes see what the feature does and
  * where to get it; the database refuses the write regardless.
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -23,7 +24,16 @@ const EXAMPLE = `/* Rounder buttons and a warmer heading */
 h1 { letter-spacing: -0.01em; }
 a[role="button"], button { border-radius: 9999px; }`;
 
-export function CustomCssEditor() {
+interface CustomCssEditorProps {
+  /**
+   * Receives the sanitised draft as the agent types (US-533), so the Theme
+   * page's Live Preview can show it before it is saved. '' when the plan does
+   * not include custom CSS, because the public page would not apply it.
+   */
+  onPreviewCssChange?: (css: string) => void;
+}
+
+export function CustomCssEditor({ onPreviewCssChange }: CustomCssEditorProps = {}) {
   const { toast } = useToast();
   const { hasFeature, isLoading: planLoading } = usePlanUsage();
   const { css: stored, isLoading, isError, save } = useAgentCustomCss();
@@ -37,6 +47,11 @@ export function CustomCssEditor() {
   const result = useMemo(() => sanitizeCustomCss(draft), [draft]);
   const overLimit = draft.length > CUSTOM_CSS_MAX_LENGTH;
   const dirty = draft !== stored;
+  const previewCss = entitled ? result.css : '';
+
+  useEffect(() => {
+    onPreviewCssChange?.(previewCss);
+  }, [previewCss, onPreviewCssChange]);
 
   const persist = (value: string) =>
     save.mutate(value, {
@@ -106,7 +121,8 @@ export function CustomCssEditor() {
                 <p id="custom-css-help">
                   Write selectors as if your page were the whole document: <code>h1</code>,{' '}
                   <code>a</code>, <code>body</code>. Images must be on your own site; fonts and
-                  imports from other sites are not loaded.
+                  imports from other sites are not loaded. The Live Preview above shows the result
+                  as you type.
                 </p>
                 <p
                   id="custom-css-count"

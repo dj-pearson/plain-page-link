@@ -92,4 +92,30 @@ describe('CustomCssEditor (US-514)', () => {
     );
     expect(screen.getByText(/does not use it on this plan/)).toBeInTheDocument();
   });
+
+  it('hands the Live Preview the sanitised draft as the agent types (US-533)', () => {
+    const onPreview = vi.fn();
+    render(
+      <MemoryRouter>
+        <CustomCssEditor onPreviewCssChange={onPreview} />
+      </MemoryRouter>
+    );
+    fireEvent.change(screen.getByLabelText('Your CSS'), {
+      target: { value: 'h1 { color: red } @import url(https://x.test/a.css);' },
+    });
+    expect(onPreview).toHaveBeenLastCalledWith('.ab-custom-css h1 { color: red; }');
+  });
+
+  it('previews nothing on a plan that would not apply the CSS (US-533)', () => {
+    h.entitled = false;
+    h.stored = 'h1 { color: red }';
+    const onPreview = vi.fn();
+    render(
+      <MemoryRouter>
+        <CustomCssEditor onPreviewCssChange={onPreview} />
+      </MemoryRouter>
+    );
+    expect(onPreview).toHaveBeenCalled();
+    expect(onPreview).not.toHaveBeenCalledWith(expect.stringContaining('h1'));
+  });
 });
