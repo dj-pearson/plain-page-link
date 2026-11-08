@@ -15,6 +15,7 @@ import {
   type ListingMeta,
   type ProfileMeta,
 } from './social-meta';
+import { profileManifestPath } from './profile-manifest';
 import { needsCanonicalRedirect, normalizeUsername } from '../../src/lib/username';
 import { selectListingForPage } from '../../src/lib/publicListingVisibility';
 
@@ -169,6 +170,30 @@ export function markNoindex(html: string): string {
     : stripped;
 }
 
+const MANIFEST_LINK = /<link\b[^>]*\brel=["']?manifest["']?[^>]*>/gi;
+
+/**
+ * Point the document's web app manifest at the agent's own (US-471).
+ *
+ * index.html links /manifest.json, the AgentBio dashboard app (start_url
+ * /dashboard). In the browser useProfileManifest swaps it once React runs; the
+ * crawler HTML is never touched by React, so it went on naming the dashboard
+ * app under the agent's URL. Every manifest link is removed and exactly one,
+ * naming /:username/manifest.json, goes back in its place (or before </head>
+ * if the document had none).
+ */
+export function linkProfileManifest(html: string, username: string): string {
+  const link = `<link rel="manifest" href="${profileManifestPath(username)}" />`;
+  let placed = false;
+  const out = html.replace(MANIFEST_LINK, () => {
+    if (placed) return '';
+    placed = true;
+    return link;
+  });
+  if (placed) return out;
+  return out.includes('</head>') ? out.replace('</head>', `    ${link}\n  </head>`) : out;
+}
+
 /** A single route parameter, whichever shape Pages hands it over in. */
 export function routeParam(raw: string | string[] | undefined): string | undefined {
   return Array.isArray(raw) ? raw[0] : raw;
@@ -301,7 +326,7 @@ export async function serveProfileRoute(
   if (listingGone) {
     headers.set('x-agentbio-prerender', 'listing-not-found');
     headers.set('x-robots-tag', 'noindex');
-    return new Response(markNoindex(injectSocialTags(html, tags)), {
+    return new Response(markNoindex(linkProfileManifest(injectSocialTags(html, tags), username)), {
       status: 404,
       statusText: 'Not Found',
       headers,
@@ -310,7 +335,7 @@ export async function serveProfileRoute(
 
   headers.set('x-agentbio-prerender', listingId ? 'listing' : 'profile');
 
-  return new Response(injectSocialTags(html, tags), {
+  return new Response(linkProfileManifest(injectSocialTags(html, tags), username), {
     status: assetResponse.status,
     statusText: assetResponse.statusText,
     headers,
