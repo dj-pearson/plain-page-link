@@ -335,7 +335,7 @@ describe('GET /:username', () => {
 
     expect(html).toContain('412 Maple Avenue, Salt Lake City, UT — $525,000');
     expect(html).toContain('content="https://cdn.example.com/412-maple.jpg"');
-    expect(html).toContain('"@type":"SingleFamilyResidence"');
+    expect(html).toContain('"@type":"RealEstateListing"');
   });
 
   it('keeps the agent card when the deep-linked listing no longer exists', async () => {

@@ -5,9 +5,10 @@
  * public surfaces:
  *   - Organization        → landing page
  *   - RealEstateAgent     → public agent profiles (a Person who is an agent)
- *   - RealEstateListing   → property listings (price, address, details)
  *   - Article             → blog posts
  *   - BreadcrumbList      → navigation breadcrumbs
+ *
+ * Property listings live in listingJsonLd.ts, shared with the crawler HTML.
  *
  * Each returns a plain object suitable for `<SEOHead schema={...}>` (which
  * serializes it into a <script type="application/ld+json"> tag). Undefined
@@ -77,60 +78,6 @@ export function realEstateAgentSchema(profile: AgentProfileInput): JsonLd {
             '@type': 'PostalAddress',
             addressLocality: profile.city,
             addressRegion: profile.state,
-          })
-        : undefined,
-  });
-}
-
-export interface ListingInput {
-  title: string;
-  description?: string;
-  price?: number;
-  currency?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  bedrooms?: number;
-  bathrooms?: number;
-  squareFeet?: number;
-  images?: string[];
-  url?: string;
-  status?: string;
-}
-
-export function realEstateListingSchema(listing: ListingInput): JsonLd {
-  const offerStatus =
-    listing.status === 'sold' ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock';
-
-  return compact({
-    '@context': 'https://schema.org',
-    '@type': 'RealEstateListing',
-    name: listing.title,
-    description: listing.description,
-    url: listing.url,
-    image: listing.images && listing.images.length > 0 ? listing.images : undefined,
-    address:
-      listing.address || listing.city || listing.state
-        ? compact({
-            '@type': 'PostalAddress',
-            streetAddress: listing.address,
-            addressLocality: listing.city,
-            addressRegion: listing.state,
-          })
-        : undefined,
-    numberOfBedrooms: listing.bedrooms,
-    numberOfBathroomsTotal: listing.bathrooms,
-    floorSize:
-      listing.squareFeet !== undefined
-        ? compact({ '@type': 'QuantitativeValue', value: listing.squareFeet, unitCode: 'FTK' })
-        : undefined,
-    offers:
-      listing.price !== undefined
-        ? compact({
-            '@type': 'Offer',
-            price: listing.price,
-            priceCurrency: listing.currency || 'USD',
-            availability: offerStatus,
           })
         : undefined,
   });

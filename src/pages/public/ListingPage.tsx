@@ -38,7 +38,7 @@ import { formatPrice, parsePrice } from '@/lib/format';
 import { listingPagePath } from '@/lib/listingShare';
 import { isUnpublishedPreview } from '@/lib/profilePublishing';
 import { selectAvailableListings, selectListingForPage } from '@/lib/publicListingVisibility';
-import { realEstateListingSchema } from '@/lib/structured-data';
+import { listingJsonLdNodes } from '@/lib/listingJsonLd';
 import { needsCanonicalRedirect, normalizeUsername } from '@/lib/username';
 import { getSafeOrigin } from '@/lib/utils';
 import type { PublicProfileListing } from '@/types';
@@ -169,25 +169,28 @@ export default function ListingPage() {
   const title = `${place || 'Property'}${price > 0 ? ` — ${formatPrice(price)}` : ''} | ${agentName}`;
   const description = listingMetaDescription(listing, agentName);
 
-  const { '@context': _context, ...listingNode } = realEstateListingSchema({
-    title: place || 'Property listing',
-    description: listing.description ?? undefined,
-    price: price || undefined,
-    address: listing.address,
-    city: listing.city,
-    state: listing.state ?? undefined,
-    bedrooms: listing.bedrooms ?? undefined,
-    bathrooms: listing.bathrooms ?? undefined,
-    squareFeet: listing.square_feet ?? undefined,
-    images: photos,
-    url: pageUrl,
-    status: listing.status ?? undefined,
-  }) as Record<string, unknown>;
-  void _context;
+  // The RealEstateListing + property model the crawler HTML declares too
+  // (functions/_lib/social-meta.ts), so both agree on the `#listing` node the
+  // agent's page links to (US-578).
   const schema = {
     '@context': 'https://schema.org',
     '@graph': [
-      { ...listingNode, '@id': `${pageUrl}#listing` },
+      ...listingJsonLdNodes({
+        pageUrl,
+        name: place || 'Property listing',
+        description: listing.description,
+        images: photos,
+        streetAddress: listing.address,
+        city: listing.city,
+        state: listing.state,
+        postalCode: listing.zip_code,
+        bedrooms: listing.bedrooms,
+        bathrooms: listing.bathrooms,
+        squareFeet: listing.square_feet,
+        price,
+        status: listing.status,
+        propertyType: listing.property_type,
+      }),
       {
         '@type': 'BreadcrumbList',
         itemListElement: [

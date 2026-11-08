@@ -217,6 +217,7 @@ describe('buildProfileTags listings in the JSON-LD (US-551)', () => {
         price: 525000,
         priceCurrency: 'USD',
         itemOffered: {
+          '@type': 'RealEstateListing',
           '@id': 'https://agentbio.net/jane/listing/abc-123#listing',
           name: '412 Maple Avenue, Salt Lake City, UT',
           url: 'https://agentbio.net/jane/listing/abc-123',
@@ -227,6 +228,7 @@ describe('buildProfileTags listings in the JSON-LD (US-551)', () => {
         url: 'https://agentbio.net/jane/listing/sold-1',
         availability: 'https://schema.org/SoldOut',
         itemOffered: {
+          '@type': 'RealEstateListing',
           '@id': 'https://agentbio.net/jane/listing/sold-1#listing',
           name: '9 Birch Court, Salt Lake City, UT',
           url: 'https://agentbio.net/jane/listing/sold-1',
@@ -241,7 +243,10 @@ describe('buildProfileTags listings in the JSON-LD (US-551)', () => {
         itemOffered: { '@id': string };
       }[]
     )[0];
-    expect(offer.itemOffered['@id']).toBe(buildListingTags(profile, listing, ORIGIN).jsonLd['@id']);
+    const graph = buildListingTags(profile, listing, ORIGIN).jsonLd['@graph'] as {
+      '@id': string;
+    }[];
+    expect(offer.itemOffered['@id']).toBe(graph[0]['@id']);
   });
 
   it('caps the offers at the same number of homes the body links to', () => {
@@ -268,9 +273,40 @@ describe('buildListingTags', () => {
     expect(tags.description).toContain('1,980 sqft');
     expect(tags.image).toBe('https://cdn.example.com/412-maple.jpg');
     expect(tags.url).toBe('https://agentbio.net/jane/listing/abc-123');
-    expect(tags.jsonLd['@type']).toBe('SingleFamilyResidence');
+    const graph = tags.jsonLd['@graph'] as Record<string, unknown>[];
+    expect(graph.map((n) => n['@type'])).toEqual(['RealEstateListing', 'Accommodation']);
     // A property is not a person; og:type=profile would be wrong for it.
     expect(tags.ogType).toBe('website');
+  });
+
+  // US-578: the SPA's ListingPage.tsx builds the same graph from the same
+  // module, so the `#listing` node the agent's page links to has one type.
+  it("declares the #listing node as the RealEstateListing the agent's page offers", () => {
+    const tags = buildListingTags(
+      profile,
+      { ...listing, property_type: 'condo', status: 'sold', bathrooms: 2.5 },
+      ORIGIN
+    );
+    const [node, home] = tags.jsonLd['@graph'] as Record<string, Record<string, unknown>>[];
+    const offered = (
+      buildProfileTags(profile, ORIGIN, [{ ...listing, status: 'sold' }]).jsonLd.makesOffer as {
+        itemOffered: Record<string, unknown>;
+      }[]
+    )[0].itemOffered;
+
+    expect(node['@id']).toBe(offered['@id']);
+    expect(node['@type']).toBe(offered['@type']);
+    expect(node.mainEntity).toEqual({ '@id': 'https://agentbio.net/jane/listing/abc-123#home' });
+    expect(node.image).toEqual(['https://cdn.example.com/412-maple.jpg']);
+    expect(node.offers).toMatchObject({
+      price: 525000,
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/SoldOut',
+    });
+    expect(home['@type']).toBe('Apartment');
+    expect(home.numberOfBedrooms).toBe(3);
+    expect(home.numberOfBathroomsTotal).toBe(3);
+    expect(home.address).toMatchObject({ streetAddress: '412 Maple Avenue', addressRegion: 'UT' });
   });
 
   it('falls back to the agent card when the listing has no photo', () => {
