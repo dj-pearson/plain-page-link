@@ -2886,8 +2886,8 @@
         "A rule in seo-audit.mjs catches an anonymous duplicate of a node type that should be singular"
       ],
       "priority": "low",
-      "passes": false,
-      "notes": "Opened 2026-09-10 (iteration 11), found while checking a naive duplicate count rather than trusting it. Low priority: two partial descriptions of one page is untidy rather than false, which is why it was not folded into US-180."
+      "passes": true,
+      "notes": "Opened 2026-09-10 (iteration 11), found while checking a naive duplicate count rather than trusting it. Low priority: two partial descriptions of one page is untidy rather than false, which is why it was not folded into US-180. DONE in round 10 as US-480."
     },
     {
       "id": "US-183",
@@ -4582,8 +4582,8 @@
         "There is a test for both cases"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-268)"
+      "passes": true,
+      "notes": " (follow-up slice from US-268) DONE in round 10 as US-477."
     },
     {
       "id": "US-291",
@@ -6294,8 +6294,8 @@
         "The new link expires and is written to the audit log"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-397)"
+      "passes": true,
+      "notes": " (follow-up from US-397) DONE in round 10 as US-478."
     },
     {
       "id": "US-405",
@@ -6767,8 +6767,8 @@
         "Counts and the conversion funnel treat closed as won and nurturing as in progress, with tests"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-428)"
+      "passes": true,
+      "notes": " (follow-up from US-428) DONE in round 10 as US-473."
     },
     {
       "id": "US-429",
@@ -6861,7 +6861,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": " (follow-up from US-431)"
+      "notes": " (follow-up from US-431) Slice done in round 10 as US-476."
     },
     {
       "id": "US-443",
@@ -7012,8 +7012,8 @@
         "A test pins BIO_DRIP_DAY max < window"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-434)"
+      "passes": true,
+      "notes": " (follow-up from US-434) DONE in round 10 as US-479."
     },
     {
       "id": "US-435",
@@ -7094,8 +7094,8 @@
         "Photos already on the saved listing are never removed by a cancel"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-451)"
+      "passes": true,
+      "notes": " (follow-up from US-451) DONE in round 10 as US-472."
     },
     {
       "id": "US-462",
@@ -7170,8 +7170,8 @@
         "profileReducedMotion.test.tsx still passes; add a test that no purple/indigo classes render"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Recorded as a [listings] finding in round 8, and given to this lane as a finding this round. (follow-up from US-453)"
+      "passes": true,
+      "notes": "Recorded as a [listings] finding in round 8, and given to this lane as a finding this round. (follow-up from US-453) DONE in round 10 as US-474."
     },
     {
       "id": "US-454",
@@ -7202,8 +7202,8 @@
         "The owner sees those leads as unassigned or as their own"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "This needs a product call on whether the leads go to the owner or to NULL (round robin does not re-run on update). Pausing the rules is done in US-454. (follow-up from US-454)"
+      "passes": true,
+      "notes": "This needs a product call on whether the leads go to the owner or to NULL (round robin does not re-run on update). Pausing the rules is done in US-454. (follow-up from US-454) DONE in round 10 as US-475."
     },
     {
       "id": "US-455",
@@ -7382,8 +7382,8 @@
         "Chrome still reports the app as installable"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Needs an image resize path; check whether Supabase storage image transforms are enabled on the self-hosted instance. (follow-up from US-460)"
+      "passes": true,
+      "notes": "Needs an image resize path; check whether Supabase storage image transforms are enabled on the self-hosted instance. (follow-up from US-460) DONE in round 10 as US-481."
     },
     {
       "id": "US-471",
@@ -7395,6 +7395,338 @@
       "priority": 2,
       "passes": false,
       "notes": " (follow-up from US-460)"
+    },
+    {
+      "id": "US-472",
+      "lane": "listings",
+      "round": 10,
+      "title": "Photos uploaded in the add and edit listing dialogs and never saved stayed public in storage",
+      "description": "Implements US-461 (slice of US-451). Before this change, photos stayed in the public listing-photos bucket with no row pointing at them in three cases. (1) The agent picked photos in the edit dialog, which uploads them at once (ListingPhotoManager.tsx handleFiles), and then cancelled. (2) The agent uploaded a photo and removed it again before saving. updateListing only compares against the row's previous photos, so it never saw that upload. (3) The add form uploaded its photos and then the insert failed, for example on a plan limit or a dropped connection. A retry uploaded the photos again. The optimize-image -200/-400/-800 variants stayed too. These photos are now removed. Photos already on a saved listing are never removed.",
+      "acceptanceCriteria": [
+        "Cancelling the edit dialog (Cancel button or Escape/overlay) after uploading removes the new uploads that were not saved, together with their -200/-400/-800 .webp variants",
+        "An upload that finishes after the edit dialog has closed is removed",
+        "After a successful edit save, uploads that were removed again before saving are removed; a failed save removes nothing, so a retry can still use them",
+        "A failed add-listing insert removes the photos it uploaded, and the mutation still rejects",
+        "Photos already on the saved listing are never removed by a cancel",
+        "Before removing anything, discardUnsavedPhotos re-reads the agent's stored listings and keeps any object a stored row refers to. If that read fails, nothing is removed",
+        "Only the agent's own listing-photos objects can be removed. Other agents' folders and hot-linked or imported URLs are never touched (this reuses the US-451 path rules)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Base: the worktree was hard-reset to claude/continuous-improvement-loops-fx2ob1 (3b2308c).\n\nWhy this story: US-461 was the open listings slice. The other open stories did not fit this session:\n- US-462 needs owner approval to run.\n- US-360 and US-437 need Playwright browsers.\n- US-276 depends on the leads lane.\n- US-275 is mostly done; it needs prerender, sitemap and a11y work.\n\nChanges:\n- src/hooks/useListings.ts\n  - New discardUnsavedPhotos(urls), returned from the hook.\n  - It re-reads stored rows with `select('photos, image').eq('user_id', uid)` instead of using the cache. The cache can be stale: a save that errored on the way back may still have landed.\n  - It reuses orphanedListingPhotoPaths, so only owned originals and their variants are candidates, and anything a stored row refers to is kept.\n  - If the read fails, it logs logger.warn and removes nothing. It never throws.\n  - addListing calls it with the insert's photos/image when the insert errors, then rethrows. Because it lives in the hook, the cleanup covers every add path.\n- src/components/listings/ListingPhotoManager.tsx: new optional onUploaded(urls) callback, called after each successful upload.\n- src/components/modals/EditListingModal.tsx\n  - Tracks the URLs uploaded during the dialog session in a ref, plus a closed flag.\n  - handleClose, used by Cancel and the Dialog's onOpenChange, discards the uploads that are not in initialData.photos, then calls onClose.\n  - An upload that resolves after the dialog closed is discarded straight away.\n  - onSubmit now receives (data, uploaded).\n- src/pages/dashboard/Listings.tsx: wires onDiscardUploads. handleEditListing discards uploads that are not in data.photos, and only after the save succeeds.\n\nTests:\n- useListings.test.ts: 6 new cases.\n  - Unsaved uploads are removed with their variants.\n  - The DB re-read keeps a saved photo.\n  - A failed read removes nothing.\n  - Another agent's folder, a hot-linked URL and an empty list cause no storage call.\n  - A failed add removes its photos and still rejects.\n  - A successful add makes no storage call.\n- New EditListingModal.test.tsx: 5 cases covering cancel, no uploads, Escape, the uploads passed to submit, and a late upload.\n- New Listings.photoDiscard.test.tsx: 3 page-wiring cases. A saved edit discards only the dropped uploads, a failed save discards nothing, and cancel is wired.\n- EditModals.test.tsx: one assertion updated for the new second onSubmit argument.\n\nNote: I tried a page-level test for the add flow, but vi.mock('@/components/modals/AddListingModal') did not reach the lazy import in Listings.tsx; the real modal kept rendering. I did not find the cause. That is part of why the add-failure cleanup lives in addListing, where useListings.test.ts covers it.\n\nVERIFIED: - npx tsc --noEmit: exit 0\n- npx vitest run src/hooks/useListings.test.ts src/lib/listingPhotoCleanup.test.ts src/hooks/useListingImageUpload.test.ts src/components/modals src/components/listings src/pages/dashboard src/pages/QuickActionsDashboard: 26 files, 188 tests passed\n- After the commit hook ran prettier: npx vitest run src/hooks/useListings.test.ts src/pages/dashboard/Listings.photoDiscard.test.tsx src/components/modals: 6 files, 39 tests passed\n- npx eslint on the 8 changed files: clean. The lint-staged eslint --fix and prettier pre-commit hook passed.\n- No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-482",
+      "lane": "listings",
+      "round": 10,
+      "title": "US-451 slice: offline listing delete (sync-manager) bypasses photo cleanup",
+      "description": "src/lib/sync-manager.ts:162-170 syncListingDelete runs supabase.from('listings').delete().eq('id', id) with no user_id filter and no select. It never removes the listing's photos from listing-photos, so a listing deleted offline leaves its photos public, the same leak US-451 fixed for online deletes. Make it read the row's photos and image first, delete with .eq('user_id', uid).select('id'), and then call the shared orphan cleanup. That probably means lifting removeListingPhotoObjects and discardUnsavedPhotos out of useListings into a non-hook module.",
+      "acceptanceCriteria": [
+        "An offline-queued delete removes the listing's owned photos and their variants once the row delete succeeds",
+        "A delete that removes zero rows leaves storage alone",
+        "The delete is scoped to the caller's user_id"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-472)"
+    },
+    {
+      "id": "US-483",
+      "lane": "listings",
+      "round": 10,
+      "title": "Delete dead useSecureListings.ts",
+      "description": "The lane brief reports src/hooks/useSecureListings.ts as dead code. Confirm it has no importers and delete it, so nobody copies its older patterns.",
+      "acceptanceCriteria": ["No importers remain", "tsc and the listings suites still pass"],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-472)"
+    },
+    {
+      "id": "US-484",
+      "lane": "listings",
+      "round": 10,
+      "title": "US-461 follow-up: discard uploads when the Listings page unmounts with the edit dialog open",
+      "description": "If the agent navigates away while the edit dialog is open, nothing calls onClose. The LazyModal error-boundary close button also bypasses handleClose. Uploads from those sessions are still orphaned. A small fix: an unmount effect in EditListingModal that discards when the dialog was neither saved nor closed.",
+      "acceptanceCriteria": [
+        "Unmounting the edit dialog without saving discards its unsaved uploads",
+        "A successful save does not trigger the unmount discard"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-472)"
+    },
+    {
+      "id": "US-473",
+      "lane": "leads",
+      "round": 10,
+      "title": "Leads in qualified, nurturing or closed were missing from every count, and the list could not be filtered by those statuses",
+      "description": "US-439 (taken as US-473). The Leads KPI chips counted only byStatus.new, .contacted and .converted. A lead in qualified, nurturing or closed was in none of them, and a closed deal never counted as a win. Status filtering was only possible through those three chips, so qualified, nurturing, closed and lost leads could not be filtered at all. The Analytics funnel also counted converted only. The chips are now status groups (New / In progress / Won). A new status select covers every status in LEAD_STATUSES plus the two groups. A group filter is sent to the database. Both funnels count closed as won and nurturing in the qualified stage.",
+      "acceptanceCriteria": [
+        "Agents can filter /dashboard/leads by every status in LEAD_STATUSES (new 'Filter by status' select plus ?status= deep links)",
+        "The KPI chips count nurturing as In progress and closed as Won (from lead_stats by_status), with tests",
+        "The Analytics funnel and ConversionFunnel treat closed as won and nurturing as in progress",
+        "An unknown ?status= value reads as 'all' instead of a filter that matches nothing"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence before the change: in src/pages/dashboard/Leads.tsx (old ~217-219 and ~245-247), the counts used only new/contacted/converted. The chips at ~600-650 filtered to 'new', 'contacted' or 'converted', and there was no other status filter in the toolbar. In src/pages/dashboard/Analytics.tsx:88, convertedInRange = byStatus.converted only.\n\nWhat changed:\n- src/lib/leadStatus.ts adds IN_PROGRESS_STATUSES (contacted, qualified, nurturing), WON_STATUSES (converted, closed), LEAD_STATUS_GROUPS (in_progress, won), statusFilterValues(), normalizeStatusFilter() and summarizeLeadStatuses().\n- src/hooks/useLeads.ts: leadsQuery takes `statuses`. One status uses .eq and a group uses .in('status', [...]). The paged list and fetchAllLeads (CSV export) both go through it, so an export follows a group filter too.\n- src/pages/dashboard/Leads.tsx: the chips are New / In progress / Won, counted from summarizeLeadStatuses over the lead_stats by_status data (or over the loaded rows as a fallback). The toolbar has a 'Filter by status' Select (All, In progress, Won, each status) that writes the same ?status= URL param. The toolbar was already flex-wrap.\n- src/pages/dashboard/Analytics.tsx: converted = won (converted + closed). The qualified stage adds nurturing.\n- src/components/dashboard/ConversionFunnel.tsx uses the shared WON_STATUSES.\n\nTests:\n- src/lib/leadStatus.test.ts: every status is in exactly one group, closed is won and nurturing is in progress, plus the summary math, filter parsing and group/status name collision.\n- src/pages/dashboard/Leads.test.tsx: the In progress chip queries .in with contacted/qualified/nurturing, and the Won chip with converted/closed. ?status=nurturing queries .eq and shows Nurturing in the select. ?status=archived adds no status filter. The chip counts are 9 and 11 from a lead_stats fixture with nurturing and closed.\n\nVERIFIED: - `npx tsc --noEmit` passed (exit 0).\n- `npx vitest run src/lib/leadStatus.test.ts src/pages/dashboard/Leads.test.tsx src/hooks/useLeads.test.ts src/hooks/useLeads.export.test.ts`: 4 files, 45 tests passed.\n- `npx vitest run src/components src/pages/dashboard src/hooks src/lib`: 167 files, 1350 tests passed.\n- eslint on the touched files: 0 errors, 2 warnings. Both are no-useless-assignment, at ConversionFunnel.tsx:68 and Leads.tsx:378, on lines this change did not touch.\n- Re-ran leadStatus and Leads tests after prettier: 40 passed.\n- No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-485",
+      "lane": "leads",
+      "round": 10,
+      "title": "lead_stats by_source and analytics_summary count closed as a conversion",
+      "description": "supabase/migrations/20260930000005_lead_stats.sql:35 counts by_source.converted with FILTER (WHERE status = 'converted'), and supabase/migrations/20261028000007_analytics_summary.sql:69 counts 'conversions' with status = 'converted'. A lead the agent moves to 'closed' therefore drops out of per-source conversion rates on Analytics and out of analytics_summary conversions. A new migration should recreate both functions to use status IN ('converted','closed'), keeping the SECURITY DEFINER search_path, REVOKE/GRANT and assert_caller_is rules.",
+      "acceptanceCriteria": [
+        "by_source.converted and analytics_summary conversions count converted and closed",
+        "A test reads the migration and holds its won list equal to WON_STATUSES in src/lib/leadStatus.ts",
+        "verify:migrations and verify:schema pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-473)"
+    },
+    {
+      "id": "US-474",
+      "lane": "profile",
+      "round": 10,
+      "title": "The sticky contact bar on an agent's page ignored their theme colours",
+      "description": "Closes US-464. On /:username the StickyActionBar is the main contact element on phones. It gave every action its own fixed colour (blue Call, green Text, purple Email, orange Schedule, indigo Home Value), whatever theme the agent had picked. Its mobile and desktop panels also had both a border and a shadow-2xl, which breaks the craft-floor rule of one elevation per element. Now the first action is filled with the theme's --primary, using its contrast-picked foreground. The other actions use a 10% tint of --primary with near-black text, so text stays readable whatever colour the agent chose. Each panel keeps the shadow only.",
+      "acceptanceCriteria": [
+        "Action buttons use the profile theme's --primary variable (filled for the first action, a bg-primary/10 tint for the rest) and no purple, indigo, blue, green or orange literals",
+        "Both the expanded mobile panel and the desktop panel declare elevation once (shadow-2xl, no border)",
+        "profileReducedMotion.test.tsx still passes; the new StickyActionBar.test.tsx checks that no stock-hue classes render, even with the mobile panel open"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Before: src/components/profile/StickyActionBar.tsx gave each action a fixed hue: lines 61-95 (bg-blue-600, bg-green-700, bg-purple-600, bg-orange-700, bg-indigo-600). Lines 129 and 204 had `bg-white rounded-2xl shadow-2xl border border-gray-200`.\n\nWhat changed: the per-action color and mobileColor fields are removed (mobileColor was never read). A new actionColor(index) helper returns 'bg-primary text-primary-foreground hover:bg-primary/90' for the first action and 'bg-primary/10 text-gray-900 hover:bg-primary/20' for the rest. Both panels drop `border border-gray-200`. Action buttons get type=\"button\", and their icons get aria-hidden.\n\nWhy the theme colour reaches the bar: StickyActionBar renders inside <main style={PROFILE_MAIN_STYLE}> (FullProfilePage.tsx:422-632). That style sets --primary to var(--theme-primary) and --primary-foreground to var(--theme-primary-foreground) (useProfileTheme.ts:52-57), and the foreground is contrast-picked in themes.ts:610.\n\nI checked that this Tailwind config really generates the opacity variants: compiling bg-primary/10 with npx tailwindcss gives `hsl(var(--primary) / 0.1)`. The FAB already used bg-primary. impeccable detect on the file reported nothing, but it ran regex-only, so contrast rules were not checked.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx vitest run src/components/profile/StickyActionBar.test.tsx src/components/profile/profileReducedMotion.test.tsx: 2 files, 8 tests passed.\nnpx vitest run src/components/profile src/pages/public: 19 files, 111 tests passed.\nOn commit, lint-staged ran eslint --fix and prettier on the 2 files and both passed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-486",
+      "lane": "profile",
+      "round": 10,
+      "title": "US-283 slice: make the manifest and index.html theme colours agree",
+      "description": "public/manifest.json theme_color is #2563eb, but index.html:78 sets the theme-color meta to #0ea5e9, so the installed PWA's browser chrome and the page disagree. Pick one value; #2563eb also matches the profile manifest and the 'modern' preset fallback.",
+      "acceptanceCriteria": [
+        "manifest.json theme_color and the index.html theme-color meta are identical",
+        "A test or check holds them together"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-474)"
+    },
+    {
+      "id": "US-487",
+      "lane": "profile",
+      "round": 10,
+      "title": "US-283 slice: ProfileCompletionWidget counts publish state, logo and service areas",
+      "description": "Make ProfileCompletionWidget count is_published, brokerage_logo and service_cities. Optionally add 'Publish your page' as a checklist step.",
+      "acceptanceCriteria": [
+        "The widget's percentage reflects is_published, the logo and service areas",
+        "Tests cover each new item"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-474)"
+    },
+    {
+      "id": "US-488",
+      "lane": "profile",
+      "round": 10,
+      "title": "US-283 slice: custom_css decision",
+      "description": "Remove profiles.custom_css from src/types/theme.ts and the UI, or build a sanitised path, and record the decision. This needs an owner decision if it means building a sanitised path.",
+      "acceptanceCriteria": ["Decision recorded and implemented"],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-474)"
+    },
+    {
+      "id": "US-475",
+      "lane": "uiux",
+      "round": 10,
+      "title": "A removed or departed teammate could still read and update the leads already assigned to them",
+      "description": "This closes US-465. The leads policies admit `auth.uid() = assigned_to` (SELECT/UPDATE in 20260902000006 and 20261028000004). The lead_activities policies do the same (20261107000349:118,146,154). US-454 stopped new leads being routed to someone who left, but leads already assigned to them kept the assignment. So after an owner removed a teammate, that person could still read those leads and their timelines, and update their status. Now, when a team_members row is deleted, a trigger clears assigned_to on those leads and writes an audit row. The migration also clears existing stale assignments.",
+      "acceptanceCriteria": [
+        "After remove, leave, team deletion or account deletion, no lead owned by the team owner has assigned_to set to the departed user. The trigger is a team_members AFTER DELETE trigger with WHEN OLD.user_id IS NOT NULL.",
+        "Only the departed user's leads are cleared. Leads assigned to teammates who stay, and leads the owner assigned to themselves, keep their assignment.",
+        "Each departure that unassigns leads writes one audit_logs row: action 'team_member_leads_unassigned', resource 'team', details {departed_user_id, leads_unassigned}.",
+        "Leads that already point at someone who is not an accepted member of a team the owner owns are cleared by the migration.",
+        "verify:schema checks the departure case. The member's two zip-routed leads are unassigned, the round-robin member's leads are untouched, and the audit row exists.",
+        "The owner now sees those leads as unassigned: assigned_to is NULL and lead.user_id is unchanged. The TeamPage remove and leave dialogs say this, and both mutations refresh the leads queries."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Product call I made (the story said it needed one): departed members' leads become UNASSIGNED (NULL), not reassigned to the owner. Reasons:\n- The owner already owns these leads through leads.user_id, so nothing drops out of their CRM.\n- notify_lead_assignee (20260930000006:28) returns early on NULL, so nobody gets a misleading \"assigned to you\" notification.\n- The owner reassigns from there.\nThe acceptance criterion allowed either NULL or the owner.\n\nFiles:\n- supabase/migrations/20261108000475_unassign_leads_on_member_departure.sql. New function unassign_leads_for_departed_member():\n  - SECURITY DEFINER, search_path pinned to public, extensions, pg_temp. EXECUTE revoked from PUBLIC/anon/authenticated and granted to service_role.\n  - Runs from the AFTER DELETE trigger unassign_leads_on_member_delete on team_members.\n  - The condition is \"the lead's owner still has this user as an accepted member of a team the owner owns\". It deliberately does not look up OLD.team_id's owner, so team deletion is covered too: the teams row is already gone when the cascade fires.\n  - Writes one audit row per departure through log_audit_event, with a count.\n  - A one-time UPDATE clears existing out-of-team assignments.\n- scripts/verify-schema.mjs, zip-routing check (around line 772): new assertions after the member is deleted.\n- src/pages/dashboard/TeamPage.tsx:\n  - removeMember and leaveTeam onSuccess now refresh ['leads'] (and ['leads-assigned-count'] for the leaver).\n  - The remove dialog (accepted member) and the leave dialog say their assigned leads become unassigned.\n- src/pages/dashboard/TeamPage.test.tsx: tests that both dialogs show the new text and that the leads queries are refreshed.\n\nManual check on a scratch database: created an owner, a member, a team, a lead assigned to the member and a lead self-assigned to the owner, then deleted the team. The member's lead became NULL, the owner's lead was unchanged, and one audit row was written.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run src/pages/dashboard/TeamPage.test.tsx src/components/settings/LeadRoutingRules.test.tsx supabase/functions/teams`: 3 files, 33 tests, all passed.\n- `npm run verify:migrations`: \"OK — 79 migration files structurally valid.\"\n- Full chain applied to a fresh scratch Postgres 16 database (scripts/supabase-prelude.sql, then every migration in one pass with ON_ERROR_STOP=1), then `node scripts/verify-schema.mjs --db-url ...`: the zip-routing check, including the new US-475 assertions, passed. One check failed, \"every table referenced in code exists\". The names it flags (0123456789abcdefghijklmn and nmlkjihgfedcba9876543210) come from supabase/functions/_shared/resend-webhook.test.ts, which this change does not touch.\n- Negative control: the same run with 20261108000475 skipped failed with \"a departed member kept leads assigned to them, so they can still read them\" and \"unassigning a departed member's leads left no audit row\".\n- `npx eslint` on TeamPage.tsx and its test: 0 errors. The 2 warnings were already there (lines 354 and 410, no-unescaped-entities).\n- The lint-staged pre-commit hook (eslint --fix, prettier) passed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261108000475_unassign_leads_on_member_departure.sql. It adds the trigger and clears, once, any lead whose assigned_to is not the owner and not an accepted member of a team the owner owns."
+    },
+    {
+      "id": "US-489",
+      "lane": "uiux",
+      "round": 10,
+      "title": "Leads page: show who a lead is assigned to, and let the owner reassign it",
+      "description": "Leads.tsx only has an 'assigned to me' filter (lines 92 and 127-139). The owner cannot see or change who holds a lead, so leads unassigned by US-475 cannot be handed to another teammate from the UI.",
+      "acceptanceCriteria": [
+        "The lead row or detail shows the assignee (or 'Unassigned')",
+        "The owner can pick an accepted teammate or clear the assignment",
+        "Tests"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-475)"
+    },
+    {
+      "id": "US-476",
+      "lane": "performance",
+      "round": 10,
+      "title": "The Leads dashboard loaded its detail, Zapier and upgrade dialogs, the CSV writer and date-fns before it showed a single lead",
+      "description": "US-442 slice. The Leads route (/dashboard/leads) now downloads 29.2 KB gzip beyond the entry chunk and DashboardLayout, down from 57.1 KB. The lead detail, Zapier and upgrade dialogs load when they are opened. The CSV writer loads when an export runs. \"Last contacted\" no longer uses date-fns, so date-vendor is off the route. leadAddressLabel moved out of leadFormSchema into its own small module.",
+      "acceptanceCriteria": [
+        "Leads route closure beyond entry + DashboardLayout reduced: 57.1 KB -> 29.2 KB gzip (measured from the vite build manifest)",
+        "Leads.test.tsx still passes (including the export test, now with the dynamic import)",
+        "No dialog, exportUtils, leadFormSchema or date-fns import is static in Leads.tsx (source guard test)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "How it was measured: `npx vite build --manifest`, then a scratch script (/tmp/claude-0/-home-user-plain-page-link/3a5c39fd-7090-5660-8a7d-dbafb71cb691/scratchpad/closure.mjs). It takes the static `imports` closure of the route chunk, removes the entry closure and the DashboardLayout closure, and gzips what is left. Rollup renamed the route key from src/pages/dashboard/Leads.tsx to _Leads-<hash>.js, as US-402's notes predicted, so the script falls back to finding the chunk by `name`.\n\nBefore (57.1 KB): Leads 16.3, useLeadStats 6.8, date-vendor 6.3, useContacts 2.0, leadFormSchema 1.8, exportUtils 1.6, useLeadActivities 1.5, UpgradeModal 1.3, keyDates 1.1, and so on.\nAfter the dialogs and export moved (37.0 KB). After date-fns and leadFormSchema came off too (29.2 KB): Leads 8.5, useLeadStats 6.8 (this chunk holds useLeads itself, so the page needs it), useLeadActivities 1.5, useNotificationPreferences 1.4, and so on.\nThe LeadDetailModal chunk is 54.6 KB beyond entry + layout. That cost now falls on the first open, and hovering or focusing a lead row starts the download early.\n\nChanges:\n- src/pages/dashboard/Leads.tsx: LeadDetailModal, ZapierIntegrationModal and UpgradeModal now use React.lazy inside LazyModal. Zapier and Upgrade also use useMountOnFirstOpen, the same pattern as US-412/US-431. The lead detail mounts while selectedLead is set, as it did before; the LazyModal error close clears selectedLead so the next click retries the load. Lead rows call preloadLeadDetail on onPointerEnter and onFocus. handleExportLeads loads '@/lib/exportUtils' in parallel with fetchAllLeads through Promise.all. A failed load lands in the existing 'Export failed' toast. formatDistanceToNow was replaced by timeAgo.\n- src/lib/timeAgo.ts (new): relative time from Intl.RelativeTimeFormat('en', {numeric:'auto'}). The wording changes slightly: date-fns said \"about 3 hours ago\" and \"1 day ago\"; this says \"3 hours ago\" and \"yesterday\".\n- src/lib/leadAddressLabel.ts (new): leadAddressLabel moved here. src/lib/leadFormSchema.ts re-exports it, so existing callers are unchanged.\n- Tests: src/lib/timeAgo.test.ts (new). src/pages/dashboard/Leads.test.tsx gained a 'Leads route weight (US-476)' source guard that fails if date-fns, the three dialogs, exportUtils or leadFormSchema are imported statically again.\n\nThe commit hook (lint-staged) ran eslint --fix and prettier. It backs up through git stash; that was the hook's own doing, not a manual stash. tsc and the tests passed again after it.\n\nVERIFIED: npx tsc --noEmit -p . — passes (before and after the commit hook).\nnpx vitest run src/pages/dashboard/Leads.test.tsx src/lib/timeAgo.test.ts src/lib/leadFormSchema.test.ts src/hooks/useMountOnFirstOpen.test.ts — 4 files, 36 tests passed. After the commit: the first three files, 32 tests passed.\nnpx vitest run src/features-claims.test.ts — 18 passed.\nnpx eslint on the touched files — 0 errors, 1 warning (no-useless-assignment on `let truncated = false`; the same warning is on HEAD at line 372).\nnpx vite build --manifest — exit 0. node scripts/check-bundle-size.mjs — \"OK — 275 chunks within budget (1 documented exception(s))\".\nRoute closure beyond entry + layout: 57.1 KB before, 29.2 KB after (gzip).\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-490",
+      "lane": "performance",
+      "round": 10,
+      "title": "Lead detail first open: trim the 54.6 KB LeadDetailModal chunk",
+      "description": "Since US-476 the detail chunk loads on first open, warmed when a lead row is hovered. It still pulls date-fns (format), useContacts through AddLeadToClientsButton, keyDates and LeadListingCard. Some of these could load only when their section expands.",
+      "acceptanceCriteria": ["Detail chunk closure measured before/after", "No behaviour change"],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-476)"
+    },
+    {
+      "id": "US-477",
+      "lane": "security",
+      "round": 10,
+      "title": "The Profile page saved any text in its link fields, and the booking modal could frame or link a non-https Calendly URL",
+      "description": "Closes the open security story US-290. The Profile page now checks its nine link fields when the agent saves: website, Calendly, Facebook, Instagram, LinkedIn, TikTok, YouTube, Zillow and Realtor.com. A bare host such as \"zillow.com/me\" is saved with https:// in front. Any other value that is not a web address is refused next to its field, in the same words the US-456 database refusal uses. The tab holding the first bad field opens, and nothing is sent. CalendlyModal no longer embeds or links a calendly_url that is not https. Old rows saved before the US-456 check can hold anything, and CalendlyEmbed's fallback puts the URL straight into an <a href>.",
+      "acceptanceCriteria": [
+        "Saving the Profile page with javascript: in any URL field shows an inline error (aria-invalid, aria-describedby) and a banner, and updateProfile is not called",
+        "A bare host is saved with https:// in front, and the field then shows the stored value",
+        "Calendly must be https: http:// is refused on Profile, and the modal shows 'Online booking isn't available' with no embed and no link",
+        "When the refused field is on a tab that is not open, that tab opens",
+        "Tests cover all of the above (profileUrls.test.ts, Profile.test.tsx, CalendlyModal.test.tsx)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Background: before this change, Profile.tsx marked only website_url as type=url. The social, Zillow, Realtor.com and Calendly inputs saved any string. US-456 (migration 20261108000456) made the database refuse such values, but the agent only found out from a banner after the round trip, and a bare host was refused when it could have been fixed. Also, type=url makes the browser block \"zillow.com/me\" while it accepts \"javascript:x\".\n\nChanges:\n- New src/lib/profileUrls.ts:\n  - PROFILE_URL_FIELDS maps each field to the tab it is on.\n  - normalizeProfileUrl / normalizeProfileUrls run sanitizeExternalUrl (http/https only, bare host gets https://). Calendly is https-only.\n  - httpsOnlyUrl.\n- src/lib/urlSchemeErrors.ts: the message builder is pulled out as urlFieldMessage(field), so the check before saving uses the same words as the database refusal. urlSchemeErrorFrom behaves as before.\n- src/pages/dashboard/Profile.tsx:\n  - New local UrlInput component: type=text, inputMode=url, autoComplete=url, aria-invalid / aria-describedby, and an inline error in text-destructive.\n  - The nine URL inputs use it.\n  - handleSubmit normalises the fields first. On a refusal it sets urlErrors, opens the tab with the first error (Tabs is now controlled, because Radix unmounts inactive tabs) and sets the banner, then returns.\n  - On success it sends the normalised values and shows them in the form.\n  - Editing a field clears its error.\n- src/components/integrations/CalendlyModal.tsx: safeCalendlyUrl = httpsOnlyUrl(calendlyUrl). Only that value goes to buildCalendlyUrl and CalendlyEmbed. When it is empty, the modal shows a short \"Online booking isn't available…\" message.\n\nA stored legacy value that is not a URL (the constraints are NOT VALID) will now block a save until the agent fixes it. The database already refused those updates; the difference is that the agent is now told which field is wrong.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, run both before and after the pre-commit prettier pass.\n- `npx vitest run src/lib/profileUrls.test.ts src/lib/urlSchemeErrors.test.ts src/pages/dashboard/Profile.test.tsx src/components/integrations/CalendlyModal.test.tsx src/utils`: 6 files, 65 tests passed.\n- After prettier, the four touched suites: 39 tests passed.\n- `npx vitest run src/pages/public src/components/integrations`: 7 files, 44 tests passed.\n- `npx eslint` on the touched files: 0 errors. The 6 react/no-unescaped-entities warnings in Profile.tsx were already there and are not on lines this change touches.\n- No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-478",
+      "lane": "enterprise",
+      "round": 10,
+      "title": "If the data-export email goes missing, the subject has to request and wait for a whole new export",
+      "description": "Implements US-404. gdpr-export now takes POST { action: 'resend_link', requestId }. It checks that the request belongs to the caller, both in the query and again in resendExportLink, then signs a new link to the same file and emails it to the account's address. The browser never receives the link, so the email is still the only place the bearer link appears. The new link expires when the file does (file_expires_at), so no link outlives its file and the email's \"after which the file is deleted\" stays true. Resends have their own rate limit (gdpr-export-resend, 3 per hour), so asking for the link again does not use up export attempts. Settings shows \"Email the link again\" on each Ready export request.",
+      "acceptanceCriteria": [
+        "POST gdpr-export with {action:'resend_link', requestId} emails a freshly signed link to the caller's own completed export while file_expires_at is in the future, and answers 200 {success, expiresAt} with no URL in the body",
+        "Another user's request id, or a malformed one, answers 404 and sends nothing; the lookup filters on user_id = caller and the result is checked again",
+        "A request that is not completed answers 409. An expired or purged file, or one with under 5 minutes left, answers 410. An account with no email answers 422. An email that fails to send answers 502 and writes no audit row",
+        "The signed link expires at file_expires_at, never later",
+        "Resends are rate-limited separately (gdpr-export-resend, 3 per hour) and never use up the export budget",
+        "The settings screen shows 'Email the link again' only on Ready rows with more than 5 minutes left, shows 'Sending...' while a resend is pending, and explains each refusal in plain words",
+        "A successful resend is audited as gdpr_data_export with details {request_id, link_resent: true}; a failed audit write does not turn a sent email into an error"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- supabase/functions/_shared/gdpr-export-queue.ts: adds HeldExport, ExportResendStore, MIN_RESEND_LINK_SECONDS, resendExportLink() and supabaseExportResendStore(). The resend store reuses the queue store's getSubject, signedUrl, sendEmail and audit, and adds findOwnExport, which selects id, user_id, status, file_url and file_expires_at filtered by .eq('id').eq('user_id').eq('request_type','export'). This module is still free of Deno globals, so vitest covers it.\n- supabase/functions/gdpr-export/index.ts: for POST it reads the JSON body (an empty body still means \"queue an export\"). action === 'resend_link' goes to its own rate limit and then to resendExportLink; the reply is {success, expiresAt, message} or {success:false, error} with the refusal's status. The existing GET and queue paths are unchanged.\n- src/lib/dataExportRequests.ts: ExportRequestView.canResend is true only for a completed row whose expiry is more than MIN_RESEND_LINK_MS (5 minutes, the same as the server) away. Adds describeResendError (410, 409, 422, 429, 404, anything else).\n- src/hooks/useGDPR.ts: adds a resendExportLink mutation that calls callEdgeFunction('gdpr-export', {method:'POST', auth:true, body:{action:'resend_link', requestId}}), plus resendingExportId. On error it refetches exportRequests, so a 410 row changes to Expired.\n- src/components/settings/GDPRSettings.tsx: adds a link-variant \"Email the link again\" button on Ready rows, with a 44px minimum touch target on mobile.\n\nWhy this story: it is the open enterprise slice with the clearest effect on users. A lost email meant waiting up to an hour for a full rebuild, even though the file was still held for 7 days.\n\nVERIFIED: Run in the worktree after the lint-staged prettier/eslint pass at commit time:\n- `npx tsc --noEmit`: exit 0.\n- `npx vitest run supabase/functions/_shared/gdpr-export-queue.test.ts supabase/functions/_shared/gdpr-export.test.ts src/lib/dataExportRequests.test.ts src/hooks/useGDPR.test.ts src/components/settings/GDPRSettings.test.tsx src/edge-function-routing.test.ts src/schema-references.test.ts supabase/functions/_shared/cors.test.ts src/lib/edgeFunctions.test.ts`: 9 files, 106 tests passed (before the commit-time formatting).\n- After the commit, a re-run of gdpr-export-queue, dataExportRequests, useGDPR, GDPRSettings, schema-references and edge-function-routing: 75 tests passed.\n- New tests: 9 in gdpr-export-queue.test.ts (8 for resendExportLink, plus a source check that index.ts routes resend_link under its own rate limit and never puts the link in the response), 3 in dataExportRequests.test.ts, 2 in useGDPR.test.ts and 2 in GDPRSettings.test.tsx.\n- `npx eslint` on the touched src files: 0 errors. One react/no-unescaped-entities warning at GDPRSettings.tsx:301 is in code this change did not touch.\n- Deno is not installed here, so `deno check` on gdpr-export/index.ts was not run. CI's verify-backend workflow runs it.\n- No migration was added.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the gdpr-export edge function (functions.agentbio.net, the Coolify application built from the root Dockerfile, which runs edge-functions-server.ts). It imports email.ts, env.ts and gdpr-export-queue.ts, so the deploy needs the same email provider settings scheduled-maintenance already uses."
+    },
+    {
+      "id": "US-479",
+      "lane": "marketing",
+      "round": 10,
+      "title": "Free-tool drip emails were lost (bio email 7 never sent) or sent twice (listing drip)",
+      "description": "This closes US-449 and fixes the same scheduling fault in the listing drip. Both lead-magnet drips now choose what to send with one shared, tested rule: the earliest email that is due and has not been sent yet. They look back over the last due day plus 7 days of grace. Before this, the bio drip never sent email 7. The listing drip lost an email whenever a run was missed or a send failed, and it sent the same email again if it ran twice in a day.",
+      "acceptanceCriteria": [
+        "The bio drip looks back further than the last due day, so email 7 has whole days to go out (US-449)",
+        "A test checks that BIO_DRIP_DAY's largest value is smaller than the look-back window",
+        "After a missed run or a failed send, emails catch up in order, and an email already sent is never chosen again",
+        "The listing drip's send days match get_pending_listing_emails() and the sequence rows init_listing_email_sequence() creates, and tests check both against the baseline SQL",
+        "Every scheduled listing email has matching HTML in send-scheduled-listing-emails (a test checks this)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What was wrong:\n- supabase/functions/send-scheduled-bio-emails/index.ts:51-64 (before) only read captures from the last 7 days (`.gte(created_at, now-7d)`). BIO_DRIP_DAY in _shared/bio-drip-emails.ts puts email 7 on day 7, and a capture counts as 7 whole days old only at the moment it leaves that window. So email 7 never sent and email_sequence_completed never became true.\n- supabase/functions/send-scheduled-listing-emails/index.ts:41-48,104-107 (before) looked the email up by the exact day count (`EMAIL_SCHEDULE[days_since_capture]`). The keys were days 2,3,4,6,7,8, so each email went out one day later than get_pending_listing_emails() schedules it (baseline SQL :1448-1455, email n on day n), and nothing was due on day 1 or day 5. A day without a run, or a failed send, lost that email for good. The sender never checked what had already been sent: on day 2, for example, email 2's pending row makes the RPC return the capture, and the code then resent email 1. So a second run on the same day sent the same email twice.\n\nWhat changed:\n- New supabase/functions/_shared/drip-schedule.ts holds pure functions with no Deno dependencies: nextDueDripEmail, dripLookbackDays (last due day plus DRIP_GRACE_DAYS=7), wholeDaysSince, isFinalDripEmail and dripOrder.\n- New supabase/functions/_shared/listing-drip.ts holds LISTING_DRIP (subject and day), keyed 1,2,3,5,6,7, the sequence numbers the database seeds. The HTML is keyed the same way.\n- The bio sender now uses `dripLookbackDays(BIO_DRIP_DAY)` and nextDueDripEmail, and marks the sequence complete through isFinalDripEmail.\n- The listing sender reads each capture's sent sequence numbers from listing_email_sequences, picks the next due email, and marks only that email as sent. A failed send is still not marked as sent, so the next run retries it.\n- INSTAGRAM_BIO_ANALYZER_SETUP.md: replaced the stale \"Change Email Timing\" snippet.\n- New supabase/functions/_shared/drip-schedule.test.ts (13 tests) covers: no resend, catch-up order, the last email only after all others, a capture 7 days and 3 hours old being due email 7, the senders using the shared helpers, and the listing schedule matching both the baseline SQL and the HTML keys.\n\nNo migration and no change to the frontend.\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx vitest run supabase/functions/_shared src/marketing-claims.test.ts: 30 files and 322 tests passed, both before and after the lint-staged formatter ran at commit.\nnpx vitest run on drip-schedule, bio-drip-emails, marketing-unsubscribe and log-redaction tests: 4 files and 42 tests passed.\nDeno is not available in the sandbox, so I checked the edge functions without it:\n- Strict tsc (moduleResolution bundler, allowImportingTsExtensions) on _shared/drip-schedule.ts, listing-drip.ts and bio-drip-emails.ts: exit 0.\n- A temporary strict type-check file covering how the bio sender uses BIO_DRIP_DAY with the new helpers: exit 0. I deleted the file before committing.\n- TypeScript transpileModule diagnostics on both sender index.ts files: 0 each.\nNo migration was added, so verify:migrations was not needed.\n\nREVIEW: fix_required; fix-up: The reviewer was right. get_pending_listing_emails() (baseline :1423-1455) has no upper age limit. The sender also had no window, so nextDueDripEmail would have sent email 1 to any capture at least 1 day old, including ones from years back. A send that kept failing would also have been retried on every run. I added isPastDripWindow(schedule, days) to supabase/functions/_shared/drip-schedule.ts. It returns true when days >= dripLookbackDays(schedule), which is 14 for the listing drip. send-scheduled-listing-emails/index.ts now checks this for each capture before it reads sent rows or picks an email. A capture past the window is marked email_sequence_completed=true, so it drops out of the RPC for good, and then skipped. If that update fails, the error is logged per capture. One deliberate choice: I used >= instead of the reviewer's >. That way the window is exactly the bio sender's, which only takes captures created in the last 14 days, so they are at most 13 whole days old. Added tests in drip-schedule.test.ts: the window boundaries (last due day and lookback-1 are still worked, lookback is closed), the reviewer's 2025-03-01 capture with nothing sent (nextDueDripEmail would pick email 1, but it is past the window), and a source pin. The pin checks that the listing sender calls isPastDripWindow(LISTING_DRIP_DAY, daysSinceCapture) before nextDueDripEmail and that it sets email_sequence_completed: true and then continues. This is the same kind of pin the bio sender's test has. Committed as 1af9251 \"US-479: address review\" and moved loop/r10-marketing to HEAD. Nothing was pushed, and prd.json and progress.txt were not touched.\n\nOWNER ACTIONS: Redeploy edge functions send-scheduled-bio-emails and send-scheduled-listing-emails (the functions.agentbio.net Coolify app). | Neither drip is on a cron yet (see US-103/US-136 notes). Once one is scheduled, any cadence is now safe: running hourly or twice a day no longer resends an email, and a missed day no longer loses one."
+    },
+    {
+      "id": "US-480",
+      "lane": "seo",
+      "round": 10,
+      "title": "Feature pages published two anonymous WebPage nodes for one page (fixes US-182)",
+      "description": "SEOHead added its speakable block as a second WebPage node with no @id. It also nested any @graph schema a page passed inside a second @graph. So /features/lead-capture and /features/analytics each described themselves in two partial WebPage nodes that no consumer could match up. SEOHead now builds its JSON-LD with a pure helper, buildStructuredData. The output has one flat @graph. A top-level WebPage node without an @id gets the canonical URL as its @id, and the speakable spec is merged into that node. A WebPage node is added only when the page has none, and it uses the same @id. Both pages also give their WebPage node an explicit @id and url, and set isPartOf to websiteId(getBaseUrl()).",
+      "acceptanceCriteria": [
+        "/features/lead-capture and /features/analytics each emit exactly one WebPage node across all JSON-LD blocks",
+        "That node's @id and url are getCanonicalUrl(path), its isPartOf is the site WebSite id, and it carries the SpeakableSpecification",
+        "SEOHead never nests an @graph inside another @graph",
+        "FAQPage nodes are left alone: they are not given the page id and are not merged",
+        "A WebPage node that already has an @id other than the canonical URL is left unchanged"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-182, an open SEO story in scope with a single right answer. US-389 and the rest of US-371 still need an owner decision on custom domains, and US-370 is dead-code cleanup.\n\nRoot cause: the old src/components/SEOHead.tsx at lines 94-125. speakableSchema was built as {'@type':'WebPage', speakable, url} with no @id and pushed next to the page's schema. LeadCapture.tsx:16 and Analytics.tsx:27 passed generateCombinedSchema([WebPage-without-@id, FAQPage]), which is already an @graph. The output was therefore an outer @graph holding an inner @graph plus a second anonymous WebPage.\n\nChanges:\n- src/lib/structured-data-graph.ts (new): buildStructuredData({schema, canonicalUrl, speakableSelectors}). It flattens the schema to its top-level nodes and strips each node's @context. It gives an anonymous top-level WebPage (exactly 'WebPage', not a subtype such as FAQPage) the canonical URL as its @id, the same convention ArticleSEO already uses. It merges speakable into the WebPage node whose @id is the canonical URL, keeping any existing url on that node; when there is no such node it appends one. It returns null for no nodes, a single node carrying @context for one node, and {@context, @graph} for more.\n- src/components/SEOHead.tsx: the hand-rolled speakable and combine logic is replaced by one call, buildStructuredData.\n- src/pages/features/LeadCapture.tsx and Analytics.tsx: the WebPage node now has '@id' and url set to canonicalUrl and isPartOf {'@id': websiteId(getBaseUrl())}, and canonicalUrl is computed once.\n- src/lib/structured-data-graph.test.tsx (new): 6 unit tests, plus a server-mode Helmet render of both pages that counts the WebPage nodes across every JSON-LD block (Breadcrumb emits its own BreadcrumbList block). I checked that the 2 page tests fail against the old SEOHead (2 failed / 6 passed) and pass with the fix.\n\nEffect on other pages: speakableSelectors is passed only by these two pages. Any other page that passes a top-level WebPage node without an @id now gets canonicalUrl as its @id, which is what that node describes anyway.\n\nVERIFIED: npx tsc --noEmit: passed (TSC_OK).\nnpx vitest run src/lib/structured-data-graph.test.tsx src/config/site-entities.test.tsx src/config/seo-origin-sources.test.ts src/features-claims.test.ts: 4 files, 43/43 passed.\nnpx vitest run src/components src/pages/features src/pages/Pricing.test.tsx: 269/269 passed.\nRegression check: with the old SEOHead.tsx put back, structured-data-graph.test.tsx gave 2 failed / 6 passed (the two page tests). With the fix it gives 8/8.\neslint on the new and changed lib and component files: no new errors. The feature pages have 5 react/no-unescaped-entities warnings in copy this change did not touch. The pre-commit hook (eslint --fix and prettier) passed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-491",
+      "lane": "seo",
+      "round": 10,
+      "title": "Link inline Organization references to the site Organization node",
+      "description": "Pricing.tsx (offers[].seller, around line 95) and VsLater.tsx:44 use an inline {'@type':'Organization', name:'AgentBio'} with no @id. Use publisherOrganization(getBaseUrl()) so these nodes resolve to the site Organization.",
+      "acceptanceCriteria": [
+        "No inline Organization node named AgentBio without an @id in src/pages"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-480)"
+    },
+    {
+      "id": "US-481",
+      "lane": "mobile",
+      "round": 10,
+      "title": "An installed agent page showed the AgentBio logo instead of the agent's photo (US-470 slice 1)",
+      "description": "A homebuyer who adds an agent's page to their home screen now gets the agent's photo as the icon, as long as the agent uploaded the photo after this ships. Before, the manifest could only list the AgentBio platform icons. avatar_url can be any size or aspect ratio, and Chrome decides installability from the icon sizes the manifest declares. Now, when the agent uploads a photo, the browser crops it to a square (keeping more of the top for portraits), renders it as 192 and 512 PNGs, and stores them next to the photo, named after it. /:username/manifest.json works out the icon URLs from the profile's current avatar_url. It checks with HEAD requests that both exist in our own storage, then lists them ahead of the platform icons. On iOS Safari, the apple-touch-icon link switches to the photo icon while the profile is open.",
+      "acceptanceCriteria": [
+        "The home-screen icon from /:username is the agent's photo when the agent has one with stored icons (manifest lists photo 192/512 first)",
+        "The platform icon remains the fallback: missing icons, a failed or slow HEAD check, an avatar outside our avatars bucket, or no avatar all keep /icons/icon-*.png",
+        "Installability: icons are listed only after a HEAD finds both sizes, so a declared icon never 404s; the 384 logo is dropped when photo icons exist so the photo is chosen at every density",
+        "On iOS Safari (not the installed app) the apple-touch-icon names the photo icon once found, and goes back to /Icon.png when the visitor leaves the profile",
+        "An avatar upload never fails because of the icons (render or icon upload failure is logged and skipped); the replaced photo's icons are removed with it"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Files:\n- src/lib/avatarAppIcon.ts (new, pure, shared with Pages Functions): APP_ICON_SIZES [192,512]; appIconObjectName('avatar-123.jpg',512) gives 'avatar-123-app-icon-512.png'; avatarAppIconUrls(avatarUrl, storageBase?) only accepts <base>/storage/v1/object/public/avatars/<folder>/<name> on the storage origin, so the function only ever asks our own storage (avatar_url is text the agent can write); headshotSquare crop rectangle.\n- src/lib/renderAppIcons.ts (new): createImageBitmap with EXIF orientation, canvas with a white background, PNG output. Throws if the shorter side is under 144px.\n- src/hooks/useProfileImageUpload.ts: new `appIcons` option, turned on in useAvatarUpload.ts. Icons upload after the photo and before the profile update, so a new avatar_url is never visible without its icons when they could be made. The stale-object cleanup keeps the new icon names, and the old photo's icons are deleted along with the old photo.\n- functions/_lib/profile-manifest.ts: selects avatar_url too (a public column, already used by profile-route.ts PROFILE_COLUMNS). findAvatarIcons runs HEAD on both sizes in parallel with a 2s timeout. buildProfileManifest(profile, avatarIcons) puts the photo icons first and, when they are present, filters the platform icons to 192/512.\n- src/hooks/useProfileManifest.ts and src/components/profile/ProfileRoute.tsx: ProfileRoute reads avatar_url through useQuery with the same publicProfileQueryOptions key plus `select`, so there is no extra request. The hook switches link[rel=apple-touch-icon] only on iOS Safari in a tab ('standalone' in navigator, and not already standalone), and only after a HEAD succeeds. It restores the logo on unmount.\nI chose US-470 over US-471 because it is the open mobile story with visible user impact. US-471 is a small, separate crawler-HTML change and remains open.\n\nVERIFIED: npx tsc --noEmit: clean (covers src and functions). npx vitest run src/components/profile src/hooks src/lib src/pages/dashboard/Profile.test.tsx src/pages/public functions: 167 files, 1659 tests passed. After a type fix in the test: npx vitest run functions/_tests/profile-manifest.test.ts: 12 passed (5 new US-481 cases). New or extended: src/lib/avatarAppIcon.test.ts (10 tests), src/hooks/useProfileImageUpload.test.ts (5 new: icons stored before the profile update, old icons removed and new kept, upload survives a render failure, upload survives an icon upload failure, not done for the brokerage logo), src/hooks/useProfileManifest.test.tsx (3 new iOS apple-touch-icon cases). eslint on the changed src files: clean. lint-staged ran eslint --fix and prettier on commit. Not run: the vite build or route-weight budget. ProfileRoute (entry chunk) now imports avatarAppIcon.ts, a small dependency-free module. No migration.\n\nREVIEW: approve\n\nOWNER ACTIONS: Deploy Cloudflare Pages (the /:username/manifest.json Pages Function and the frontend upload change ship together; no migration, no edge function). | Confirm Supabase storage on the self-hosted instance answers HEAD on /storage/v1/object/public/avatars/... with 200 for an existing object (storage-api has a HEAD route; if HEAD were refused, the manifest silently keeps the platform icons)."
+    },
+    {
+      "id": "US-492",
+      "lane": "mobile",
+      "round": 10,
+      "title": "Backfill home-screen icons for agents whose photo was uploaded before US-481",
+      "description": "Existing avatars have no -app-icon-192/512.png siblings, so their installed page still shows the logo until they upload again. On the dashboard Profile page (or a one-time effect after sign-in), if avatar_url is in our avatars bucket and a HEAD for the 512 icon returns 404, fetch the avatar, run renderAppIcons, and upload both icons under the derived names (avatarAppIconUrls / appIconObjectName). Storage CORS allows the fetch.",
+      "acceptanceCriteria": [
+        "An agent with a pre-US-481 avatar gets both icons stored after opening the dashboard once",
+        "No work when the icons already exist or there is no avatar",
+        "Failures are silent and retried on a later visit"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "src/lib/avatarAppIcon.ts and src/lib/renderAppIcons.ts already have everything needed. (follow-up from US-481)"
+    },
+    {
+      "id": "US-493",
+      "lane": "mobile",
+      "round": 10,
+      "title": "Onboarding wizard avatar upload also stores the home-screen icons",
+      "description": "src/pages/onboarding/OnboardingWizardPage.tsx:59-85 uploads the avatar with its own storage code, not useProfileImageUpload, so a photo chosen during onboarding gets no icons. Route it through the shared icon upload, or call renderAppIcons and upload the two icons under appIconObjectName(objectName, size).",
+      "acceptanceCriteria": [
+        "An avatar uploaded in onboarding has -app-icon-192.png and -app-icon-512.png siblings",
+        "An onboarding upload still succeeds when icons cannot be rendered"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-481)"
     }
   ]
 }

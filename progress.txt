@@ -5728,3 +5728,75 @@ Other findings:
 - [seo] The legal pages' WebPage nodes still use a generic 'about: Thing' and no author or publisher. Linking publisher to organizationId() would tie each policy to the entity that issues it.
 - [mobile] The profile manifest's theme_color (#2563eb) matches public/manifest.json, but index.html:78 sets theme-color #0ea5e9. The colour mismatch between the installed app's chrome and the page predates this change.
 - [mobile] The dashboard manifest declares every icon as purpose 'any maskable' (public/manifest.json:13-58). Using one image for both purposes crops the logo on Android adaptive icons. Separate maskable art would fix it.
+
+---
+
+## Continuous improvement loop — round 10 — 2026-11-08 (US-472 to US-481 done)
+
+Ten lanes; nine approved outright, marketing needed one fix-up (drip window had no upper age bound). Closed US-182, US-290, US-404, US-439, US-449, US-461, US-464, US-465, US-470; slice of US-442.
+Integration fixes: US-476's extensionless re-export broke the byte-identical lead form schema shared with Deno (schema keeps the function, Leads keeps a tested light copy); US-477's URL inputs needed aria-labelledby for the static field-name check; cleared the round's new lint warnings. Lane prompts now require the full suite and no new eslint warnings before commit.
+Final: tsc clean (app + node config), 2582 unit tests pass (from 2465), verify:migrations OK (79 files), vite build OK, eslint 583 warnings (CI ratchet 588 -> 583).
+
+- US-472 [listings] Photos uploaded in the add and edit listing dialogs and never saved stayed public in storage
+- US-473 [leads] Leads in qualified, nurturing or closed were missing from every count, and the list could not be filtered by those statuses
+- US-474 [profile] The sticky contact bar on an agent's page ignored their theme colours
+- US-475 [uiux] A removed or departed teammate could still read and update the leads already assigned to them
+- US-476 [performance] The Leads dashboard loaded its detail, Zapier and upgrade dialogs, the CSV writer and date-fns before it showed a single lead
+- US-477 [security] The Profile page saved any text in its link fields, and the booking modal could frame or link a non-https Calendly URL
+- US-478 [enterprise] If the data-export email goes missing, the subject has to request and wait for a whole new export
+- US-479 [marketing] Free-tool drip emails were lost (bio email 7 never sent) or sent twice (listing drip)
+- US-480 [seo] Feature pages published two anonymous WebPage nodes for one page (fixes US-182)
+- US-481 [mobile] An installed agent page showed the AgentBio logo instead of the agent's photo (US-470 slice 1)
+
+Owner actions:
+- US-475: Apply migration supabase/migrations/20261108000475_unassign_leads_on_member_departure.sql. It adds the trigger and clears, once, any lead whose assigned_to is not the owner and not an accepted member of a team the owner owns.
+- US-478: Redeploy the gdpr-export edge function (functions.agentbio.net, the Coolify application built from the root Dockerfile, which runs edge-functions-server.ts). It imports email.ts, env.ts and gdpr-export-queue.ts, so the deploy needs the same email provider settings scheduled-maintenance already uses.
+- US-479: Redeploy edge functions send-scheduled-bio-emails and send-scheduled-listing-emails (the functions.agentbio.net Coolify app).
+- US-479: Neither drip is on a cron yet (see US-103/US-136 notes). Once one is scheduled, any cadence is now safe: running hourly or twice a day no longer resends an email, and a missed day no longer loses one.
+- US-481: Deploy Cloudflare Pages (the /:username/manifest.json Pages Function and the frontend upload change ship together; no migration, no edge function).
+- US-481: Confirm Supabase storage on the self-hosted instance answers HEAD on /storage/v1/object/public/avatars/... with 200 for an existing object (storage-api has a HEAD route; if HEAD were refused, the manifest silently keeps the platform icons).
+
+Opened:
+- US-482 [listings] US-451 slice: offline listing delete (sync-manager) bypasses photo cleanup
+- US-483 [listings] Delete dead useSecureListings.ts
+- US-484 [listings] US-461 follow-up: discard uploads when the Listings page unmounts with the edit dialog open
+- US-485 [leads] lead_stats by_source and analytics_summary count closed as a conversion
+- US-486 [profile] US-283 slice: make the manifest and index.html theme colours agree
+- US-487 [profile] US-283 slice: ProfileCompletionWidget counts publish state, logo and service areas
+- US-488 [profile] US-283 slice: custom_css decision
+- US-489 [uiux] Leads page: show who a lead is assigned to, and let the owner reassign it
+- US-490 [performance] Lead detail first open: trim the 54.6 KB LeadDetailModal chunk
+- US-491 [seo] Link inline Organization references to the site Organization node
+- US-492 [mobile] Backfill home-screen icons for agents whose photo was uploaded before US-481
+- US-493 [mobile] Onboarding wizard avatar upload also stores the home-screen icons
+
+Other findings:
+- [listings] src/lib/sync-manager.ts:162-170 syncListingDelete deletes with no user_id filter and no select('id'), and does no photo cleanup. RLS limits the damage, but this is inconsistent with useListings.deleteListing. Recorded as a nextSlice.
+- [listings] In a Vitest test, vi.mock('@/components/modals/AddListingModal') does not reach the lazy import in src/pages/dashboard/Listings.tsx:68, while the EditListingModal mock does; the cause is still unknown. Listings.lazyDialogs.test.tsx renders the real add modal, so it does not show this. A future test that needs to stub the add modal will hit it.
+- [leads] src/components/dashboard/LeadsTable.tsx:81 has its own per-status badge switch, separate from Leads.tsx getStatusBadge (~459). Both should read one badge-variant map from leadStatus.ts.
+- [leads] US-279 (the Leads filter row overflows on phones) looks largely addressed already by US-246: the toolbar is flex-wrap and data-testid=leads-toolbar. Only the 375px Playwright no-horizontal-scroll assertion remains, so it may be closable once that test is added.
+- [leads] Analytics.tsx funnel passes contacted: stats.totalLeads (all leads, not contacted ones), which mislabels the stage. This is pre-existing and was not changed here.
+- [profile] src/components/profile/StickyActionBar.tsx:224-232: the desktop panel's agent block still uses gray-200 borders around the avatar. That is neutral and fine, but the whole panel is hard-coded bg-white and does not follow a dark theme's --theme-background. Following it would need a themed surface and text pair.
+- [profile] src/components/pageBuilder/BlockSettings.tsx: the Trash2 delete buttons in TestimonialSettings and GallerySettings still have no aria-label and no type=button (also recorded in round 9).
+- [uiux] The verify-schema check 'every table referenced in code exists' fails on the loop branch. It treats two hex-string fixtures in supabase/functions/_shared/resend-webhook.test.ts as .from() table names. CI verify-backend will fail until the check excludes them or the test changes the fixture shape.
+- [uiux] The audit row written when a whole team is deleted has user_id NULL, because the teams row is already gone and the owner cannot be looked up. resource_id still holds the team id. Acceptable, but an admin audit view filtering by user will not show it.
+- [uiux] verify-schema's zip-routing check leaves rows in audit_logs (lead_auto_assign and now team_member_leads_unassigned) after cleanup. The exact-count audit assertion therefore assumes a fresh database, which is how CI runs it. A second run against the same database can report a false failure.
+- [performance] src/components/profile/LazyModal.tsx: the error fallback hard-codes bg-white, text-gray-900 and bg-blue-600, so it ignores the dark theme. Leads now uses it too, which makes seven dashboard routes (already noted at progress.txt:5629).
+- [performance] src/pages/dashboard/Leads.tsx:~395: `let truncated = false` raises a no-useless-assignment eslint warning. The same warning is on HEAD at line 372, so this change did not introduce it.
+- [performance] src/lib/format.ts:1 imports date-fns at module top for formatDate and formatRelativeTime. timeAgo (src/lib/timeAgo.ts) could replace formatRelativeTime for callers that only need 'how long ago', which would take date-vendor off more routes (related to US-421).
+- [security] src/lib/calendly.ts:28 buildCalendlyUrl returns any non-calendly https URL unchanged. CalendlyModal now refuses only non-https URLs. An https URL on another host would still be framed, but the production CSP frame-src only allows Calendly, so it shows an empty box. Refusing non-calendly.com hosts on save would need the owner to confirm that no agent uses another scheduler in this field.
+- [security] src/pages/public/ListingPage.tsx:209 and FullProfilePage.tsx:620 decide whether to show 'Schedule a Showing' from Boolean(profile.calendly_url). A legacy non-https value therefore opens the modal's 'not available' message instead of falling back to the lead form. The fix is to gate both on httpsOnlyUrl(profile.calendly_url).
+- [security] US-384 (api_keys revoked_at/is_active backfill) and US-342 (named columns on listings in useSecureListings/ListingsBlock) are still small, self-contained security-lane slices for the next round.
+- [enterprise] supabase/functions/gdpr-export/index.ts: the immediate GET still closes a pending queued request as 'completed' with no file (US-424, still open).
+- [enterprise] supabase/functions/_shared/gdpr-export-queue.ts, supabaseExportQueueStore().audit: every export audit row is logged under the single p_action 'gdpr_data_export'. Resends are told apart only by details.link_resent, so an admin filter on action cannot separate them.
+- [enterprise] src/components/settings/GDPRSettings.tsx:301: an existing react/no-unescaped-entities eslint warning, which counts against the lint ratchet.
+- [marketing] supabase/migrations/20260806000005_squashed_baseline.sql:1828-1834: init_listing_email_sequence() still seeds email_subject values with old claims ('Real data: What sells homes faster in 2025', '20% off AgentBio (expires tonight) + Free listing templates'). The sender overrides them with LISTING_DRIP subjects at send time, but admins reading listing_email_sequences see the old ones. A migration could reseed them from listing-drip.ts.
+- [marketing] The baseline's get_pending_listing_emails() (:1423) is a plain (not SECURITY DEFINER) function. Under Supabase's default grants it is probably executable by anon/authenticated; RLS on the tables should still stop it returning rows to a browser caller. Worth a security-lane check.
+- [marketing] send-scheduled-listing-emails still calls Resend directly with fetch and its own FROM_EMAIL, instead of _shared/email.ts sendEmail, which the bio drip uses. Its HTML also still has gradient and border-left callouts (US-447).
+- [marketing] Both drips send at most one email per capture per run. That is fine at a daily or hourly cadence, but a capture that has fallen far behind gets its old emails in order rather than skipping to the current one.
+- [seo] src/pages/features/LeadCapture.tsx and Analytics.tsx emit both a WebPage node and a separate anonymous FAQPage node, built by generateFAQSchema in src/lib/faq-schema.ts. FAQPage is a subtype of WebPage, so strictly these are still two page-typed nodes. I left them separate on purpose: merging them by @id would give LeadCapture two conflicting mainEntity values (a SoftwareApplication and the Questions). Deciding whether the FAQ should be the page's mainEntity is an SEO content call.
+- [seo] src/lib/faq-schema.ts:78 generateSpeakableSchema still builds a standalone WebPage with no @id. Nothing seems to call it now that SEOHead handles speakable; check with grep and delete it if so.
+- [seo] US-389 and the remainder of US-371 still need the owner to decide whether profiles served on a custom domain should canonicalise to that domain. Until then src/pages/public/FullProfilePage.tsx keeps building the canonical URL from getSafeOrigin().
+- [mobile] src/hooks/useProfileImageUpload.ts cleanup deletes every object in <uid>/ except the new one. That is why the icon names have to be excluded explicitly. Anything else stored in the avatars uid folder in future would be deleted on the next avatar upload.
+- [mobile] src/components/ui/OptimizedImage.tsx:257-277 generateSupabaseImageSources appends ?width= to /object/public URLs. Supabase only resizes under /storage/v1/render/image/, so these 'sources' are the full image every time (performance lane).
+- [mobile] public/manifest.json theme_color (#2563eb) and index.html theme-color (#0ea5e9) still differ, as already recorded under US-283 (profile lane). profile-manifest.ts also hard-codes #2563eb.
