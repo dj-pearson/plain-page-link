@@ -150,6 +150,14 @@ describe('GET /:username', () => {
     expect(missing.status).toBe(404);
   });
 
+  it("links the agent's own web app manifest, not the dashboard's (US-471)", async () => {
+    expect(INDEX_HTML).toContain('<link rel="manifest" href="/manifest.json">');
+    const html = await (await call({}).promise).text();
+    expect(html.match(/rel="manifest"/g)).toHaveLength(1);
+    expect(html).toContain('<link rel="manifest" href="/jane/manifest.json" />');
+    expect(html).not.toContain('href="/manifest.json"');
+  });
+
   it("does not serve the homepage's body or structured data under the agent's URL (US-242)", async () => {
     // The fixture really is the homepage; prove it, or the rest proves nothing.
     expect(INDEX_HTML).toContain('"@type":"SoftwareApplication"');
@@ -517,6 +525,23 @@ describe('/:username/listing/:listingId (US-275)', () => {
     });
     return { promise, next };
   };
+
+  it("links the agent's manifest on a listing page, including a withdrawn one (US-471)", async () => {
+    const html = await (await callListing({ path: '/jane/listing/abc-123' }).promise).text();
+    expect(html.match(/rel="manifest"/g)).toHaveLength(1);
+    expect(html).toContain('<link rel="manifest" href="/jane/manifest.json" />');
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+      return Response.json([]);
+    });
+    const gone = await callListing({ path: '/jane/listing/abc-123' }).promise;
+    expect(gone.status).toBe(404);
+    const goneHtml = await gone.text();
+    expect(goneHtml.match(/rel="manifest"/g)).toHaveLength(1);
+    expect(goneHtml).toContain('<link rel="manifest" href="/jane/manifest.json" />');
+  });
 
   it("gives a crawler the listing's card, scoped to the agent, with the page as its URL", async () => {
     const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
