@@ -35,8 +35,10 @@ import {
 import {
   fallBackToOriginal,
   getImageUrls,
+  HIGH_FETCH_PRIORITY,
   imageVariantUrl,
-  PLACEHOLDER_PROPERTY_IMAGE,
+  LISTING_DETAIL_IMAGE_SIZES,
+  responsiveImage,
 } from '@/lib/images';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -96,6 +98,10 @@ export default function ListingDetails({
   const reduceMotion = useReducedMotion() ?? false;
 
   const photos = listingPhotos(listing);
+  // The photo shown large. It is the listing page's LCP, and used to be the
+  // uploaded original - often a multi-megabyte phone photo - even though
+  // optimize-image stores 200/400/800px WebP variants beside it (US-613).
+  const currentPhoto = responsiveImage(photos[currentImageIndex]);
 
   const address = listing.address || '';
   const city = listing.city || '';
@@ -243,16 +249,22 @@ export default function ListingDetails({
         <AnimatePresence mode="wait">
           <motion.img
             key={currentImageIndex}
-            src={photos[currentImageIndex]}
+            src={currentPhoto.src}
+            srcSet={currentPhoto.srcSet}
+            sizes={currentPhoto.srcSet ? LISTING_DETAIL_IMAGE_SIZES : undefined}
             alt={`${address} - Photo ${currentImageIndex + 1}`}
             className="w-full h-full object-cover"
+            decoding="async"
+            // The first photo is the largest thing above the fold; later ones
+            // only load once the visitor pages to them.
+            {...(currentImageIndex === 0 ? HIGH_FETCH_PRIORITY : {})}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.3 }}
-            onError={(e) => {
-              e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
-            }}
+            // A missing variant (an older upload, or optimize-image failed)
+            // falls back to the original, then to the placeholder.
+            onError={(e) => fallBackToOriginal(e.currentTarget, currentPhoto.original)}
           />
         </AnimatePresence>
 
