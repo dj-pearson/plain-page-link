@@ -6,6 +6,8 @@
  * private gdpr-exports bucket and emails the subject a link that expires
  * (US-397, _shared/gdpr-export-queue.ts). An account too large to export in one
  * request is served by the queue.
+ * POST { action: 'resend_link', requestId } emails a fresh link to the
+ * caller's own completed export while its file is still held (US-404).
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -15,6 +17,9 @@ import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
 import { decryptSecret } from '../_shared/encryption.ts';
 import { reportError } from '../_shared/report.ts';
+import { sendEmail } from '../_shared/email.ts';
+import { getSiteUrl } from '../_shared/env.ts';
+import { resendExportLink, supabaseExportResendStore } from '../_shared/gdpr-export-queue.ts';
 import {
   buildExportDocument,
   collectSections,
@@ -62,6 +67,63 @@ serve(async (req: Request) => {
     // counted before the export runs, so a transient failure (now a 503
     // rather than a silently empty file) would have locked the subject out
     // for an hour.
+    // POST { action: 'resend_link', requestId } re-emails a fresh link to a
+    // completed export that has not expired (US-404). Any other POST body,
+    // including none, queues a new export as before.
+    let postBody: Record<string, unknown> | null = null;
+    if (req.method === 'POST') {
+      const parsed: unknown = await req.json().catch(() => null);
+      postBody = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    }
+    const isResend = postBody?.action === 'resend_link';
+
+    // Its own budget, so re-sending a link never spends the subject's export
+    // attempts (and vice versa). Each one sends an email, hence the limit.
+    if (isResend) {
+      const rl = await checkRateLimitDb(serviceSupabase, user.id, 'gdpr-export-resend', {
+        maxRequests: 3,
+        windowSeconds: 3600,
+      });
+      if (!rl.allowed) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'You have asked for the link several times in the last hour. Please check your inbox and spam folder, or try again later.',
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'Retry-After': String(rl.retryAfterSeconds),
+            },
+            status: 429,
+          }
+        );
+      }
+      const outcome = await resendExportLink(
+        supabaseExportResendStore(serviceSupabase, {
+          decrypt: decryptSecret,
+          sendEmail: (email) => sendEmail(email),
+        }),
+        { requestId: postBody?.requestId, userId: user.id, now: new Date(), siteUrl: getSiteUrl() }
+      );
+      return new Response(
+        JSON.stringify(
+          outcome.ok
+            ? {
+                success: true,
+                expiresAt: outcome.expiresAt,
+                message: 'We have emailed you a fresh download link.',
+              }
+            : { success: false, error: outcome.error }
+        ),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: outcome.ok ? 200 : outcome.status,
+        }
+      );
+    }
+
     if (req.method === 'POST' || req.method === 'GET') {
       const rl = await checkRateLimitDb(serviceSupabase, user.id, 'gdpr-export', {
         maxRequests: 3,

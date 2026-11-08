@@ -96,3 +96,35 @@ describe('GDPRSettings export', () => {
     expect(screen.queryByText('Your export requests')).not.toBeInTheDocument();
   });
 });
+
+describe('GDPRSettings resend export link (US-404)', () => {
+  it('offers to email the link again for a ready export, and only for that one', async () => {
+    const resendExportLink = vi.fn();
+    setState({
+      exportRequests: [
+        row({ id: 'ready', status: 'completed', file_expires_at: '2999-01-01T00:00:00Z' }),
+        row({ id: 'old', status: 'completed', file_expires_at: '2000-01-01T00:00:00Z' }),
+        row({ id: 'q', status: 'pending' }),
+      ],
+      resendExportLink,
+      resendingExportId: null,
+    });
+    renderWithProviders(<GDPRSettings />);
+    const buttons = screen.getAllByRole('button', { name: /Email the link again/ });
+    expect(buttons).toHaveLength(1);
+    await userEvent.click(buttons[0]);
+    expect(resendExportLink).toHaveBeenCalledWith('ready');
+  });
+
+  it('shows progress while the link is being sent', () => {
+    setState({
+      exportRequests: [
+        row({ id: 'ready', status: 'completed', file_expires_at: '2999-01-01T00:00:00Z' }),
+      ],
+      resendExportLink: vi.fn(),
+      resendingExportId: 'ready',
+    });
+    renderWithProviders(<GDPRSettings />);
+    expect(screen.getByRole('button', { name: 'Sending...' })).toBeDisabled();
+  });
+});

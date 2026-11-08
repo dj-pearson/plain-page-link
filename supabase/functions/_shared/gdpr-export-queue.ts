@@ -252,6 +252,127 @@ export function summarizeExportQueueReport(report: ExportQueueReport, purged: nu
   );
 }
 
+/**
+ * Re-sending the link for an export that is still held (US-404).
+ *
+ * The link is a bearer credential that exists only in the email, so a subject
+ * whose email went astray had to request, and wait for, a whole new export.
+ * This signs a fresh link to the same file and emails it again. It never
+ * returns the link to the caller: the email stays the only place it goes, so
+ * holding a session is still not the same as holding the data.
+ *
+ * The new link expires when the file does (file_expires_at), so the email's
+ * "after which the file is deleted" stays true and no link outlives its file.
+ */
+
+/** The file behind an export request, as findOwnExport reads it. */
+export interface HeldExport {
+  id: string;
+  userId: string;
+  status: string;
+  /** Object path in EXPORT_BUCKET, or null once purged. */
+  path: string | null;
+  expiresAt: string | null;
+}
+
+export interface ExportResendStore
+  extends Pick<ExportQueueStore, 'getSubject' | 'signedUrl' | 'sendEmail' | 'audit'> {
+  /** The export request with this id, only if it belongs to userId; null otherwise. */
+  findOwnExport(requestId: string, userId: string): Promise<HeldExport | null>;
+}
+
+/** A link with less than this left is not worth sending. */
+export const MIN_RESEND_LINK_SECONDS = 5 * 60;
+
+export type ResendOutcome =
+  | { ok: true; expiresAt: string }
+  | { ok: false; status: 404 | 409 | 410 | 422 | 502; error: string };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Signs and emails a fresh link to the caller's own completed export.
+ * Returns a refusal (never throws) for anything the caller can be told about;
+ * a store error is thrown.
+ */
+export async function resendExportLink(
+  store: ExportResendStore,
+  input: { requestId: unknown; userId: string; now: Date; siteUrl: string }
+): Promise<ResendOutcome> {
+  const notFound = { ok: false as const, status: 404 as const, error: 'That export was not found.' };
+  if (typeof input.requestId !== 'string' || !UUID_RE.test(input.requestId)) return notFound;
+
+  const held = await store.findOwnExport(input.requestId, input.userId);
+  // Someone else's request reads exactly like one that does not exist.
+  if (!held || held.userId !== input.userId) return notFound;
+  if (held.status !== 'completed') {
+    return {
+      ok: false,
+      status: 409,
+      error: 'That export has not been sent yet. We will email you the link when it is ready.',
+    };
+  }
+  const expiresMs = held.expiresAt ? new Date(held.expiresAt).getTime() : Number.NaN;
+  const remainingSeconds = Math.floor((expiresMs - input.now.getTime()) / 1000);
+  if (!held.path || Number.isNaN(expiresMs) || remainingSeconds < MIN_RESEND_LINK_SECONDS) {
+    return {
+      ok: false,
+      status: 410,
+      error: 'That export has expired and its file was deleted. Please request a new export.',
+    };
+  }
+
+  const subject = await store.getSubject(input.userId);
+  if (!subject?.email) {
+    return { ok: false, status: 422, error: 'Your account has no email address to send the link to.' };
+  }
+
+  const link = await store.signedUrl(held.path, remainingSeconds);
+  const expiresAt = new Date(expiresMs);
+  const sent = await store.sendEmail(exportReadyEmail(subject.email, link, expiresAt, input.siteUrl));
+  if (!sent.ok) {
+    return { ok: false, status: 502, error: 'We could not send the email. Please try again in a few minutes.' };
+  }
+
+  // The email went; a failed audit write must not report it as unsent.
+  await store
+    .audit(input.userId, 'success', { request_id: held.id, link_resent: true })
+    .catch(() => undefined);
+  return { ok: true, expiresAt: expiresAt.toISOString() };
+}
+
+/** The resend store over a service-role client. */
+export function supabaseExportResendStore(
+  supabase: SupabaseClient,
+  deps: { decrypt: Decrypt; sendEmail: (email: EmailOptions) => Promise<SendEmailResult> }
+): ExportResendStore {
+  const base = supabaseExportQueueStore(supabase, deps);
+  return {
+    getSubject: base.getSubject,
+    signedUrl: base.signedUrl,
+    sendEmail: base.sendEmail,
+    audit: base.audit,
+    async findOwnExport(requestId, userId) {
+      const { data, error } = await supabase
+        .from('gdpr_data_requests')
+        .select('id, user_id, status, file_url, file_expires_at')
+        .eq('id', requestId)
+        .eq('user_id', userId)
+        .eq('request_type', 'export')
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      return {
+        id: data.id as string,
+        userId: data.user_id as string,
+        status: data.status as string,
+        path: (data.file_url as string | null) ?? null,
+        expiresAt: (data.file_expires_at as string | null) ?? null,
+      };
+    },
+  };
+}
+
 /** The store over a service-role client. */
 export function supabaseExportQueueStore(
   supabase: SupabaseClient,

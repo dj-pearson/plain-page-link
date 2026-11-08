@@ -40,6 +40,8 @@ export function GDPRSettings() {
     exportRequests,
     exportRequestsError,
     hasExportInFlight,
+    resendExportLink,
+    resendingExportId,
     isDeletionStatusLoading,
     isAccountDeletionScheduled,
     daysUntilDeletion,
@@ -153,6 +155,17 @@ export function GDPRSettings() {
                           )}
                         </div>
                         {view.detail && <p className="mt-1 text-muted-foreground">{view.detail}</p>}
+                        {view.canResend && (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="mt-1 h-auto min-h-[44px] px-0 sm:min-h-0"
+                            onClick={() => resendExportLink(view.id)}
+                            disabled={resendingExportId !== null}
+                          >
+                            {resendingExportId === view.id ? 'Sending...' : 'Email the link again'}
+                          </Button>
+                        )}
                       </li>
                     );
                   })}

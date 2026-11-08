@@ -48,7 +48,15 @@ export interface ExportRequestView {
   /** One sentence the subject can act on, or null. */
   detail: string | null;
   requestedAt: string | null;
+  /** The file is still held, so the link can be emailed again (US-404). */
+  canResend: boolean;
 }
+
+/**
+ * The server will not re-send a link with less than this left
+ * (MIN_RESEND_LINK_SECONDS in supabase/functions/_shared/gdpr-export-queue.ts).
+ */
+export const MIN_RESEND_LINK_MS = 5 * 60 * 1000;
 
 /** True when an export for this subject is still on its way. */
 export function hasExportInFlight(rows: readonly ExportRequestRow[]): boolean {
@@ -76,7 +84,7 @@ export function describeExportRequest(
   row: ExportRequestRow,
   now: Date = new Date()
 ): ExportRequestView {
-  const base = { id: row.id, requestedAt: row.created_at };
+  const base = { id: row.id, requestedAt: row.created_at, canResend: false };
   switch (row.status) {
     case 'pending':
       return {
@@ -103,6 +111,7 @@ export function describeExportRequest(
               label: 'Ready',
               tone: 'done',
               detail: `Sent by email. The link works until ${expires.toLocaleDateString()}.`,
+              canResend: expires.getTime() - now.getTime() > MIN_RESEND_LINK_MS,
             }
           : {
               ...base,
@@ -150,6 +159,25 @@ export function shouldOfferQueuedExport(error: unknown): boolean {
   }
   // fetch rejects with a TypeError when the connection itself fails.
   return error instanceof TypeError;
+}
+
+/** The message for a failed link re-send, in words for the subject (US-404). */
+export function describeResendError(error: unknown): string {
+  if (error instanceof EdgeFunctionError) {
+    switch (error.status) {
+      case 410:
+        return 'That export has expired and its file was deleted. Please request a new export.';
+      case 409:
+        return 'That export has not been sent yet. We will email you the link when it is ready.';
+      case 422:
+        return 'Your account has no email address to send the link to.';
+      case 429:
+        return 'You have asked for the link several times in the last hour. Please check your inbox and spam folder, or try again later.';
+      case 404:
+        return 'That export was not found. Please request a new export.';
+    }
+  }
+  return 'We could not send the link. Please try again in a few minutes.';
 }
 
 /** The message for a failed POST, in words for the subject. */
