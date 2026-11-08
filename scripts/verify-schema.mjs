@@ -4134,6 +4134,71 @@ check('team owners cannot change max_seats/owner_id and admins cannot insert acc
 });
 
 // ---------------------------------------------------------------------------
+// 12b. The public media buckets are served by public URL, which never reads
+//      storage.objects RLS. A SELECT policy on them only adds the list API, so
+//      one reaching anon let any visitor enumerate every agent's user id and
+//      every photo of an unpublished page or draft listing (US-592). anon must
+//      list nothing; a signed-in agent lists their own folder and no other.
+// ---------------------------------------------------------------------------
+check('media buckets are not listable beyond the owner (US-592)', () => {
+  const out = [];
+  const a = '00000000-dead-beef-0000-0000000059a1';
+  const b = '00000000-dead-beef-0000-0000000059b1';
+  const buckets = [...STORAGE_BUCKETS].filter((id) =>
+    q(`SELECT 1 FROM storage.buckets WHERE id = '${id}';`).length
+  );
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES
+        ('${a}', 'storage-a@example.test'), ('${b}', 'storage-b@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      ${buckets
+        .map(
+          (id) => `INSERT INTO storage.objects (bucket_id, name) VALUES
+            ('${id}', '${a}/us592-a.jpg'), ('${id}', '${b}/us592-b.jpg');`
+        )
+        .join('\n')}
+    `);
+    const mine = `name LIKE '%/us592-%'`;
+    const [anonSees] = q(`SET ROLE anon; SELECT count(*) FROM storage.objects WHERE ${mine};`);
+    if (anonSees !== '0') {
+      out.push(`anon lists ${anonSees} media object(s); a public bucket needs no SELECT policy`);
+    }
+    const [ownerSees] = q(`
+      SET ROLE authenticated;
+      SET request.jwt.claim.sub = '${a}';
+      SELECT count(*) FROM storage.objects WHERE ${mine} AND name LIKE '${a}/%';
+    `);
+    if (ownerSees !== String(buckets.length)) {
+      out.push(`an agent lists ${ownerSees} of their own ${buckets.length} media object(s)`);
+    }
+    const [otherSees] = q(`
+      SET ROLE authenticated;
+      SET request.jwt.claim.sub = '${a}';
+      SELECT count(*) FROM storage.objects WHERE ${mine} AND name LIKE '${b}/%';
+    `);
+    if (otherSees !== '0') {
+      out.push(`an agent lists ${otherSees} media object(s) in another agent's folder`);
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'media listing check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM storage.objects WHERE name LIKE '%/us592-%';
+         DELETE FROM auth.users WHERE id IN ('${a}', '${b}');`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 13. Every bucket named in storage.from() must be created by a migration.
 //     There are no storage.buckets rows and no storage.objects policies in the
 //     applied schema at all — bucket creation lives only in the unapplied
