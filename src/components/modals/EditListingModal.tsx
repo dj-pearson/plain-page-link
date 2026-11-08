@@ -14,6 +14,7 @@ import {
 import { parseSquareFeet } from '@/lib/format';
 import { LISTING_STATUSES } from '@/lib/listingStatus';
 import { ListingPhotoManager } from '@/components/listings/ListingPhotoManager';
+import { normalizeVirtualTourUrl } from '@/lib/listingUrls';
 
 export interface EditListingFormData {
   address: string;
@@ -72,6 +73,8 @@ export function EditListingModal({
   // The caller keys this component by listing id, so a different listing
   // still mounts a fresh form.
   const [formData, setFormData] = useState<EditListingFormData>(initialData);
+  // US-517: shown under the virtual tour field when its value cannot be saved.
+  const [tourError, setTourError] = useState<string | null>(null);
 
   // Photos uploaded while this dialog is open (US-461). ListingPhotoManager
   // uploads the moment files are picked, so a cancel used to leave them
@@ -103,7 +106,17 @@ export function EditListingModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData, [...uploadedRef.current]);
+    // The database refuses a virtual tour that is not an http(s) address
+    // (listings_virtual_tour_url_scheme, US-456). Check it here so the agent
+    // learns which field and why, and so a bare host is saved with https://.
+    const tour = normalizeVirtualTourUrl(formData.virtual_tour_url);
+    if ('error' in tour) {
+      setTourError(tour.error);
+      document.getElementById('virtual_tour_url')?.focus();
+      return;
+    }
+    setTourError(null);
+    onSubmit({ ...formData, virtual_tour_url: tour.value }, [...uploadedRef.current]);
   };
 
   return (
@@ -305,13 +318,33 @@ export function EditListingModal({
 
             <div className="col-span-2">
               <Label htmlFor="virtual_tour_url">Virtual Tour URL</Label>
+              {/* type="text" with inputMode="url", as on the Profile page: the
+                  browser's url check accepts "javascript:x" and refuses
+                  "my.matterport.com/show?m=1", the reverse of what the save
+                  allows (US-517). handleSubmit does the real check. */}
               <Input
                 id="virtual_tour_url"
-                type="url"
+                name="virtual_tour_url"
+                type="text"
+                inputMode="url"
+                autoComplete="url"
+                autoCapitalize="none"
+                spellCheck={false}
                 placeholder="https://..."
                 value={formData.virtual_tour_url || ''}
-                onChange={(e) => setFormData({ ...formData, virtual_tour_url: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, virtual_tour_url: e.target.value });
+                  if (tourError) setTourError(null);
+                }}
+                aria-invalid={tourError ? true : undefined}
+                aria-describedby={tourError ? 'virtual_tour_url-error' : undefined}
+                className={tourError ? 'border-destructive' : undefined}
               />
+              {tourError && (
+                <p id="virtual_tour_url-error" className="mt-1 text-sm text-destructive">
+                  {tourError}
+                </p>
+              )}
             </div>
 
             <div className="col-span-2">
