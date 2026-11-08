@@ -50,7 +50,14 @@ describe('ProfileCustomCssScope (US-514)', () => {
     expect(style!.textContent).not.toContain('@import');
 
     const scope = container.querySelector('.ab-custom-css') as HTMLElement;
-    expect(scope.style.contain).toBe('paint');
+    // Containment lives on an unclassed wrapper no scoped selector can match.
+    const boundary = scope.parentElement as HTMLElement;
+    expect(boundary.style.contain).toBe('paint');
+    expect(boundary.style.overflow).toBe('clip');
+    expect(boundary.className).toBe('');
+    expect(boundary.id).toBe('');
+    expect(boundary.contains(screen.getByTestId('compliance'))).toBe(false);
+    expect(scope.style.contain).toBe('');
     expect(scope.dataset.customCss).toBe('applied');
     expect(scope).toHaveClass('space-y-4');
     // The compliance footer is not inside the scope, so `.ab-custom-css footer`
@@ -63,7 +70,24 @@ describe('ProfileCustomCssScope (US-514)', () => {
     expect(container.querySelector('style')).toBeNull();
     const scope = container.querySelector('.ab-custom-css') as HTMLElement;
     expect(scope.style.contain).toBe('');
+    expect(container.querySelector('[data-custom-css-boundary]')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Jane Doe' })).toBeInTheDocument();
+  });
+
+  it('keeps the containment out of reach of the review probes', () => {
+    const { container } = renderWith(
+      ':root { --p: fixed; contain: none !important } h1 { position: var(--p); top: 0; z-index: 99999 } body { position: relative; z-index: 9999; margin-bottom: -400px; transform: translateY(300px) }'
+    );
+    const css = container.querySelector('style')!.textContent!;
+    expect(css).not.toMatch(/contain|margin-bottom|transform|z-index: 9999;/);
+    // Every rule is prefixed by the scope class, which the boundary does not carry,
+    // so nothing the agent writes can match the element holding contain: paint.
+    const boundary = container.querySelector('[data-custom-css-boundary]') as HTMLElement;
+    for (const rule of css.split('\n')) {
+      const selector = rule.slice(0, rule.indexOf('{')).trim();
+      expect(boundary.matches(selector)).toBe(false);
+    }
+    expect(boundary.style.contain).toBe('paint');
   });
 
   it('renders nothing for CSS the sanitiser rejects outright', () => {

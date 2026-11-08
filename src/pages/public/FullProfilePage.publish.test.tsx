@@ -122,11 +122,15 @@ describe('FullProfilePage publish state', () => {
     const heading = await screen.findByRole('heading', { name: /Jane Doe/, level: 1 });
     const scope = container.querySelector('.ab-custom-css') as HTMLElement;
     expect(scope.querySelector('style')?.textContent).toBe('.ab-custom-css h1 { color: red; }');
-    expect(scope.style.contain).toBe('paint');
+    // Containment is on an unclassed wrapper the agent's selectors cannot reach.
+    const boundary = scope.parentElement as HTMLElement;
+    expect(boundary.style.contain).toBe('paint');
+    expect(boundary.className).toBe('');
     expect(scope.contains(heading)).toBe(true);
     const footer = container.querySelector('footer') as HTMLElement;
     expect(footer).toHaveTextContent(/Equal Housing/i);
     expect(scope.contains(footer)).toBe(false);
+    expect(boundary.contains(footer)).toBe(false);
   });
 
   it('shows the owner a preview of an unpublished page: banner, noindex, no view counted', async () => {

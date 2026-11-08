@@ -61,6 +61,47 @@ describe('sanitizeCustomCss', () => {
     expect(removed).toContain('url() pointing at another site');
   });
 
+  it('refuses a same-origin-looking url() the URL parser would read as another host', () => {
+    // The URL parser strips tab/LF/CR anywhere, so "/\t/evil.example" is //evil.example.
+    expect(new URL('/\t/evil.example/p.gif', 'https://agentbio.net/jane').host).toBe(
+      'evil.example'
+    );
+    for (const probe of [
+      'a { background: url("/\t/evil.example/p.gif") }',
+      "a { background: url('/\n/evil.example/p.gif') }",
+      'a { background: url("/ /evil.example/p.gif") }',
+      'a { background: url(/\t/evil.example/p.gif) }',
+      'input[value^="a"] { background: url("/\t/evil.example/?v=a") }',
+    ]) {
+      const { css, removed } = sanitizeCustomCss(probe);
+      expect(css, probe).toBe('');
+      expect(removed, probe).toContain('url() pointing at another site');
+    }
+    expect(sanitizeCustomCss('a { background: url(/img/hero-1.webp?v=2) }').css).toBe(
+      `${S} a { background: url(/img/hero-1.webp?v=2); }`
+    );
+  });
+
+  it('refuses layout and containment declarations on the container itself', () => {
+    const escape = sanitizeCustomCss(
+      ':root { --p: fixed; contain: none !important } h1 { position: var(--p); top: 0; left: 0; z-index: 99999 }'
+    );
+    expect(escape.css).not.toMatch(/contain/);
+    expect(escape.css).toContain(`${S} { --p: fixed; }`);
+
+    const overlay = sanitizeCustomCss(
+      'body { position: relative; z-index: 9999; margin-bottom: -400px; transform: translateY(300px); background: #fff }'
+    );
+    expect(overlay.css).toBe(`${S} { background: #fff; }`);
+    expect(overlay.removed.some((r) => r.includes('page container'))).toBe(true);
+
+    // body:hover is still the container; body a is not.
+    expect(sanitizeCustomCss('body:hover { translate: 0 300px }').css).toBe('');
+    expect(sanitizeCustomCss('body a { position: relative; top: 2px }').css).toBe(
+      `${S} a { position: relative; top: 2px; }`
+    );
+  });
+
   it.each([
     ['expression()', 'a { width: expression(alert(1)) }'],
     ['javascript: URLs', 'a { background: javascript:alert(1) }'],

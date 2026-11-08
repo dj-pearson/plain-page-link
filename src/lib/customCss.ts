@@ -11,12 +11,16 @@
  *     `html`, `body` and `:root` at the start of a selector mean the container
  *     itself. A descendant selector cannot match anything outside the
  *     container, so the compliance footer, the sticky action bar, the modals
- *     and the dashboard chrome are out of reach. (The page also renders the
- *     container with `contain: paint`, so nothing inside it can be positioned
- *     or painted over the footer below it.)
+ *     and the dashboard chrome are out of reach. (The page also wraps the
+ *     container in an unclassed element with `contain: paint` and
+ *     `overflow: clip`, which no scoped selector can reach, so nothing inside
+ *     can be positioned or painted over the footer below it.) Rules on the
+ *     container itself also lose position, transform, margin, inset, z-index
+ *     and contain declarations.
  *   - Nothing is fetched from another origin: `@import`, `@font-face` and every
  *     at-rule other than `@media`, `@supports` and `@container` are dropped, and
- *     so is any declaration using `url()` (other than a same-origin path),
+ *     so is any declaration using `url()` (other than a same-origin path made of
+ *     plain path characters — no whitespace, which the URL parser strips),
  *     `image-set()`, `src()`, `element()`, `expression()`, `javascript:`,
  *     `behavior` or `-moz-binding`.
  *   - Backslash escapes are refused rather than decoded — they are how a
@@ -25,7 +29,7 @@
  *   - `position: fixed` and `position: sticky` are dropped; the agent's CSS
  *     restyles their page, it does not float things over the visitor's screen.
  *     (A value can still arrive through var(); `contain: paint` on the
- *     container is what actually keeps a fixed box inside it.)
+ *     wrapper is what actually keeps a fixed box inside it.)
  *   - Unbalanced braces, brackets or quotes reject the whole stylesheet: a
  *     parser that guesses where a broken rule ends can be steered.
  *
@@ -159,20 +163,64 @@ function splitTopLevel(text: string, separator: string): string[] {
   }
 }
 
+/**
+ * Only characters that cannot change how the URL parser reads a path. A
+ * literal tab, newline or other whitespace is legal inside a CSS string, and
+ * the WHATWG URL parser strips tab/LF/CR from anywhere in a URL, so
+ * `url("/<TAB>/evil.example/p.gif")` would otherwise pass a "starts with one
+ * slash" test and still load from evil.example.
+ */
+const SAFE_URL_PATH = /^\/[A-Za-z0-9/._~%?=&#+,-]*$/;
+const URL_CHECK_BASE = 'https://agentbio.invalid';
+
 function urlIsSameOriginPath(value: string): boolean {
   const urls = value.match(/url\s*\(([^)]*)\)/gi);
   if (!urls) return true;
   return urls.every((u) => {
-    const inner = u
+    let inner = u
       .replace(/^url\s*\(/i, '')
       .replace(/\)$/, '')
-      .trim()
-      .replace(/^['"]|['"]$/g, '')
       .trim();
-    // A path on this origin. Not `//host` (protocol-relative), not a scheme.
-    return inner.startsWith('/') && !inner.startsWith('//');
+    const quote = inner[0];
+    if (quote === '"' || quote === "'") {
+      if (inner.length < 2 || inner[inner.length - 1] !== quote) return false;
+      inner = inner.slice(1, -1);
+    }
+    // A path on this origin. Not `//host` (protocol-relative), not a scheme,
+    // and nothing the URL parser would strip or reinterpret.
+    if (!SAFE_URL_PATH.test(inner) || inner.startsWith('//')) return false;
+    try {
+      return new URL(inner, URL_CHECK_BASE).origin === URL_CHECK_BASE;
+    } catch {
+      return false;
+    }
   });
 }
+
+/**
+ * True when a scoped selector matches the container itself (`.ab-custom-css`,
+ * `.ab-custom-css:hover`) rather than something inside it.
+ */
+function targetsContainer(scoped: string): boolean {
+  if (!scoped.startsWith(SCOPE)) return false;
+  const rest = scoped.slice(SCOPE.length);
+  let depth = 0;
+  for (const ch of rest) {
+    if (ch === '(' || ch === '[') depth += 1;
+    else if (ch === ')' || ch === ']') depth -= 1;
+    else if (depth === 0 && /[\s>+~]/.test(ch)) return false;
+  }
+  return true;
+}
+
+/**
+ * Declarations that would move the container, lift it over its neighbours or
+ * switch off its containment. The outer wrapper's `contain: paint` already
+ * clips the result; these are refused on the container as well so the agent's
+ * page cannot even try to sit on top of the compliance footer.
+ */
+const CONTAINER_LAYOUT_PROPERTY =
+  /^(?:contain|content-visibility|container|container-type|position|inset(?:-.*)?|top|right|bottom|left|z-index|isolation|transform(?:-.*)?|translate|rotate|scale|zoom|float|margin(?:-.*)?|offset(?:-.*)?)$/;
 
 function scopeSelector(selector: string): string | null {
   const s = selector.trim().replace(/\s+/g, ' ');
@@ -199,7 +247,7 @@ function scopeSelector(selector: string): string | null {
   return `${SCOPE} ${s}`;
 }
 
-function sanitizeDeclarations(body: string, removed: Set<string>): string {
+function sanitizeDeclarations(body: string, removed: Set<string>, onContainer = false): string {
   const kept: string[] = [];
   for (const raw of splitTopLevel(body, ';')) {
     const decl = raw.trim();
@@ -227,6 +275,10 @@ function sanitizeDeclarations(body: string, removed: Set<string>): string {
     }
     if (!urlIsSameOriginPath(value)) {
       removed.add('url() pointing at another site');
+      continue;
+    }
+    if (onContainer && CONTAINER_LAYOUT_PROPERTY.test(lowerProp)) {
+      removed.add(`${lowerProp} on the page container (html, body, :root)`);
       continue;
     }
     if (lowerProp === 'position' && /\b(fixed|sticky)\b/i.test(value)) {
@@ -303,7 +355,7 @@ function sanitizeRules(text: string, removed: Set<string>): string[] {
       .filter((sel): sel is string => sel !== null);
     if (!selectors.length) continue;
 
-    const declarations = sanitizeDeclarations(body, removed);
+    const declarations = sanitizeDeclarations(body, removed, selectors.some(targetsContainer));
     if (!declarations) continue;
     out.push(`${selectors.join(', ')} { ${declarations} }`);
   }
