@@ -19,16 +19,29 @@
  * things that are already true elsewhere: the routes the build publishes, the
  * plan matrix the app enforces, and the marketing-claims rules the UI obeys.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PRICING_PLANS } from './config/pricing-plans';
 import { STATIC_ROUTES, locationRoutes } from './config/prerender-routes';
 import { TOOLS } from './config/tools';
+import { listingPagePath } from './lib/listingShare';
 
 const LLMS_TXT = readFileSync(join(process.cwd(), 'public', 'llms.txt'), 'utf8');
 
 const ORIGIN = 'https://agentbio.net';
+
+/**
+ * The two URL shapes the agent-pages section writes as templates (US-636).
+ * Braces mark a placeholder; nothing else in the file uses them.
+ */
+const PROFILE_TEMPLATE = '/{username}';
+const LISTING_TEMPLATE = '/{username}/listing/{listing-id}';
+
+/** Served by Pages Functions at request time, not rendered by the build. */
+const REQUEST_TIME_FILES = ['/sitemap-profiles.xml'];
+/** Written by scripts/prerender.mts from the routes it rendered. */
+const BUILD_FILES = ['/sitemap.xml'];
 
 /** Every agentbio.net URL the file points at, as a route path. */
 function referencedPaths(): string[] {
@@ -47,6 +60,10 @@ const PUBLISHED = new Set<string>([
   // Rendered from `articles` rows rather than from STATIC_ROUTES, so it is not
   // in that list — but /blog itself is always published.
   '/blog',
+  ...BUILD_FILES,
+  ...REQUEST_TIME_FILES,
+  PROFILE_TEMPLATE,
+  LISTING_TEMPLATE,
 ]);
 
 describe('llms.txt', () => {
@@ -133,6 +150,45 @@ describe('llms.txt', () => {
     expect(LLMS_TXT, 'twitter.com/agentbio is not an account this site links to').not.toContain(
       'twitter.com/agentbio'
     );
+  });
+
+  it('tells answer engines that agent pages exist and where they are listed (US-636)', () => {
+    // The pages the product exists to make visible were missing from the one
+    // file written for answer engines: it described AgentBio's marketing pages
+    // and nothing else, so a reader learned nothing about the agent pages it
+    // could cite.
+    expect(LLMS_TXT).toContain(`${ORIGIN}${PROFILE_TEMPLATE}`);
+    expect(LLMS_TXT).toContain(`${ORIGIN}${LISTING_TEMPLATE}`);
+    expect(LLMS_TXT).toContain(`${ORIGIN}/sitemap-profiles.xml`);
+  });
+
+  it('writes the agent-page templates in the shapes the site serves', () => {
+    // The listing template must be what listingPagePath builds, which is what
+    // the profile body, the sitemap and the share links all use.
+    expect(listingPagePath('jane', 'abc')).toBe(
+      LISTING_TEMPLATE.replace('{username}', 'jane').replace('{listing-id}', 'abc')
+    );
+    // And both shapes have a crawler half, so an answer engine is served the
+    // page's content rather than the SPA shell.
+    expect(existsSync(join(process.cwd(), 'functions', '[username].ts'))).toBe(true);
+    expect(
+      existsSync(join(process.cwd(), 'functions', '[username]', 'listing', '[listingId].ts'))
+    ).toBe(true);
+  });
+
+  it('names only sitemaps that are served and declared in robots.txt', () => {
+    const robots = readFileSync(join(process.cwd(), 'public', 'robots.txt'), 'utf8');
+    for (const path of [...BUILD_FILES, ...REQUEST_TIME_FILES]) {
+      expect(robots, `robots.txt does not declare ${path}`).toContain(`Sitemap: ${ORIGIN}${path}`);
+    }
+    for (const path of REQUEST_TIME_FILES) {
+      expect(
+        existsSync(join(process.cwd(), 'functions', `${path.slice(1)}.ts`)),
+        `${path} has no Pages Function behind it`
+      ).toBe(true);
+    }
+    const named = referencedPaths().filter((path) => path.endsWith('.xml'));
+    expect(named.sort()).toEqual([...BUILD_FILES, ...REQUEST_TIME_FILES].sort());
   });
 
   it('is substantial enough to be worth serving', () => {
