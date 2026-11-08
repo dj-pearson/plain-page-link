@@ -26,8 +26,15 @@
 /** The date the claims below were last checked against the vendors' own pages. */
 export const COMPETITORS_VERIFIED_ON = '2026-09-08';
 
-/** Human-readable form of {@link COMPETITORS_VERIFIED_ON}, for page copy. */
-export const COMPETITORS_VERIFIED_LABEL = '8 September 2026';
+/**
+ * Human-readable form of COMPETITORS_VERIFIED_ON, for page copy ("8 September
+ * 2026"). Derived, not a second literal (US-577): the note above says to change
+ * VERIFIED_ON, and with two literals doing only that left every comparison page
+ * showing the old date.
+ */
+export const COMPETITORS_VERIFIED_LABEL = new Date(
+  `${COMPETITORS_VERIFIED_ON}T00:00:00Z`
+).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 export interface CompetitorFacts {
   name: string;
