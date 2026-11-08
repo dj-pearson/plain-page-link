@@ -201,12 +201,23 @@ jobs:
           # With a DSN, the Sentry SDK and Session Replay used to add 81 KB gzip
           # to the entry chunk and nothing noticed. A dummy: no project behind it.
           VITE_SENTRY_DSN: https://public@o0.ingest.sentry.io/0
+          # US-535: write dist/.vite/manifest.json for the dashboard route
+          # check below. The Cloudflare Pages deploy does not set this.
+          BUILD_MANIFEST: 'true'
 
       - name: Check bundle size budgets
         run: npm run size-check
         env:
           # Tells the check to insist the SDK was compiled (lazily) at all.
           VITE_SENTRY_DSN: https://public@o0.ingest.sentry.io/0
+
+      - name: Check what each dashboard route loads beyond the layout
+        # US-535 (US-402). The route-weight job opens public routes in a
+        # browser; /dashboard/* needs a login it does not have. This weighs
+        # each dashboard route's static-import closure from the manifest,
+        # beyond the entry and DashboardLayout, against a per-route budget, and
+        # fails if one statically reaches form-vendor or charts-vendor again.
+        run: npm run dashboard-weight
 
   lint:
     name: Lint
