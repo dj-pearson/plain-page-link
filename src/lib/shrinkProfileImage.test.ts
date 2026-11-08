@@ -9,7 +9,9 @@ import {
   LOGO_SHRINK,
   candidateTypes,
   renameForType,
+  renderAvatarVariant,
   scaledSize,
+  variantSize,
   shouldReplace,
   shrinkProfileImage,
 } from './shrinkProfileImage';
@@ -27,6 +29,21 @@ describe('scaledSize', () => {
 
   it('keeps an extreme logo at least 1px tall', () => {
     expect(scaledSize(10000, 5, 400)).toEqual({ width: 400, height: 1 });
+  });
+});
+
+describe('variantSize (US-604)', () => {
+  it('fits the SHORT side, which is what fills an object-cover circle', () => {
+    expect(variantSize(600, 800, 256)).toEqual({ width: 256, height: 341 });
+    expect(variantSize(800, 600, 256)).toEqual({ width: 341, height: 256 });
+  });
+
+  it('never upscales', () => {
+    expect(variantSize(200, 300, 256)).toEqual({ width: 200, height: 300 });
+  });
+
+  it('caps the long side of a panorama at three times the short side', () => {
+    expect(variantSize(8000, 800, 256)).toEqual({ width: 768, height: 77 });
   });
 });
 
@@ -162,5 +179,29 @@ describe('shrinkProfileImage', () => {
     );
     const file = bigPhoto();
     expect(await shrinkProfileImage(file, AVATAR_SHRINK)).toBe(file);
+  });
+
+  describe('renderAvatarVariant (US-604)', () => {
+    it('renders a 256px-short-side WebP', async () => {
+      const close = stubBitmap(600, 800);
+      const { canvas, drawImage } = stubCanvas((type) => new Blob([new Uint8Array(900)], { type }));
+
+      const out = await renderAvatarVariant(bigPhoto(), 256);
+      expect(out?.type).toBe('image/webp');
+      expect([canvas.width, canvas.height]).toEqual([256, 341]);
+      expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 256, 341);
+      expect(close).toHaveBeenCalled();
+    });
+
+    it('gives null where WebP cannot be encoded, so no companion is claimed', async () => {
+      stubBitmap(600, 800);
+      stubCanvas(() => new Blob([new Uint8Array(900)], { type: 'image/png' }));
+      expect(await renderAvatarVariant(bigPhoto(), 256)).toBeNull();
+    });
+
+    it('gives null where the browser cannot draw images', async () => {
+      vi.stubGlobal('createImageBitmap', undefined);
+      expect(await renderAvatarVariant(bigPhoto(), 256)).toBeNull();
+    });
   });
 });

@@ -21,6 +21,8 @@ export function useAvatarUpload() {
     appIcons: true,
     // Stored downscaled: the public page draws it small (US-591).
     shrink: AVATAR_SHRINK,
+    // And a 256px companion for the 32-128px circles that draw it (US-604).
+    smallVariant: true,
   });
 
   return { uploadAvatar: upload, uploading, acceptedTypes, maxSize };

@@ -47,12 +47,15 @@ vi.mock('@/stores/useAuthStore', () => ({
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }));
 vi.mock('@/lib/fileValidation', () => ({ validateUpload: validateMock }));
 vi.mock('@/lib/renderAppIcons', () => ({ renderAppIcons: renderIconsMock }));
-const { shrinkMock } = vi.hoisted(() => ({
+const { shrinkMock, variantMock } = vi.hoisted(() => ({
   shrinkMock: vi.fn(async (file: File) => file),
+  // No companion unless a test says so: jsdom cannot encode WebP either.
+  variantMock: vi.fn(async (_file: Blob, _side: number): Promise<Blob | null> => null),
 }));
 vi.mock('@/lib/shrinkProfileImage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/shrinkProfileImage')>()),
   shrinkProfileImage: shrinkMock,
+  renderAvatarVariant: variantMock,
 }));
 
 import { useBrokerageLogoUpload } from './useBrokerageLogoUpload';
@@ -301,5 +304,84 @@ describe('useAvatarUpload home-screen icons (US-481)', () => {
       await result.current.uploadLogo(new File(['x'], 'logo.png', { type: 'image/png' }));
     });
     expect(renderIconsMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAvatarUpload 256px companion (US-604)', () => {
+  const FULL_URL =
+    'https://example.supabase.co/storage/v1/object/public/avatars/u1/avatar-1700000000000-full.jpg';
+  const variant = new Blob(['v'], { type: 'image/webp' });
+
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    fromBucket.mockClear();
+    storageMock.upload.mockReset().mockResolvedValue({ error: null });
+    storageMock.getPublicUrl.mockReset().mockReturnValue({ data: { publicUrl: FULL_URL } });
+    storageMock.list.mockReset().mockResolvedValue({
+      data: [
+        { name: 'avatar-1-full.jpg' },
+        { name: 'avatar-1-256.webp' },
+        { name: 'avatar-1700000000000-full.jpg' },
+        { name: 'avatar-1700000000000-256.webp' },
+      ],
+    });
+    storageMock.remove.mockReset().mockResolvedValue({ error: null });
+    profilesMock.update.mockReset().mockReturnValue(profilesMock);
+    profilesMock.eq.mockReset().mockReturnValue(profilesMock);
+    profilesMock.select.mockReset().mockReturnValue(profilesMock);
+    profilesMock.single.mockReset().mockResolvedValue({ data: { id: 'u1' }, error: null });
+    validateMock.mockReset().mockResolvedValue(null);
+    renderIconsMock.mockReset().mockResolvedValue(new Map());
+    variantMock.mockReset().mockResolvedValue(variant);
+  });
+
+  const uploadPhoto = async () => {
+    const { result } = renderHook(() => useAvatarUpload(), { wrapper });
+    await act(async () => {
+      await result.current.uploadAvatar(new File(['x'], 'me.jpg', { type: 'image/jpeg' }));
+    });
+  };
+
+  it('stores the companion first, then the photo under a -full name', async () => {
+    await uploadPhoto();
+
+    expect(variantMock).toHaveBeenCalledWith(expect.any(File), 256);
+    expect(storageMock.upload.mock.calls[0]).toEqual([
+      'u1/avatar-1700000000000-256.webp',
+      variant,
+      expect.objectContaining({ contentType: 'image/webp', cacheControl: '31536000' }),
+    ]);
+    expect(storageMock.upload.mock.calls[1][0]).toBe('u1/avatar-1700000000000-full.jpg');
+    expect(profilesMock.update).toHaveBeenCalledWith({ avatar_url: FULL_URL });
+  });
+
+  it("keeps the new companion and removes the old photo's", async () => {
+    await uploadPhoto();
+    expect(storageMock.remove).toHaveBeenCalledWith([
+      'u1/avatar-1-full.jpg',
+      'u1/avatar-1-256.webp',
+    ]);
+  });
+
+  it('names the photo without -full when the companion could not be made', async () => {
+    variantMock.mockResolvedValue(null);
+    await uploadPhoto();
+    expect(storageMock.upload).toHaveBeenCalledTimes(1);
+    expect(storageMock.upload.mock.calls[0][0]).toBe('u1/avatar-1700000000000.jpg');
+  });
+
+  it('names the photo without -full when the companion upload failed', async () => {
+    storageMock.upload.mockResolvedValueOnce({ error: { message: 'quota exceeded' } });
+    await uploadPhoto();
+    expect(storageMock.upload.mock.calls[1][0]).toBe('u1/avatar-1700000000000.jpg');
+    expect(profilesMock.update).toHaveBeenCalled();
+  });
+
+  it('is not made for the brokerage logo', async () => {
+    const { result } = renderHook(() => useBrokerageLogoUpload(), { wrapper });
+    await act(async () => {
+      await result.current.uploadLogo(new File(['x'], 'logo.png', { type: 'image/png' }));
+    });
+    expect(variantMock).not.toHaveBeenCalled();
   });
 });

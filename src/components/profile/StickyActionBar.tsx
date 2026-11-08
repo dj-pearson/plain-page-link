@@ -4,6 +4,7 @@ import { Phone, MessageSquare, Mail, Calendar, Home, X, ChevronUp } from 'lucide
 import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
 import { trackContactTap } from '@/lib/analyticsEvents';
+import { AvatarImage } from './AvatarImage';
 
 interface StickyActionBarProps {
   profile: PublicProfile;
@@ -223,8 +224,10 @@ export function StickyActionBar({
             {/* Agent Info */}
             <div className="mt-4 pt-4 border-t border-gray-200 text-center">
               {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
+                <AvatarImage
+                  url={profile.avatar_url}
+                  width={48}
+                  height={48}
                   alt={profile.full_name || profile.username}
                   className="w-12 h-12 rounded-full mx-auto mb-2 object-cover border-2 border-gray-200"
                 />

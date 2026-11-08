@@ -13,6 +13,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { buildOnboardingProfileUpdate, onboardingTimeZoneToSave } from '@/lib/onboardingProfile';
 import { agentTimeZoneKey } from '@/hooks/useAgentTimeZone';
 import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
+import { storeAvatarVariant } from '@/lib/storeAvatarVariant';
+import { avatarObjectName } from '@/lib/avatarVariant';
 import {
   AVATAR_SHRINK,
   PROFILE_IMAGE_CACHE_CONTROL,
@@ -73,12 +75,16 @@ export default function OnboardingWizardPage() {
           const original = wizardData.profileBasics.photo;
           // US-591: stored downscaled, as a dashboard upload is.
           const photo = await shrinkProfileImage(original, AVATAR_SHRINK);
-          const fileExt = photo.name.split('.').pop();
+          const fileExt = photo.name.split('.').pop() ?? 'jpg';
           // US-075: the first path segment must be the uploader's id — the
           // storage policies key on it. This used to be `avatars/<uid>-<ts>`,
           // whose first segment was the literal string 'avatars', which an
           // owner-scoped policy rejects.
-          const objectName = `avatar-${Date.now()}.${fileExt}`;
+          const stem = `avatar-${Date.now()}`;
+          // US-604: the 256px companion the public page draws, stored first
+          // because the photo's name records whether it exists.
+          const variantName = await storeAvatarVariant(user.id, stem, photo);
+          const objectName = avatarObjectName(stem, fileExt, variantName !== null);
           const filePath = `${user.id}/${objectName}`;
 
           const { error: uploadError } = await supabase.storage

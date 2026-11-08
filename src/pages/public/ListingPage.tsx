@@ -25,6 +25,7 @@ import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { ProfileUnavailable } from '@/components/profile/ProfileUnavailable';
 import { UnpublishedPreviewBanner } from '@/components/profile/UnpublishedPreviewBanner';
 import { LazyModal } from '@/components/profile/LazyModal';
+import { AvatarImage } from '@/components/profile/AvatarImage';
 import {
   ListingContactBar,
   LISTING_CONTACT_BAR_SPACER,
@@ -248,8 +249,8 @@ export default function ListingPage() {
             >
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               {profile.avatar_url && (
-                <img
-                  src={profile.avatar_url}
+                <AvatarImage
+                  url={profile.avatar_url}
                   alt=""
                   width={32}
                   height={32}

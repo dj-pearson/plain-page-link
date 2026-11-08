@@ -143,3 +143,58 @@ export async function shrinkProfileImage(file: File, options: ShrinkOptions): Pr
     bitmap?.close();
   }
 }
+
+/**
+ * The size of the avatar's small companion (US-604): scaled so its SHORTER
+ * side is `minSide`, because the circle is drawn with object-cover and the
+ * short side is what fills it. A 128px circle at DPR 2 needs 256 on the short
+ * side. The long side is capped at three times that, for a panorama.
+ */
+export function variantSize(
+  width: number,
+  height: number,
+  minSide: number
+): { width: number; height: number } {
+  const shortest = Math.min(width, height);
+  if (shortest <= minSide || shortest <= 0) return { width, height };
+  const scale = minSide / shortest;
+  const scaled = {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+  return scaledSize(scaled.width, scaled.height, minSide * 3);
+}
+
+/**
+ * Render the avatar's small WebP companion (US-604), or null when this browser
+ * cannot decode the photo or cannot encode WebP (older Safari answers toBlob
+ * with a PNG). Only the app draws the companion; the lead auto-reply email and
+ * share cards keep the JPEG avatar_url, so WebP is safe here. Never throws.
+ */
+export async function renderAvatarVariant(file: Blob, minSide: number): Promise<Blob | null> {
+  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return null;
+
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const { width, height } = variantSize(bitmap.width, bitmap.height, minSide);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.fillStyle = OPAQUE_BACKGROUND;
+    context.fillRect(0, 0, width, height);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(bitmap, 0, 0, width, height);
+
+    const encoded = await encode(canvas, 'image/webp');
+    return encoded && encoded.type === 'image/webp' && encoded.size > 0 ? encoded : null;
+  } catch {
+    return null;
+  } finally {
+    bitmap?.close();
+  }
+}
