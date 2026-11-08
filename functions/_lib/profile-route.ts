@@ -6,17 +6,25 @@
  */
 
 import {
+  buildListingBody,
   buildListingTags,
+  buildProfileBody,
   buildProfileTags,
   injectSocialTags,
   isCrawler,
   isReservedNonRoute,
   isReservedSegment,
+  type BodyListing,
   type ListingMeta,
+  type ProfileBodyOptions,
   type ProfileMeta,
 } from './social-meta';
 import { needsCanonicalRedirect, normalizeUsername } from '../../src/lib/username';
-import { selectListingForPage } from '../../src/lib/publicListingVisibility';
+import {
+  selectAvailableListings,
+  selectListingForPage,
+  selectSoldListings,
+} from '../../src/lib/publicListingVisibility';
 
 export interface Env {
   /** Same values the SPA build uses; set in the Pages project's variables. */
@@ -39,17 +47,27 @@ export interface PagesContext {
 type ProfileRow = ProfileMeta & { id: string };
 
 const PROFILE_COLUMNS =
-  'id,username,full_name,bio,avatar_url,og_image,seo_title,seo_description,title,brokerage_name,service_cities';
+  'id,username,full_name,bio,avatar_url,og_image,seo_title,seo_description,title,brokerage_name,service_cities,license_number,license_state,phone,email_display';
 const LISTING_COLUMNS =
   'id,status,address,city,state,price,bedrooms,bathrooms,square_feet,description,photos,image';
+/** The profile body's listing rows (US-539): what a link label needs, no photos. */
+const BODY_LISTING_COLUMNS = 'id,status,address,city,state,price,bedrooms,bathrooms,square_feet';
+/**
+ * Enough rows to fill the body after the visibility filter drops the hidden
+ * ones; the sitemap, not this page, is what lists every home.
+ */
+const BODY_LISTING_FETCH_LIMIT = 40;
 /** The two toggles that decide whether a listing is public (anon holds SELECT on these). */
 const SETTINGS_COLUMNS = 'show_listings,show_sold_properties';
+/** The profile body also honours the contact toggle (anon holds SELECT on it too). */
+const PROFILE_SETTINGS_COLUMNS = 'show_listings,show_sold_properties,show_contact_buttons';
 
 type ListingRow = ListingMeta & { id: string; status?: string | null };
 
 interface VisibilitySettings {
   show_listings?: boolean | null;
   show_sold_properties?: boolean | null;
+  show_contact_buttons?: boolean | null;
 }
 
 /** The upstream must answer quickly or not at all; a crawler will not wait. */
@@ -159,6 +177,42 @@ async function fetchVisibleListing(
 }
 
 /**
+ * What the profile body may show (US-539): the listings the page itself would
+ * show, in its order (available first, then sold), and whether contact links
+ * are allowed.
+ *
+ * Every row is held to selectListingForPage, the rule the page, the listing
+ * route and the sitemap apply, so a home the agent hid is never named here.
+ * If either read fails, nothing is shown: the body is a bonus, and a blip
+ * must not publish what the agent chose to hide.
+ */
+async function fetchProfileBodyOptions(
+  base: string,
+  apiKey: string,
+  profileId: string
+): Promise<ProfileBodyOptions> {
+  const [listings, settings] = await Promise.all([
+    fetchJson<BodyListing>(
+      `${base}/rest/v1/listings?select=${BODY_LISTING_COLUMNS}&user_id=eq.${encodeURIComponent(profileId)}&status=in.(active,pending,under_contract,sold)&order=sort_order.asc,created_at.desc,id.asc&limit=${BODY_LISTING_FETCH_LIMIT}`,
+      apiKey
+    ),
+    fetchJson<VisibilitySettings>(
+      `${base}/rest/v1/user_settings?select=${PROFILE_SETTINGS_COLUMNS}&user_id=eq.${encodeURIComponent(profileId)}&limit=1`,
+      apiKey
+    ),
+  ]);
+  if (!settings) return { listings: [], showContact: false };
+  const toggles = settings[0] ?? null;
+  const visible = (listings ?? []).filter(
+    (row) => typeof row?.id === 'string' && selectListingForPage([row], row.id, toggles) !== null
+  );
+  return {
+    listings: [...selectAvailableListings(visible), ...selectSoldListings(visible)],
+    showContact: toggles?.show_contact_buttons !== false,
+  };
+}
+
+/**
  * Replace any robots meta with noindex, follow. The prerendered homepage
  * carries its own (index), which must not survive on a 404.
  */
@@ -261,6 +315,8 @@ export async function serveProfileRoute(
 
   const origin = new URL(request.url).origin;
   let tags = buildProfileTags(profile, origin);
+  // Undefined means injectSocialTags' heading-and-summary body.
+  let body: string | undefined;
   let listingGone = false;
 
   if (listingId) {
@@ -269,6 +325,7 @@ export async function serveProfileRoute(
     // agent's card rather than producing a broken one.
     if (lookup.state === 'visible') {
       tags = buildListingTags(profile, lookup.listing, origin);
+      body = buildListingBody(profile, lookup.listing, tags, origin);
     }
     // On its own address, a home that is definitively not public is a 404
     // (US-416). It used to answer 200 with the agent's card while the SPA
@@ -285,7 +342,13 @@ export async function serveProfileRoute(
     listingGone = listingPath && lookup.state === 'hidden';
   }
 
-  const assetResponse = await next();
+  // The agent's page itself: what answer engines read about them (US-539).
+  // Read alongside the document rather than before it.
+  const [assetResponse, bodyOptions] = await Promise.all([
+    next(),
+    listingId ? Promise.resolve(null) : fetchProfileBodyOptions(base, apiKey, profile.id),
+  ]);
+  if (bodyOptions) body = buildProfileBody(profile, tags, origin, bodyOptions);
   const contentType = assetResponse.headers.get('content-type') ?? '';
   if (!contentType.includes('text/html')) {
     return assetResponse;
@@ -301,7 +364,7 @@ export async function serveProfileRoute(
   if (listingGone) {
     headers.set('x-agentbio-prerender', 'listing-not-found');
     headers.set('x-robots-tag', 'noindex');
-    return new Response(markNoindex(injectSocialTags(html, tags)), {
+    return new Response(markNoindex(injectSocialTags(html, tags, body)), {
       status: 404,
       statusText: 'Not Found',
       headers,
@@ -310,7 +373,7 @@ export async function serveProfileRoute(
 
   headers.set('x-agentbio-prerender', listingId ? 'listing' : 'profile');
 
-  return new Response(injectSocialTags(html, tags), {
+  return new Response(injectSocialTags(html, tags, body), {
     status: assetResponse.status,
     statusText: assetResponse.statusText,
     headers,

@@ -13,6 +13,9 @@
  * directly. functions/[username].ts is the Cloudflare Pages route that uses it.
  */
 
+// Relative, not '@/': the Pages Functions bundle does not resolve the Vite alias.
+import { isPublicListingStatus, listingStatusLabel } from '../../src/lib/listingStatus';
+
 export interface ProfileMeta {
   username: string;
   full_name: string | null;
@@ -24,6 +27,14 @@ export interface ProfileMeta {
   title: string | null;
   brokerage_name: string | null;
   service_cities: unknown;
+  /**
+   * Read only for the crawler body (US-539). Optional so a caller that never
+   * selected them still type-checks; anon holds SELECT on all four.
+   */
+  license_number?: string | null;
+  license_state?: string | null;
+  phone?: string | null;
+  email_display?: string | null;
 }
 
 export interface ListingMeta {
@@ -433,18 +444,17 @@ export function replaceRootContent(html: string, body: string): string {
  * without a Workers runtime, and the document being rewritten is one this
  * repository builds, not arbitrary markup.
  */
-export function injectSocialTags(html: string, tags: SocialTags): string {
+export function injectSocialTags(html: string, tags: SocialTags, body?: string): string {
   let out = html;
   for (const pattern of STRIP_PATTERNS) {
     out = out.replace(pattern, '');
   }
 
-  // The page's own heading and summary in place of the homepage's body, so a
-  // crawler's first, script-free pass reads the agent.
-  out = replaceRootContent(
-    out,
-    `<main><h1>${escapeAttribute(tags.title)}</h1><p>${escapeAttribute(tags.description)}</p></main>`
-  );
+  // The page's own content in place of the homepage's body, so a crawler's
+  // first, script-free pass reads the agent. `body` comes from
+  // buildProfileBody / buildListingBody, which escape everything they
+  // interpolate; without one, the heading and summary alone.
+  out = replaceRootContent(out, body ?? summaryBody(tags));
 
   const image = tags.image;
   const head = [
@@ -473,4 +483,200 @@ export function injectSocialTags(html: string, tags: SocialTags): string {
   // No </head> is not a shape this app's index.html has ever had, but returning
   // the document unchanged is better than returning a broken one.
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// The script-free body (US-539)
+// ---------------------------------------------------------------------------
+
+/** The body when there is nothing more to say than the head already does. */
+function summaryBody(tags: SocialTags): string {
+  return `<main><h1>${escapeAttribute(tags.title)}</h1><p>${escapeAttribute(tags.description)}</p></main>`;
+}
+
+/** A listing row as the profile body needs it. */
+export interface BodyListing {
+  id: string;
+  status?: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  price: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  square_feet: number | null;
+}
+
+/** How many listings the profile body links to. The sitemap carries the rest. */
+export const PROFILE_BODY_LISTING_LIMIT = 12;
+
+/** The status as the page's badge names it; nothing for a non-public or missing one. */
+function statusLabel(status: string | null | undefined): string[] {
+  return isPublicListingStatus(status) ? [listingStatusLabel(status)] : [];
+}
+
+function serviceCities(profile: ProfileMeta): string[] {
+  return Array.isArray(profile.service_cities)
+    ? profile.service_cities
+        .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+        .map((c) => c.trim())
+    : [];
+}
+
+function listingFacts(listing: BodyListing): string[] {
+  return [
+    formatPrice(listing.price),
+    listing.bedrooms ? `${listing.bedrooms} bd` : null,
+    listing.bathrooms ? `${listing.bathrooms} ba` : null,
+    listing.square_feet ? `${listing.square_feet.toLocaleString('en-US')} sqft` : null,
+  ].filter((fact): fact is string => Boolean(fact));
+}
+
+/**
+ * A `tel:` target, or null. Only digits and a leading plus survive, so the
+ * stored text can never put anything but a number into the href.
+ */
+function telHref(phone: string | null | undefined): string | null {
+  const trimmed = phone?.trim();
+  if (!trimmed) return null;
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15) return null;
+  return `tel:${trimmed.startsWith('+') ? '+' : ''}${digits}`;
+}
+
+/** A `mailto:` target for a plausible address, or null. */
+function mailtoHref(email: string | null | undefined): string | null {
+  const trimmed = email?.trim();
+  if (!trimmed || !/^[^\s@<>"'()?&]+@[^\s@<>"'()?&]+\.[^\s@<>"'()?&]+$/.test(trimmed)) {
+    return null;
+  }
+  return `mailto:${trimmed}`;
+}
+
+export interface ProfileBodyOptions {
+  /**
+   * The listings the page itself would show, already held to
+   * selectListingForPage by the caller. Empty when the agent hides them or
+   * the read failed.
+   */
+  listings: readonly BodyListing[];
+  /** False when the agent hides contact buttons, or the settings read failed. */
+  showContact: boolean;
+}
+
+/**
+ * What a crawler that runs no scripts reads at /:username (US-539).
+ *
+ * It used to be a heading and one paragraph, which, once answer engines
+ * reached this path (US-520), was all ChatGPT or Perplexity learned about the
+ * agent: no service area, no brokerage, no licence, no homes. This is the
+ * page's substance as plain HTML: who the agent is and where they work, the
+ * homes the page lists, each linking to its own page, and how to reach them.
+ *
+ * Every interpolated value is escaped, and every href is built here from a
+ * validated value, never copied from the row.
+ */
+export function buildProfileBody(
+  profile: ProfileMeta,
+  tags: SocialTags,
+  origin: string,
+  options: ProfileBodyOptions
+): string {
+  const base = origin.replace(/\/$/, '');
+  const name = profile.full_name?.trim() || profile.username;
+  const role = profile.title?.trim() || 'Real Estate Agent';
+  const brokerage = profile.brokerage_name?.trim();
+  const licenseNumber = profile.license_number?.trim();
+  const licenseState = profile.license_state?.trim();
+  const cities = serviceCities(profile);
+  const bio = profile.bio?.trim() ? summarise(profile.bio, 1200) : '';
+
+  const parts: string[] = [
+    `<h1>${escapeAttribute(tags.title)}</h1>`,
+    `<p>${escapeAttribute(tags.description)}</p>`,
+  ];
+  if (bio && bio !== tags.description) parts.push(`<p>${escapeAttribute(bio)}</p>`);
+
+  const facts = [
+    `<li>${escapeAttribute(role)}${brokerage ? ` at ${escapeAttribute(brokerage)}` : ''}</li>`,
+  ];
+  if (licenseNumber) {
+    facts.push(
+      `<li>License #${escapeAttribute(licenseNumber)}${
+        licenseState ? ` (${escapeAttribute(licenseState)})` : ''
+      }</li>`
+    );
+  }
+  parts.push(`<ul>${facts.join('')}</ul>`);
+
+  if (cities.length) {
+    const items = cities.map((city) => `<li>${escapeAttribute(city)}</li>`).join('');
+    parts.push(`<section><h2>Service areas</h2><ul>${items}</ul></section>`);
+  }
+
+  const listings = options.listings.slice(0, PROFILE_BODY_LISTING_LIMIT);
+  if (listings.length) {
+    const items = listings.map((listing) => {
+      const address = listing.address?.trim() || 'Property';
+      const place = [listing.city?.trim(), listing.state?.trim()].filter(Boolean).join(', ');
+      const href = `${base}/${encodeURIComponent(profile.username)}/listing/${encodeURIComponent(listing.id)}`;
+      const details = [...statusLabel(listing.status), ...listingFacts(listing)];
+      return `<li><a href="${escapeAttribute(href)}">${escapeAttribute(
+        `${address}${place ? `, ${place}` : ''}`
+      )}</a>${details.length ? ` — ${escapeAttribute(details.join(' · '))}` : ''}</li>`;
+    });
+    parts.push(`<section><h2>Listings</h2><ul>${items.join('')}</ul></section>`);
+  }
+
+  if (options.showContact) {
+    const tel = telHref(profile.phone);
+    const mailto = mailtoHref(profile.email_display);
+    const links: string[] = [];
+    if (tel && profile.phone) {
+      links.push(
+        `<li><a href="${escapeAttribute(tel)}">${escapeAttribute(profile.phone.trim())}</a></li>`
+      );
+    }
+    if (mailto && profile.email_display) {
+      links.push(
+        `<li><a href="${escapeAttribute(mailto)}">${escapeAttribute(profile.email_display.trim())}</a></li>`
+      );
+    }
+    if (links.length) {
+      parts.push(
+        `<section><h2>Contact ${escapeAttribute(name)}</h2><ul>${links.join('')}</ul></section>`
+      );
+    }
+  }
+
+  return `<main>${parts.join('')}</main>`;
+}
+
+/**
+ * What a crawler reads at /:username/listing/:id (US-539): the home's facts
+ * and who lists it, with a link back to the agent's page.
+ */
+export function buildListingBody(
+  profile: ProfileMeta,
+  listing: ListingMeta & { status?: string | null },
+  tags: SocialTags,
+  origin: string
+): string {
+  const name = profile.full_name?.trim() || profile.username;
+  const role = profile.title?.trim() || 'Real Estate Agent';
+  const brokerage = profile.brokerage_name?.trim();
+  const profileUrl = `${origin.replace(/\/$/, '')}/${encodeURIComponent(profile.username)}`;
+  const details = [...statusLabel(listing.status), ...listingFacts(listing)];
+
+  const parts = [`<h1>${escapeAttribute(tags.title)}</h1>`];
+  if (details.length) parts.push(`<p>${escapeAttribute(details.join(' · '))}</p>`);
+  if (listing.description?.trim()) {
+    parts.push(`<p>${escapeAttribute(summarise(listing.description, 1200))}</p>`);
+  }
+  parts.push(
+    `<p>Listed by <a href="${escapeAttribute(profileUrl)}">${escapeAttribute(name)}</a>, ${escapeAttribute(
+      role
+    )}${brokerage ? ` at ${escapeAttribute(brokerage)}` : ''}.</p>`
+  );
+  return `<main>${parts.join('')}</main>`;
 }
