@@ -41,10 +41,11 @@ function isEmpty(value: Nullable<string>): value is null | undefined | '' {
  * serves every function, with the caller's JWT.
  */
 async function invokePiiCrypto<T>(
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  signal?: AbortSignal
 ): Promise<{ data: T | null; error: Error | null }> {
   try {
-    const data = await callEdgeFunction<T>('pii-crypto', { body, auth: true });
+    const data = await callEdgeFunction<T>('pii-crypto', { body, auth: true, signal });
     return { data, error: null };
   } catch (error) {
     return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
@@ -253,6 +254,65 @@ export async function findContactsMatchingLead(leadId: string): Promise<ContactM
     if (data.complete !== false) break;
   }
   return matches;
+}
+
+/** One of the caller's contacts that already has a typed email or phone (US-670). */
+export type ContactMatchForDetails = ContactMatchForLead;
+
+/**
+ * The client form waits on this before saving, so it is held to fewer rounds
+ * and a time budget; past either, the caller saves without the check.
+ */
+const MAX_DETAILS_ROUNDS = 3;
+const DETAILS_BUDGET_MS = 8000;
+
+/**
+ * The caller's contacts that already have this email or phone, strongest
+ * match first, excluding `excludeContactId` (the contact being edited).
+ * pii-crypto compares keyed fingerprints; nothing is decrypted into the
+ * browser.
+ *
+ * Throws when pii-crypto cannot answer within the budget; the form then saves
+ * without the check rather than refuse to save.
+ */
+export async function findContactsMatchingDetails(details: {
+  email?: string | null;
+  phone?: string | null;
+  excludeContactId?: string | null;
+}): Promise<ContactMatchForDetails[]> {
+  const email = details.email?.trim() || null;
+  const phone = details.phone?.trim() || null;
+  if (!email && !phone) return [];
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DETAILS_BUDGET_MS);
+  try {
+    let matches: ContactMatchForDetails[] = [];
+    for (let round = 0; round < MAX_DETAILS_ROUNDS; round++) {
+      const { data, error } = await invokePiiCrypto<{
+        matches: ContactMatchForDetails[];
+        complete: boolean;
+      }>(
+        {
+          op: 'match_contacts_for_details',
+          email,
+          phone,
+          excludeContactId: details.excludeContactId ?? null,
+        },
+        controller.signal
+      );
+      if (error) throw error;
+      if (!data || !Array.isArray(data.matches)) {
+        throw new Error('pii-crypto returned an unexpected response');
+      }
+      matches = data.matches;
+      // A match found in an incomplete pass is already worth showing.
+      if (data.complete !== false || matches.length > 0) break;
+    }
+    return matches;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

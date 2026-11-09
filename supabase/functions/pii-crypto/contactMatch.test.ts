@@ -2,6 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   lookupHashes,
   matchContactsForLead,
+  matchContactsForDetails,
+  parseDetailsBody,
+  MAX_EMAIL_LENGTH,
+  MAX_PHONE_LENGTH,
+  type DetailsCandidateRow,
+  type DetailsMatchDeps,
   type CandidateRow,
   type ContactHashes,
   type ContactMatchDeps,
@@ -219,5 +225,177 @@ describe('matchContactsForLead (US-629)', () => {
 
     const missing = setup({ lead: null });
     expect(await matchContactsForLead(missing.deps, AGENT, LEAD)).toEqual({ status: 'not_found' });
+  });
+});
+
+describe('matchContactsForDetails (US-670)', () => {
+  const EDITING = '55555555-5555-4555-8555-555555555555';
+
+  function detailsSetup(contacts: StoredContact[], copied: Set<string> | Error = new Set()) {
+    const base = setup({ contacts });
+    const deps: DetailsMatchDeps = {
+      ...base.deps,
+      findCandidates: vi.fn(async (userId: string, hashes: ContactHashes) =>
+        contacts
+          .filter(
+            (c) =>
+              c.user_id === userId &&
+              ((hashes.email_hash && c.email_hash === hashes.email_hash) ||
+                (hashes.phone_hash && c.phone_hash === hashes.phone_hash))
+          )
+          .map(
+            (c): DetailsCandidateRow => ({
+              id: c.id,
+              first_name: c.first_name,
+              last_name: c.last_name,
+              lead_id: c.lead_id,
+              email_hash: c.email_hash,
+              phone_hash: c.phone_hash,
+              encrypted_email: c.encrypted_email,
+              encrypted_phone: c.encrypted_phone,
+            })
+          )
+      ),
+      copiedFromLockedLeads: vi.fn(async () => {
+        if (copied instanceof Error) throw copied;
+        return copied;
+      }),
+    };
+    return { deps, contacts };
+  }
+
+  it('finds the client who already has a typed email, hashing unhashed contacts first', async () => {
+    const { deps } = detailsSetup([
+      contact('dana', { email: 'dana@example.com', first_name: 'Dana', last_name: 'Reyes' }),
+      contact('other', { email: 'x@y.z' }),
+    ]);
+    const result = await matchContactsForDetails(deps, AGENT, {
+      email: '  DANA@Example.com',
+      phone: null,
+      excludeContactId: null,
+    });
+    expect(result).toEqual({
+      complete: true,
+      matches: [
+        { id: 'dana', first_name: 'Dana', last_name: 'Reyes', lead_id: null, matched_on: 'email' },
+      ],
+    });
+    expect(deps.loadUnhashedContacts).toHaveBeenCalledWith(AGENT, expect.any(Number));
+  });
+
+  it('matches a phone however it was typed, and ranks email matches first', async () => {
+    const { deps } = detailsSetup([
+      contact('spouse', { phone: '+1 512 555 0142' }),
+      contact('dana', { email: 'dana@example.com' }),
+    ]);
+    const result = await matchContactsForDetails(deps, AGENT, {
+      email: 'dana@example.com',
+      phone: '(512) 555-0142',
+      excludeContactId: null,
+    });
+    expect(result.matches.map((m) => [m.id, m.matched_on])).toEqual([
+      ['dana', 'email'],
+      ['spouse', 'phone'],
+    ]);
+  });
+
+  it('does not report the contact being edited as its own duplicate', async () => {
+    const { deps } = detailsSetup([contact(EDITING, { email: 'dana@example.com' })]);
+    const result = await matchContactsForDetails(deps, AGENT, {
+      email: 'dana@example.com',
+      phone: null,
+      excludeContactId: EDITING,
+    });
+    expect(result.matches).toEqual([]);
+    expect(deps.copiedFromLockedLeads).not.toHaveBeenCalled();
+  });
+
+  it("never matches another agent's contacts", async () => {
+    const { deps } = detailsSetup([
+      contact('theirs', { email: 'dana@example.com', user_id: STRANGER }),
+    ]);
+    const result = await matchContactsForDetails(deps, AGENT, {
+      email: 'dana@example.com',
+      phone: null,
+      excludeContactId: null,
+    });
+    expect(result.matches).toEqual([]);
+  });
+
+  it("hides a contact holding a locked lead's ciphertext, so guesses cannot confirm it", async () => {
+    const { deps } = detailsSetup(
+      [
+        contact('copied', { email: 'dana@example.com' }),
+        contact('typed', { email: 'dana@example.com' }),
+      ],
+      new Set(['copied'])
+    );
+    const result = await matchContactsForDetails(deps, AGENT, {
+      email: 'dana@example.com',
+      phone: null,
+      excludeContactId: null,
+    });
+    expect(result.matches.map((m) => m.id)).toEqual(['typed']);
+  });
+
+  it('reports nothing when the locked-lead check cannot be made', async () => {
+    const { deps } = detailsSetup(
+      [contact('dana', { email: 'dana@example.com' })],
+      new Error('db down')
+    );
+    expect(
+      await matchContactsForDetails(deps, AGENT, {
+        email: 'dana@example.com',
+        phone: null,
+        excludeContactId: null,
+      })
+    ).toEqual({ matches: [], complete: true });
+  });
+
+  it('hashes nothing when neither detail is usable', async () => {
+    const { deps } = detailsSetup([contact('dana', { email: 'dana@example.com' })]);
+    expect(
+      await matchContactsForDetails(deps, AGENT, { email: null, phone: '12', excludeContactId: null })
+    ).toEqual({ matches: [], complete: true });
+    expect(deps.loadUnhashedContacts).not.toHaveBeenCalled();
+  });
+
+  it('says when more contacts remain to be fingerprinted', async () => {
+    const many = Array.from({ length: 5 }, (_, i) => contact(`c${i}`, { email: `p${i}@x.io` }));
+    const { deps } = detailsSetup(many);
+    const result = await matchContactsForDetails(
+      deps,
+      AGENT,
+      { email: 'dana@example.com', phone: null, excludeContactId: null },
+      3
+    );
+    expect(result).toEqual({ matches: [], complete: false });
+  });
+});
+
+describe('parseDetailsBody (US-670)', () => {
+  it('trims the details and accepts a missing exclude id', () => {
+    expect(parseDetailsBody({ email: ' a@b.co ', phone: '' })).toEqual({
+      ok: true,
+      input: { email: 'a@b.co', phone: null, excludeContactId: null },
+    });
+  });
+
+  it('refuses a body with nothing to match on, wrong types, or oversize values', () => {
+    expect(parseDetailsBody({}).ok).toBe(false);
+    expect(parseDetailsBody({ email: '  ', phone: null }).ok).toBe(false);
+    expect(parseDetailsBody({ email: 42 }).ok).toBe(false);
+    expect(parseDetailsBody({ email: `${'a'.repeat(MAX_EMAIL_LENGTH)}@x.io` }).ok).toBe(false);
+    expect(parseDetailsBody({ phone: '1'.repeat(MAX_PHONE_LENGTH + 1) }).ok).toBe(false);
+  });
+
+  it('requires the exclude id to be a uuid', () => {
+    expect(parseDetailsBody({ email: 'a@b.co', excludeContactId: "x' or 1=1" }).ok).toBe(false);
+    expect(
+      parseDetailsBody({ email: 'a@b.co', excludeContactId: '55555555-5555-4555-8555-555555555555' })
+    ).toMatchObject({
+      ok: true,
+      input: { excludeContactId: '55555555-5555-4555-8555-555555555555' },
+    });
   });
 });
