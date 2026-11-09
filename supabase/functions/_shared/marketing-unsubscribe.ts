@@ -143,14 +143,55 @@ export function unsubscribeHeaders(links: UnsubscribeLinks): Record<string, stri
   };
 }
 
-/** The footer line for the HTML body. The URL is ours (hex, uuid, fixed list). */
-export function unsubscribeFooterHtml(links: UnsubscribeLinks, reason: string): string {
-  const href = links.pageUrl.replace(/&/g, '&amp;');
-  return `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e5e7eb;color:#52606d;font-size:12px;line-height:1.5;">${reason} <a href="${href}" style="color:#52606d;">Unsubscribe</a> and we will not email you again.</p>`;
+/**
+ * CAN-SPAM (15 U.S.C. 7704(a)(5)) requires a commercial email to carry the
+ * sender's valid physical postal address (US-447). None of the drips did. The
+ * address is one config value, COMPANY_POSTAL_ADDRESS on the edge-functions
+ * deployment (a street address, or a registered PO box / private mailbox), so
+ * every drip footer prints the same thing and changing it is one setting.
+ * Lines may be separated by newlines; they are joined with commas.
+ *
+ * Undefined while the owner has not set it: the footer then omits the line
+ * rather than printing a placeholder that would look like an address.
+ */
+export function postalAddress(): string | undefined {
+  // typeof guard: the footer builders are also exercised outside Deno (vitest).
+  const value = typeof Deno === 'undefined' ? undefined : Deno.env.get('COMPANY_POSTAL_ADDRESS');
+  if (!value) return undefined;
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/,$/, ''))
+    .filter(Boolean);
+  return lines.length ? lines.join(', ') : undefined;
 }
 
-export function unsubscribeFooterText(links: UnsubscribeLinks, reason: string): string {
-  return `${reason} Unsubscribe: ${links.pageUrl}`;
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * The footer for the HTML body: why they got it, the unsubscribe link and the
+ * postal address. Every free-tool drip email ends with this, so the CAN-SPAM
+ * parts are written once. The URL is ours (hex, uuid, fixed list); `reason` is
+ * a constant from the caller, never visitor text.
+ */
+export function unsubscribeFooterHtml(
+  links: UnsubscribeLinks,
+  reason: string,
+  address: string | undefined = postalAddress()
+): string {
+  const href = links.pageUrl.replace(/&/g, '&amp;');
+  const addressLine = address ? `<br>AgentBio, ${escapeHtml(address)}` : '';
+  return `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e5e7eb;color:#52606d;font-size:12px;line-height:1.5;">${reason} <a href="${href}" style="color:#52606d;">Unsubscribe</a> and we will not email you again.${addressLine}</p>`;
+}
+
+export function unsubscribeFooterText(
+  links: UnsubscribeLinks,
+  reason: string,
+  address: string | undefined = postalAddress()
+): string {
+  const line = `${reason} Unsubscribe: ${links.pageUrl}`;
+  return address ? `${line}\nAgentBio, ${address}` : line;
 }
 
 /** The slice of the Supabase client isSuppressed needs, so tests can fake it. */

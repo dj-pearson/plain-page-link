@@ -22,3 +22,10 @@ export const LISTING_DRIP: Readonly<Record<number, { subject: string; day: numbe
 export const LISTING_DRIP_DAY: Readonly<Record<number, number>> = Object.fromEntries(
   Object.entries(LISTING_DRIP).map(([n, { day }]) => [Number(n), day])
 );
+
+/**
+ * The footer reason every listing-generator email gives (the welcome email and
+ * emails 1-7), beside the unsubscribe link and postal address (US-447).
+ */
+export const LISTING_UNSUBSCRIBE_REASON =
+  "You're receiving this because you used AgentBio's listing description generator.";
