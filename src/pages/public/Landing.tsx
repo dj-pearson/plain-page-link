@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { getBaseUrl } from '@/config/seo.config';
+import { organizationId, websiteId } from '@/config/site-entities';
 import { MARKETING_COPY } from '@/config/marketing-claims';
 import { Link } from 'react-router-dom';
 import { Home, BarChart3, Users, Brain, Target, Zap, Sparkles } from 'lucide-react';
@@ -29,7 +30,7 @@ const LANDING_FAQS = [
   {
     question: 'What is a real estate bio page?',
     answer:
-      'A real estate bio page is a mobile-optimized landing page specifically designed for real estate agents to showcase their property listings, capture buyer and seller leads, and book showing appointments. Unlike generic link-in-bio tools, real estate bio pages include features like property galleries, lead capture forms, MLS compliance, and appointment booking\u2014all optimized for converting social media followers into qualified leads.',
+      'A real estate bio page is a mobile-optimized landing page specifically designed for real estate agents to showcase their property listings, capture buyer and seller leads, and book showing appointments. Unlike generic link-in-bio tools, real estate bio pages include features like property galleries, lead capture forms, the Equal Housing Opportunity logo with your license number, and appointment booking\u2014all optimized for converting social media followers into qualified leads.',
   },
   {
     question: 'How do real estate agents use Instagram for leads?',
@@ -39,7 +40,7 @@ const LANDING_FAQS = [
   {
     question: "What's the difference between AgentBio and Linktree?",
     answer:
-      'Linktree is a generic link organization tool, while AgentBio is purpose-built for real estate agents. AgentBio includes property listing galleries, lead capture forms with pre-qualification questions, sold property showcase, client testimonials, MLS compliance features, and appointment booking integration. You also get lead tracking, analytics on which listings get the most interest, and mobile optimization specifically designed for real estate marketing.',
+      'Linktree is a generic link organization tool, while AgentBio is purpose-built for real estate agents. AgentBio includes property listing galleries, lead capture forms with pre-qualification questions, sold property showcase, client testimonials, the Equal Housing Opportunity logo, your license number and the MLS number on each listing, and appointment booking integration. You also get lead tracking, analytics on which listings get the most interest, and mobile optimization specifically designed for real estate marketing.',
   },
   {
     question: 'How much does a real estate agent website cost?',
@@ -49,7 +50,7 @@ const LANDING_FAQS = [
   {
     question: 'Can I showcase sold properties on my bio page?',
     answer:
-      'Yes! Showcasing sold properties is one of the most powerful social proof elements for real estate agents. AgentBio lets you create a dedicated sold properties section with photos, addresses, sale prices, and closing dates. This demonstrates your track record and expertise to potential clients browsing your Instagram bio page.',
+      'Yes! Showcasing sold properties is one of the most powerful social proof elements for real estate agents. AgentBio lets you show sold properties alongside your active listings, each with its photos, address and sale price. This demonstrates your track record and expertise to potential clients browsing your Instagram bio page.',
   },
   {
     question: 'How do I capture leads with AgentBio?',
@@ -100,13 +101,13 @@ export default function Landing() {
     '@graph': [
       {
         '@type': 'WebSite',
-        '@id': `${origin}/#website`,
+        '@id': websiteId(origin),
         url: origin,
         name: 'AgentBio - Real Estate Agent Bio Page Builder',
         description:
           'Turn your Instagram into a lead-generating real estate portfolio. Showcase listings, capture inquiries & book showings from one mobile-optimized bio page.',
         publisher: {
-          '@id': `${origin}/#organization`,
+          '@id': organizationId(origin),
         },
         // No potentialAction. A SearchAction is what Google reads to offer a
         // sitelinks searchbox, and this one pointed at /search?q=, a route that has
@@ -301,7 +302,7 @@ export default function Landing() {
               <FeatureCard
                 icon={<Home className="h-8 w-8" aria-hidden="true" />}
                 title="Showcase Your Portfolio"
-                description="Display active listings with price, photos, beds/baths. Highlight sold properties as social proof. Add virtual tours and property videos."
+                description="Display active listings with price, photos, beds/baths. Highlight sold properties as social proof. Link a virtual tour from any listing."
               />
               <FeatureCard
                 icon={<Users className="h-8 w-8" aria-hidden="true" />}
@@ -311,7 +312,7 @@ export default function Landing() {
               <FeatureCard
                 icon={<BarChart3 className="h-8 w-8" aria-hidden="true" />}
                 title="Book Appointments Fast"
-                description="Integrated Calendly for showing requests. One-tap phone & SMS contact buttons. Time zone auto-detection for out-of-area buyers."
+                description="Connect your Calendly link and buyers book showings from your page; each booking lands in your leads. One-tap call and text buttons."
               />
             </div>
           </div>
@@ -339,8 +340,8 @@ export default function Landing() {
                     <span className="text-red-700">The Problem</span>
                   </div>
                   <p className="glass-body leading-relaxed mb-6">
-                    43% of real estate referrals come through text messages and social media. But
-                    when you send clients to your traditional website:
+                    Referrals and followers arrive on a phone, from a text or a social post. But
+                    when you send them to a traditional website:
                   </p>
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
@@ -349,7 +350,7 @@ export default function Landing() {
                     </div>
                     <div className="flex items-start gap-3">
                       <span className="text-red-400 flex-shrink-0">❌</span>
-                      <p className="glass-body">Loading takes 5+ seconds on mobile</p>
+                      <p className="glass-body">Pages are slow to load on a phone</p>
                     </div>
                     <div className="flex items-start gap-3">
                       <span className="text-red-400 flex-shrink-0">❌</span>
@@ -368,14 +369,14 @@ export default function Landing() {
                     <span className="text-green-700">The Solution</span>
                   </div>
                   <p className="glass-body leading-relaxed mb-6">
-                    Your AgentBio page loads in under 2 seconds, puts your best listings front and
-                    center, and has contact buttons in thumb-reach. Everything a buyer needs to take
-                    the next step.
+                    Your AgentBio page is built for phones first: your best listings front and
+                    center, and contact buttons in thumb-reach. Everything a buyer needs to take the
+                    next step.
                   </p>
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
                       <span className="text-green-700 flex-shrink-0">✓</span>
-                      <p className="glass-body">Instant load on any mobile device</p>
+                      <p className="glass-body">One lightweight page, built for phones</p>
                     </div>
                     <div className="flex items-start gap-3">
                       <span className="text-green-700 flex-shrink-0">✓</span>
@@ -408,12 +409,10 @@ export default function Landing() {
                 id="demo-heading"
                 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4"
               >
-                <span className="glass-heading text-4xl md:text-6xl">
-                  See How Top Agents Use AgentBio
-                </span>
+                <span className="glass-heading text-4xl md:text-6xl">Agent Pages on AgentBio</span>
               </h2>
               <p className="text-xl glass-body max-w-2xl mx-auto">
-                Real examples of agents who switched from generic links to professional bio pages
+                Published pages from agents using AgentBio today
               </p>
             </header>
             <DemoProfilesShowcase />
@@ -458,27 +457,27 @@ export default function Landing() {
               <FeatureCard
                 icon={<Users className="h-8 w-8" aria-hidden="true" />}
                 title="Lead Intelligence"
-                description="See which listings visitors view most. Track where leads come from (Instagram Story vs Post vs DM). Lead scoring: Hot/Warm/Cold based on behavior."
+                description="See which listings visitors view most. See where each lead came from: campaign, referring site and device. Every lead rated hot, warm or cold from its answers: timeline, pre-approval, contact details."
               />
               <FeatureCard
                 icon={<Target className="h-8 w-8" aria-hidden="true" />}
-                title="MLS Compliance"
-                description="Equal Housing Opportunity logo auto-included. License number display for state compliance. MLS attribution when applicable. Fair Housing disclaimers."
+                title="Listing Disclosures"
+                description="Equal Housing Opportunity logo and statement on your page. License number and state displayed. MLS number shown on each listing."
               />
               <FeatureCard
                 icon={<BarChart3 className="h-8 w-8" aria-hidden="true" />}
                 title="Appointment Booking"
-                description="Integrated Calendly for showing requests. One-tap phone, SMS, and email buttons. Time zone detection for out-of-area buyers."
+                description="Connect Calendly and visitors book showings without leaving your page. Bookings are saved as leads. One-tap call, text, and email buttons."
               />
               <FeatureCard
                 icon={<Brain className="h-8 w-8" aria-hidden="true" />}
                 title="Client Testimonials"
-                description="Showcase reviews and success stories. Display 5-star ratings prominently. Add video testimonials for social proof."
+                description="Send clients your review link, approve each review before it shows, and display star ratings with every one."
               />
               <FeatureCard
                 icon={<Zap className="h-8 w-8" aria-hidden="true" />}
                 title="Mobile-First Design"
-                description="Loads in under 2 seconds on 4G. Thumb-friendly buttons and navigation. Optimized for how buyers actually browse on mobile."
+                description="Designed for the phone first. Thumb-friendly buttons and navigation. A sticky contact bar so buyers can reach you from anywhere on the page."
               />
             </div>
           </div>

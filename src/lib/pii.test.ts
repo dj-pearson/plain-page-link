@@ -5,6 +5,9 @@ import {
   encryptPIIBatch,
   decryptLeadContacts,
   decryptOwnProfilePhone,
+  findContactsMatchingLead,
+  findContactsMatchingDetails,
+  indexOwnContacts,
 } from './pii';
 
 /**
@@ -26,6 +29,26 @@ const PREFIX = 'enc:v1:';
 let invocations: { op: string; body: Record<string, unknown> }[] = [];
 let failNextCall = false;
 let profilePhoneReply: string | null = '+1 555 000 1111';
+/** Replies to match_contacts_for_lead, one per call; the last one repeats. */
+let matchReplies: { matches: unknown[]; complete: boolean }[] = [];
+
+// pii.ts calls pii-crypto through callEdgeFunction (US-622). Route it into the
+// invoke mock below so the existing replies and failure switches still apply.
+vi.mock('@/lib/edgeFunctions', async () => {
+  const { supabase } = await import('@/integrations/supabase/client');
+  return {
+    callEdgeFunction: async (name: string, opts: { body: Record<string, unknown> }) => {
+      const { data, error } = await (
+        supabase.functions.invoke as unknown as (
+          n: string,
+          o: { body: Record<string, unknown> }
+        ) => Promise<{ data: unknown; error: unknown }>
+      )(name, { body: opts.body });
+      if (error) throw error;
+      return data;
+    },
+  };
+});
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -59,6 +82,15 @@ vi.mock('@/integrations/supabase/client', () => ({
             },
             error: null,
           };
+        }
+
+        if (body.op === 'match_contacts_for_lead' || body.op === 'match_contacts_for_details') {
+          const reply = matchReplies.length > 1 ? matchReplies.shift() : matchReplies[0];
+          return { data: reply ?? null, error: null };
+        }
+
+        if (body.op === 'index_contacts') {
+          return { data: { hashed: 1, failed: 0, complete: true }, error: null };
         }
 
         if (body.op === 'decrypt_profile') {
@@ -194,5 +226,113 @@ describe('decryptOwnProfilePhone', () => {
     } finally {
       profilePhoneReply = '+1 555 000 1111';
     }
+  });
+});
+
+describe('findContactsMatchingLead (US-629)', () => {
+  const dana = {
+    id: 'c1',
+    first_name: 'Dana',
+    last_name: 'Reyes',
+    lead_id: null,
+    matched_on: 'email',
+  };
+
+  it('sends only the lead id and returns the matches', async () => {
+    matchReplies = [{ matches: [dana], complete: true }];
+    expect(await findContactsMatchingLead('lead-1')).toEqual([dana]);
+    expect(invocations).toEqual([
+      { op: 'match_contacts_for_lead', body: { op: 'match_contacts_for_lead', leadId: 'lead-1' } },
+    ]);
+  });
+
+  it('asks again while pii-crypto is still fingerprinting the sphere', async () => {
+    matchReplies = [
+      { matches: [], complete: false },
+      { matches: [], complete: false },
+      { matches: [dana], complete: true },
+    ];
+    expect(await findContactsMatchingLead('lead-1')).toEqual([dana]);
+    expect(invocations).toHaveLength(3);
+  });
+
+  it('stops after a fixed number of rounds on a very large sphere', async () => {
+    matchReplies = [{ matches: [], complete: false }];
+    expect(await findContactsMatchingLead('lead-1')).toEqual([]);
+    expect(invocations).toHaveLength(8);
+  });
+
+  it('throws when pii-crypto cannot answer, so the caller can decide', async () => {
+    failNextCall = true;
+    await expect(findContactsMatchingLead('lead-1')).rejects.toThrow();
+  });
+});
+
+describe('findContactsMatchingDetails (US-670)', () => {
+  const dana = {
+    id: 'c1',
+    first_name: 'Dana',
+    last_name: 'Reyes',
+    lead_id: null,
+    matched_on: 'email',
+  };
+
+  it('sends the trimmed details and the contact being edited', async () => {
+    matchReplies = [{ matches: [dana], complete: true }];
+    expect(
+      await findContactsMatchingDetails({
+        email: ' dana@example.com ',
+        phone: '',
+        excludeContactId: 'c9',
+      })
+    ).toEqual([dana]);
+    expect(invocations).toEqual([
+      {
+        op: 'match_contacts_for_details',
+        body: {
+          op: 'match_contacts_for_details',
+          email: 'dana@example.com',
+          phone: null,
+          excludeContactId: 'c9',
+        },
+      },
+    ]);
+  });
+
+  it('asks nothing when there is no email or phone', async () => {
+    expect(await findContactsMatchingDetails({ email: ' ', phone: null })).toEqual([]);
+    expect(invocations).toHaveLength(0);
+  });
+
+  it('asks again while fingerprinting, but stops at a match or after three rounds', async () => {
+    matchReplies = [
+      { matches: [], complete: false },
+      { matches: [dana], complete: false },
+      { matches: [], complete: true },
+    ];
+    expect(await findContactsMatchingDetails({ email: 'dana@example.com' })).toEqual([dana]);
+    expect(invocations).toHaveLength(2);
+
+    invocations = [];
+    matchReplies = [{ matches: [], complete: false }];
+    expect(await findContactsMatchingDetails({ email: 'dana@example.com' })).toEqual([]);
+    expect(invocations).toHaveLength(3);
+  });
+
+  it('throws when pii-crypto cannot answer, so the form can save without it', async () => {
+    failNextCall = true;
+    await expect(findContactsMatchingDetails({ phone: '512 555 0142' })).rejects.toThrow();
+  });
+});
+
+describe('indexOwnContacts (US-640)', () => {
+  it('sends only the op: the rows are chosen by the JWT, not the caller', async () => {
+    expect(await indexOwnContacts()).toBe(true);
+    expect(invocations).toEqual([{ op: 'index_contacts', body: { op: 'index_contacts' } }]);
+  });
+
+  it('never throws when pii-crypto is unreachable', async () => {
+    failNextCall = true;
+    await expect(indexOwnContacts()).resolves.toBe(false);
   });
 });

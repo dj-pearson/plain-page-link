@@ -25,6 +25,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SRC = join(process.cwd(), 'src');
+const FUNCTIONS = join(process.cwd(), 'supabase', 'functions');
 
 /** Files that legitimately contain these shapes. */
 const ALLOWED_FILES = [
@@ -33,8 +34,10 @@ const ALLOWED_FILES = [
   'components/tools/instagram-bio-analyzer/BioAnalyzerForm.tsx',
   'components/tools/instagram-bio-analyzer/EmailCaptureModal.tsx',
   'components/tools/listing-description-generator/EmailCaptureModal.tsx',
-  // Describes what the testimonial widget can display, not our rating.
-  'pages/features/Testimonials.tsx',
+  // pages/features/Testimonials.tsx was exempt here ("describes what the
+  // testimonial widget can display"). The exemption hid four unsourced
+  // statistics, a "3x more" claim about AgentBio and two invented, named
+  // "Real Testimonial Examples". US-332 removed them and the exemption.
   // Blog FAQ copy about the housing market — "school districts command premium
   // prices (10-20% higher)", "FSBO sells for about 10% higher with an agent".
   // These are claims about real estate, not about AgentBio, and the rules here
@@ -112,6 +115,31 @@ const RULES: { rule: string; pattern: RegExp }[] = [
     rule: 'a testimonial attributed to a first-name-plus-initial, with or without a dash',
     pattern: />\s*[A-Z][a-z]+\s+[A-Z]\.\s*</,
   },
+  // --- US-415 (US-406) ----------------------------------------------------
+  // Until US-415 this scan read src/ only, so the free-tool drip emails in
+  // supabase/functions were never checked. Pointing it there found the named
+  // testimonial and the percentages above, and three shapes no rule knew:
+  //   "4,200+ agents trust AgentBio"                — a count after the number
+  //   "I analyzed data from 2,847 real estate agents" / "We analyzed 47,000
+  //    real estate listings"                       — a study nobody ran
+  //   "20% off ... (expires tonight)", "expires in 12 hours", ?coupon=BIO20 —
+  //    a discount on a coupon no Stripe account holds, with a fake deadline
+  {
+    rule: 'a customer count stated as a fact about AgentBio',
+    pattern:
+      /\b[0-9][0-9,.]*\+?\s*(agents|realtors|users|customers|professionals)\s+(trust|use|love|rely on|choose)\b/i,
+  },
+  {
+    rule: 'a study of agents or listings nobody ran',
+    pattern:
+      /\b(analy[sz]ed|studied|surveyed)\s+(data\s+from\s+)?[0-9][0-9,.]*\+?\s*(real estate\s+)?(agents|realtors|listings|homes|profiles)\b/i,
+  },
+  {
+    rule: 'a coupon or deadline offer that checkout does not honour',
+    pattern:
+      // Not "the link will expire in 1 hour" — a reset link really does.
+      /\bexpires?\s+(tonight|at midnight)\b|\b(offer|discount|deal)\s+expires?\b|[?&]coupon=|\buse\s+code\s+[A-Z0-9]{4,}\b/i,
+  },
 ];
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -164,9 +192,9 @@ function commentMask(lines: string[]): boolean[] {
 function scan(): Finding[] {
   const findings: Finding[] = [];
 
-  for (const file of walk(SRC)) {
+  for (const file of [...walk(SRC), ...walk(FUNCTIONS)]) {
     const rel = file
-      .slice(SRC.length + 1)
+      .slice(process.cwd().length + 1)
       .split('\\')
       .join('/');
     if (ALLOWED_FILES.some((allowed) => rel.endsWith(allowed))) continue;
@@ -210,6 +238,20 @@ describe('marketing claims', () => {
       '— Sarah M., Beverly Hills',
       'Used by agents at Keller Williams, Coldwell Banker, RE/MAX',
       '<span className="text-primary">15 leads/month</span>',
+      // US-415: the drip-email shapes, verbatim.
+      'No credit card required • Cancel anytime • 4,200+ agents trust AgentBio',
+      'I analyzed data from 2,847 real estate agents using Instagram.',
+      '<p>We analyzed 47,000 real estate listings that sold in under 30 days.</p>',
+      '— Jennifer M., Top 1% Agent, Austin',
+      '"AgentBio saves me 8-10 hours per week on content creation."',
+      'Optimal: 400-600 words. Too short (under 200) = 23% fewer showings.',
+      'get 2.4x more responses than generic endings',
+      'subject: "The Instagram bio mistake 73% of agents make",',
+      'Average Agent: ~7 leads/month',
+      '${firstName}, final call: 20% off + free setup (expires tonight)',
+      'This offer expires in 12 hours',
+      'Claim Your 20% Discount: ${siteUrl}/auth/register?coupon=BIO20',
+      'Use code LISTING20 at checkout',
     ];
 
     for (const sample of samples) {
@@ -237,11 +279,84 @@ describe('marketing claims', () => {
  */
 describe('feature claims', () => {
   const FEATURE_RULES: { rule: string; pattern: RegExp }[] = [
-    { rule: 'a free trial that checkout does not offer', pattern: /free\s+trial|\b14[- ]day\s+(free\s+)?trial|free\s+for\s+14\s+days/i },
-    { rule: 'MLS integration, which does not exist', pattern: /\bMLS\s+integration\b/i },
-    { rule: 'predictive analytics or scoring, which does not exist', pattern: /\bpredictive\s+(lead\s+scoring|analytics)\b/i },
-    { rule: 'property matching or market intelligence, which do not exist', pattern: /\b(smart\s+)?property\s+matching\b|\bmarket\s+intelligence\b/i },
+    {
+      rule: 'a free trial that checkout does not offer',
+      pattern: /free\s+trial|\b14[- ]day\s+(free\s+)?trial|free\s+for\s+14\s+days/i,
+    },
+    // The second form is US-311: every /for/{city} FAQ said AgentBio
+    // "integrates with major MLS and IDX providers", which the first missed.
+    {
+      rule: 'MLS integration, which does not exist',
+      pattern: /\bMLS\s+integration\b|\bintegrates?\s+with\s+(major\s+|popular\s+)?(MLS|IDX)\b/i,
+    },
+    {
+      rule: 'predictive analytics or scoring, which does not exist',
+      pattern: /\bpredictive\s+(lead\s+scoring|analytics)\b/i,
+    },
+    {
+      rule: 'property matching or market intelligence, which do not exist',
+      pattern: /\b(smart\s+)?property\s+matching\b|\bmarket\s+intelligence\b/i,
+    },
+    // US-333 (US-320): every /for/{city} page's GEO direct-answer paragraph
+    // said AgentBio "integrates with popular CRM systems" and tracks "which
+    // {city} neighborhoods and property types generate the most engagement".
+    // The only CRM hand-off is the Zapier webhook (profiles.zapier_webhook_url)
+    // plus CSV export; analytics are per listing, per link and per source, and
+    // nothing records a neighbourhood.
+    {
+      rule: 'native CRM integrations, which do not exist (the hand-off is a Zapier webhook)',
+      pattern: /\bintegrates?\s+with\s+(?:major\s+|popular\s+|leading\s+|your\s+)?CRMs?\b/i,
+    },
+    // US-398 (US-387, US-388): the two rules above missed "MLS/IDX Integration —
+    // Auto-sync active listings from MLS" in the /vs/later comparison table,
+    // "Auto-updated listings from your MLS" in the bio analyzer's first email
+    // (the one that actually sends) and on its results page, and "CRM
+    // integration (auto-sync leads)", "Auto-send leads to Follow Up Boss,
+    // LionDesk" and "CRM Built-In" across /vs/later and the landing page.
+    // Listings are typed in by the agent; the CRM hand-off is a Zapier webhook.
+    // "No CRM integration" and "There is no built-in CRM integration" are the
+    // honest forms and stay allowed.
+    {
+      rule: 'listings that sync from the MLS, which nothing does (listings are entered by hand)',
+      pattern:
+        /\bMLS\s*\/\s*IDX\s+integration\b|\bauto[- ]?(?:updat\w*|sync\w*)\b[^.]{0,40}\bMLS\b/i,
+    },
+    {
+      rule: 'a CRM integration or sync, which does not exist (the hand-off is a Zapier webhook)',
+      pattern:
+        /(?<!\bno\s(?:built-in\s)?)\bCRM\s+(?:integrations?|sync(?:ing)?|built-in)\b|\bauto-?(?:sync|send)(?:ed|s)?\s+leads\b|\bconnect\s+(?:it\s+)?to\s+your\s+CRM\b/i,
+    },
+    {
+      rule: 'analytics broken down by neighbourhood, which nothing records',
+      pattern:
+        /\bwhich\s+(?:\{\w+\}\s+)?neighbou?rhoods\b[^.]{0,80}\b(?:engagement|clicks|leads|generate)\b/i,
+    },
   ];
+
+  /**
+   * JSX wraps prose at the print width, so a phrase can straddle two lines —
+   * the old city-page "with a free\n trial" got past a per-line scan that way.
+   * Each pair of adjacent non-comment lines is also tested joined; a hit is
+   * reported only when neither line matches on its own, so nothing is counted
+   * twice.
+   */
+  function scanLines(lines: string[], isComment: boolean[], rel: string, out: string[]) {
+    lines.forEach((line, i) => {
+      if (isComment[i]) return;
+      for (const { rule, pattern } of FEATURE_RULES) {
+        if (pattern.test(line)) {
+          out.push(`${rel}:${i + 1}  ${rule}\n      ${line.trim().slice(0, 90)}`);
+          continue;
+        }
+        const next = lines[i + 1];
+        if (next === undefined || isComment[i + 1] || pattern.test(next)) continue;
+        const joined = `${line.trim()} ${next.trim()}`;
+        if (pattern.test(joined)) {
+          out.push(`${rel}:${i + 1}-${i + 2}  ${rule}\n      ${joined.slice(0, 120)}`);
+        }
+      }
+    });
+  }
   const ROOTS = [SRC, join(process.cwd(), 'supabase', 'functions')];
   const EXEMPT = ['pages/legal/', 'pages/BlogCategory.tsx', 'marketing-claims.test.ts'];
 
@@ -249,16 +364,13 @@ describe('feature claims', () => {
     const findings: string[] = [];
     for (const root of ROOTS) {
       for (const file of walk(root)) {
-        const rel = file.slice(process.cwd().length + 1).split('\\').join('/');
+        const rel = file
+          .slice(process.cwd().length + 1)
+          .split('\\')
+          .join('/');
         if (EXEMPT.some((e) => rel.includes(e))) continue;
         const lines = readFileSync(file, 'utf8').split('\n');
-        const isComment = commentMask(lines);
-        lines.forEach((line, i) => {
-          if (isComment[i]) return;
-          for (const { rule, pattern } of FEATURE_RULES) {
-            if (pattern.test(line)) findings.push(`${rel}:${i + 1}  ${rule}\n      ${line.trim().slice(0, 90)}`);
-          }
-        });
+        scanLines(lines, commentMask(lines), rel, findings);
       }
     }
     expect(findings).toEqual([]);
@@ -269,10 +381,103 @@ describe('feature claims', () => {
       'Start Your Free 14-Day Trial',
       'Try AgentBio Free for 14 Days',
       '<p className="font-semibold">MLS Integration</p>',
+      'AgentBio integrates with major MLS and IDX providers used in Denver.',
       'with predictive lead scoring and smart property matching',
       'accelerates deals with market intelligence',
+      'The platform integrates with popular CRM systems used by {city} real estate professionals',
+      'track which {city} neighborhoods and property types generate the most engagement',
+      // US-398
+      'description="Auto-sync active listings from MLS"',
+      'feature="MLS/IDX Integration"',
+      '→ Auto-updated listings from your MLS',
+      "'Auto-updated MLS listings',",
+      '<span>CRM integration (auto-sync leads)</span>',
+      'description="Auto-send leads to Follow Up Boss, LionDesk, etc."',
+      "highlight: 'CRM Built-In',",
+      '→ CRM integration (Follow Up Boss, Salesforce, etc.)',
+      'and home valuation request. Connect to your CRM.',
+      'buyer and seller qualification questions, and CRM syncing.',
     ]) {
-      expect(FEATURE_RULES.some(({ pattern }) => pattern.test(sample)), sample).toBe(true);
+      expect(
+        FEATURE_RULES.some(({ pattern }) => pattern.test(sample)),
+        sample
+      ).toBe(true);
     }
+  });
+
+  it('catches a claim that JSX wrapped across two lines', () => {
+    const lines = [
+      '              mobile-optimized link. The platform integrates with popular',
+      '              CRM systems used by agents.',
+    ];
+    const out: string[] = [];
+    scanLines(lines, [false, false], 'x.tsx', out);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain('x.tsx:1-2');
+  });
+
+  it('does not join a line onto a comment', () => {
+    const out: string[] = [];
+    scanLines(['integrates with popular', '// CRM systems'], [false, true], 'x.tsx', out);
+    expect(out).toEqual([]);
+  });
+
+  it('allows the copy that replaced the overclaim', () => {
+    const out: string[] = [];
+    const lines = [
+      "Every new lead can be sent on to the agent's CRM through a Zapier webhook or, on paid plans, exported",
+      'the dashboard shows how many people viewed each listing, clicked each link and which',
+      'campaign sources turned into leads.',
+      // US-398: the honest forms of the CRM and MLS rules.
+      '<span>No CRM integration</span>',
+      'There is no built-in CRM integration. You can connect a Zapier webhook',
+      "{ key: 'crm_connectors', name: 'CRM connectors', blurb: 'Send leads to Follow Up Boss and others' },",
+      "{ key: 'mls_integration', name: 'MLS sync', blurb: 'Listings that update from your MLS' },",
+      'MLS sync is on the roadmap, and you can ask to be notified on the pricing page.',
+      '<span>New leads passed to your CRM via a Zapier webhook</span>',
+      '<li>Connect your CRM (Salesforce, HubSpot, etc.) as the action</li>',
+    ];
+    scanLines(
+      lines,
+      lines.map(() => false),
+      'x.tsx',
+      out
+    );
+    expect(out).toEqual([]);
+  });
+});
+
+/**
+ * US-415: the listing-generator emails sent every "Create Your Free Page"
+ * button to `${SITE_URL}/register`. There is no such route — App.tsx has
+ * /auth/register, and "register" is a reserved username, so /register fell to
+ * the profile route and rendered the 404 page. Every click from the one email
+ * that actually sends was lost.
+ */
+describe('email call-to-action links', () => {
+  const BARE_AUTH_LINK = /(?:SITE_URL|siteUrl|getSiteUrl\(\))\}\/(?:register|signup|login)\b/;
+
+  it('send sign-up links to /auth/register, not a path that 404s', () => {
+    const findings: string[] = [];
+    for (const file of walk(FUNCTIONS)) {
+      const rel = file
+        .slice(process.cwd().length + 1)
+        .split('\\')
+        .join('/');
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          if (BARE_AUTH_LINK.test(line)) {
+            findings.push(`${rel}:${i + 1}  ${line.trim().slice(0, 100)}`);
+          }
+        });
+    }
+    expect(findings).toEqual([]);
+  });
+
+  it('is actually able to fail', () => {
+    expect(BARE_AUTH_LINK.test('<a href="${SITE_URL}/register?utm_source=x">')).toBe(true);
+    expect(BARE_AUTH_LINK.test('Create Your Free Page: ${siteUrl}/signup')).toBe(true);
+    expect(BARE_AUTH_LINK.test('<a href="${SITE_URL}/auth/register">')).toBe(false);
   });
 });

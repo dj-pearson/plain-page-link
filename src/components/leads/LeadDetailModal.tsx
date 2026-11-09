@@ -43,36 +43,53 @@ import {
   Megaphone,
   Link2,
   Smartphone,
+  Trash2,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/dateFormat';
+import { formatDistanceToNowWithSuffix } from '@/lib/relativeTime';
 import type { Lead } from '@/types/lead';
 import { useLeadScore } from '@/hooks/useMLLeadScoring';
 import { useLeadContactAction, type ContactChannel } from '@/hooks/useLeadContactAction';
-import { useLeadActivities, type LeadActivity } from '@/hooks/useLeadActivities';
+import {
+  useLeadActivities,
+  type LeadActivity,
+  type MeetingType,
+  type TaskPriority,
+} from '@/hooks/useLeadActivities';
+import { useAuthStore } from '@/stores/useAuthStore';
+import {
+  QUICK_RESPONSES,
+  fillQuickResponse,
+  quickResponseHref,
+  type QuickResponseChannel,
+} from '@/lib/leadQuickResponses';
 import { getLeadNextStep } from '@/lib/leadNextStep';
-import { buildLeadStatusPatch } from '@/lib/leadStatus';
+import { buildLeadStatusPatch, LEAD_STATUSES, type LeadStatus } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
 import { calendarDateInDays, dueDateToIso, taskDueAt } from '@/lib/localDate';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
 import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButton';
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
-
-/**
- * Lead plus the one field the modal shows that is not a column.
- *
- * `property_address` used to be redeclared here as an "extra"; it is a real
- * column on `leads` and is inherited, so restating it only risked disagreeing
- * with the schema. `budget` genuinely is not a column — it is read out of
- * form_data — so it stays.
- */
-interface LeadWithExtras extends Lead {
-  budget?: string | null;
-}
+import { LeadListingCard } from '@/components/leads/LeadListingCard';
+import { LeadViewedListings } from '@/components/leads/LeadViewedListings';
+import { LeadAssigneeControl } from '@/components/leads/LeadAssigneeControl';
+import { describeLeadAnswers } from '@/lib/leadFormSchema';
+import { isAgentAuthoredActivityType } from '@/lib/leadActivityTypes';
 
 interface LeadDetailModalProps {
-  lead: LeadWithExtras | null;
+  lead: Lead | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLeadUpdated?: () => void;
@@ -95,8 +112,41 @@ const ACTIVITY_ICONS: Record<string, typeof StickyNote> = {
   form_submission: Inbox,
 };
 
+/**
+ * Timeline rows the agent wrote, and so may remove. status_change and
+ * form_submission are the system's record of what happened to the lead. This
+ * mirrors the lead_activities DELETE policy (author only, agent-authored types
+ * only, migration 20261107000349), so the button never offers a delete the
+ * database would refuse.
+ */
+export function canDeleteActivity(a: LeadActivity, currentUserId: string | null): boolean {
+  return (
+    !!currentUserId && a.user_id === currentUserId && isAgentAuthoredActivityType(a.activity_type)
+  );
+}
+
+const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
+  in_person: 'In person',
+  video: 'Video call',
+  phone: 'Phone',
+};
+
+const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+};
+
 /** The line an agent reads. Falls back to the stored title, then the type. */
 function activityHeadline(a: LeadActivity): string {
+  if (a.activity_type === 'meeting' && a.meeting_scheduled_at) {
+    const when = new Date(a.meeting_scheduled_at);
+    const base = a.title || 'Meeting';
+    return Number.isNaN(when.getTime()) ? base : `${base} · ${formatDate(when, 'MMM d, h:mm a')}`;
+  }
+  if (a.activity_type === 'task' && a.task_priority === 'high') {
+    return `${a.title || 'Follow-up'} (high priority)`;
+  }
   if (a.activity_type === 'status_change' && a.new_status) {
     return a.previous_status
       ? `Status: ${a.previous_status} → ${a.new_status}`
@@ -112,46 +162,29 @@ function activityHeadline(a: LeadActivity): string {
   return a.title || a.activity_type.replace(/_/g, ' ');
 }
 
-const STATUS_OPTIONS = [
-  { value: 'new', label: 'New', color: 'bg-green-100 text-green-800' },
-  { value: 'contacted', label: 'Contacted', color: 'bg-blue-100 text-blue-800' },
-  { value: 'qualified', label: 'Qualified', color: 'bg-purple-100 text-purple-800' },
-  { value: 'converted', label: 'Converted', color: 'bg-emerald-100 text-emerald-800' },
-  { value: 'lost', label: 'Lost', color: 'bg-gray-100 text-gray-800' },
-];
-
-const QUICK_RESPONSES = [
-  {
-    id: 'intro',
-    title: 'Introduction',
-    template:
-      "Hi {name}, thank you for reaching out! I'd love to help you {lead_type}. When would be a good time to chat?",
-  },
-  {
-    id: 'buyer_followup',
-    title: 'Buyer Follow-up',
-    template:
-      "Hi {name}, I have some great properties that match what you're looking for. Are you available for a showing this week?",
-  },
-  {
-    id: 'seller_followup',
-    title: 'Seller Follow-up',
-    template:
-      "Hi {name}, I'd like to schedule a time to visit your property and discuss your goals. What days work best for you?",
-  },
-  {
-    id: 'valuation',
-    title: 'Home Valuation',
-    template:
-      "Hi {name}, I've prepared a comparative market analysis for your property. Can we schedule a call to discuss the current market value?",
-  },
-];
+/** The dot beside each status in the picker. Keyed by LeadStatus so a new status cannot ship without one. */
+const STATUS_DOT: Record<LeadStatus, string> = {
+  new: 'bg-green-500',
+  contacted: 'bg-blue-500',
+  qualified: 'bg-purple-500',
+  nurturing: 'bg-amber-500',
+  converted: 'bg-emerald-600',
+  closed: 'bg-emerald-800',
+  lost: 'bg-gray-400',
+};
 
 export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: LeadDetailModalProps) {
   const [status, setStatus] = useState(lead?.status || 'new');
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<string>('');
+  // The quick response being previewed: filled for this lead and editable
+  // before it goes out.
+  const [draftResponse, setDraftResponse] = useState<{
+    subject: string;
+    body: string;
+  } | null>(null);
+  const currentUserId = useAuthStore((s) => s.user?.id ?? null);
   const leadScore = useLeadScore(lead);
   const recordContact = useLeadContactAction(setStatus);
 
@@ -168,6 +201,9 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     createTask,
     completeTask,
     isCreatingTask,
+    logMeeting,
+    isLoggingMeeting,
+    deleteActivity,
   } = useLeadActivities(lead?.id);
 
   // The next step. getRecommendedActions() has produced advice like "Send
@@ -178,6 +214,15 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
 
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDue, setTaskDue] = useState('');
+  const [taskPriority, setTaskPriority] = useState<TaskPriority>('medium');
+
+  const [meetingOpen, setMeetingOpen] = useState(false);
+  const [meetingType, setMeetingType] = useState<MeetingType>('in_person');
+  const [meetingAt, setMeetingAt] = useState('');
+  const [meetingLocation, setMeetingLocation] = useState('');
+  const [meetingNotes, setMeetingNotes] = useState('');
+
+  const [pendingDelete, setPendingDelete] = useState<LeadActivity | null>(null);
 
   // Re-initialise per-lead state whenever the lead changes.
   //
@@ -194,6 +239,10 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     setSelectedResponse('');
     setTaskTitle('');
     setTaskDue('');
+    setTaskPriority('medium');
+    setDraftResponse(null);
+    resetMeetingForm();
+    setPendingDelete(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead?.id]);
 
@@ -270,9 +319,40 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
       leadId: lead.id,
       title: taskTitle.trim(),
       dueDate,
+      priority: taskPriority,
     });
     setTaskTitle('');
     setTaskDue('');
+    setTaskPriority('medium');
+  };
+
+  function resetMeetingForm() {
+    setMeetingOpen(false);
+    setMeetingType('in_person');
+    setMeetingAt('');
+    setMeetingLocation('');
+    setMeetingNotes('');
+  }
+
+  const handleLogMeeting = () => {
+    if (!lead || !meetingAt) return;
+    // datetime-local has no zone; new Date() reads it as the agent's local
+    // time, which is what they typed.
+    const scheduledAt = new Date(meetingAt);
+    if (Number.isNaN(scheduledAt.getTime())) return;
+    logMeeting({
+      leadId: lead.id,
+      meetingType,
+      scheduledAt,
+      location: meetingLocation.trim() || undefined,
+      notes: meetingNotes.trim() || undefined,
+    });
+    resetMeetingForm();
+  };
+
+  const handleConfirmDelete = () => {
+    if (pendingDelete) deleteActivity(pendingDelete.id);
+    setPendingDelete(null);
   };
 
   const handleAddNote = () => {
@@ -294,34 +374,56 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     }
   };
 
-  const fillTemplate = (template: string) => {
-    return template
-      .replace('{name}', lead?.name || 'there')
-      .replace(
-        '{lead_type}',
-        lead?.lead_type === 'buyer' ? 'find your dream home' : 'sell your property'
-      );
-  };
-
   const handleSelectResponse = (responseId: string) => {
     const response = QUICK_RESPONSES.find((r) => r.id === responseId);
-    if (response) {
-      setNote(fillTemplate(response.template));
-      setSelectedResponse('');
+    if (response && lead) {
+      setDraftResponse({
+        subject: response.subject,
+        body: fillQuickResponse(response.template, lead),
+      });
     }
+    setSelectedResponse('');
+  };
+
+  /**
+   * Hands the reply to the agent's mail or messages app and records what was
+   * sent. Same status/contacted_at handling as tapping the address, but the
+   * timeline carries the text rather than a placeholder (US-130 slice 2).
+   */
+  const handleSendResponse = async (channel: QuickResponseChannel) => {
+    if (!lead || !draftResponse || !draftResponse.body.trim()) return;
+    const body = draftResponse.body.trim();
+    const href = quickResponseHref(channel, lead, body, draftResponse.subject);
+    if (!href) return;
+    window.location.href = href;
+    setDraftResponse(null);
+    await recordContact(lead, channel, {
+      subject: channel === 'email' ? draftResponse.subject : undefined,
+      body,
+    });
+    onLeadUpdated?.();
+  };
+
+  /** The old behaviour, kept for an agent who only wants it on file. */
+  const handleResponseAsNote = () => {
+    if (!draftResponse) return;
+    setNote(draftResponse.body);
+    setDraftResponse(null);
   };
 
   if (!lead) return null;
 
-  const timeAgo = lead.created_at
-    ? formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })
-    : '';
+  const timeAgo = lead.created_at ? formatDistanceToNowWithSuffix(new Date(lead.created_at)) : '';
 
   const origin = describeLeadOrigin(lead);
+  // Shown for a locked lead too: the allowance withholds contact details
+  // (pii-crypto), not the qualifying answers — and "cash buyer, ASAP" behind
+  // a lock is the clearest reason to upgrade.
+  const answers = describeLeadAnswers(lead);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -366,10 +468,13 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
+                {LEAD_STATUSES.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${option.color}`} />
+                      <span
+                        className={`w-2 h-2 rounded-full ${STATUS_DOT[option.value]}`}
+                        aria-hidden="true"
+                      />
                       {option.label}
                     </div>
                   </SelectItem>
@@ -377,6 +482,9 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               </SelectContent>
             </Select>
           </div>
+
+          {/* Who holds the lead; the owner can hand it to a teammate (US-497). */}
+          <LeadAssigneeControl lead={lead} onAssigned={onLeadUpdated} />
 
           {/* AI Lead Score */}
           {leadScore && (
@@ -499,32 +607,61 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
             </div>
           )}
 
+          {/* The property they asked about (US-264). listing_id has been
+              written since US-096 and was never shown. */}
+          {lead.listing_id && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Asked about
+              </h3>
+              <LeadListingCard
+                listingId={lead.listing_id}
+                fallbackAddress={lead.property_address}
+              />
+            </div>
+          )}
+
+          {/* The listings this visitor opened first (US-531). */}
+          <LeadViewedListings lead={lead} />
+
+          {/* What they told you (US-264). Every answer the form collected,
+              columns and form_data alike; this used to show source, address
+              and a budget key no form writes. */}
+          {answers.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                What they told you
+              </h3>
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+                {answers.map((answer) => (
+                  <div key={answer.key} className="min-w-0">
+                    <dt className="text-xs text-muted-foreground">{answer.label}</dt>
+                    <dd className="font-medium break-words">{answer.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
           {/* Lead Source & Details */}
-          {(lead.source || lead.property_address || lead.budget) && (
+          {(lead.source || (lead.property_address && !lead.listing_id)) && (
             <div className="space-y-2">
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
                 Additional Details
               </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 {lead.source && (
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                     <span className="text-muted-foreground">Source:</span>
-                    <span className="font-medium">{lead.source}</span>
+                    <span className="font-medium truncate">{lead.source}</span>
                   </div>
                 )}
-                {lead.property_address && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                {lead.property_address && !lead.listing_id && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MapPin className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                     <span className="text-muted-foreground">Property:</span>
-                    <span className="font-medium">{lead.property_address}</span>
-                  </div>
-                )}
-                {lead.budget && (
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Budget:</span>
-                    <span className="font-medium">{lead.budget}</span>
+                    <span className="font-medium break-words">{lead.property_address}</span>
                   </div>
                 )}
               </div>
@@ -605,6 +742,70 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                 ))}
               </SelectContent>
             </Select>
+            {draftResponse && (
+              <div className="space-y-3 rounded-lg border p-3" data-testid="quick-response-preview">
+                {lead.email && (
+                  <div className="space-y-1">
+                    <Label htmlFor="quick-response-subject" className="text-xs">
+                      Email subject
+                    </Label>
+                    <input
+                      id="quick-response-subject"
+                      value={draftResponse.subject}
+                      onChange={(e) =>
+                        setDraftResponse({ ...draftResponse, subject: e.target.value })
+                      }
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label htmlFor="quick-response-body" className="text-xs">
+                    Message to {lead.name}
+                  </Label>
+                  <Textarea
+                    id="quick-response-body"
+                    value={draftResponse.body}
+                    onChange={(e) => setDraftResponse({ ...draftResponse, body: e.target.value })}
+                    rows={4}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {lead.email && (
+                    <Button
+                      size="sm"
+                      className="gap-2"
+                      disabled={!draftResponse.body.trim()}
+                      onClick={() => void handleSendResponse('email')}
+                    >
+                      <Mail className="h-4 w-4" /> Send email
+                    </Button>
+                  )}
+                  {lead.phone && (
+                    <Button
+                      size="sm"
+                      variant={lead.email ? 'outline' : 'default'}
+                      className="gap-2"
+                      disabled={!draftResponse.body.trim()}
+                      onClick={() => void handleSendResponse('sms')}
+                    >
+                      <MessageSquare className="h-4 w-4" /> Send text
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={handleResponseAsNote}>
+                    Save as note
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setDraftResponse(null)}>
+                    Discard
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {lead.email || lead.phone
+                    ? 'Opens your own mail or messages app with this filled in, and logs it on the timeline.'
+                    : 'This lead has no email or phone you can see, so the message can only be saved as a note.'}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Notes Section */}
@@ -633,6 +834,18 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                   onChange={(e) => setTaskDue(e.target.value)}
                   className="rounded-md border bg-background px-3 py-2 text-sm"
                 />
+                <select
+                  aria-label="Follow-up priority"
+                  value={taskPriority}
+                  onChange={(e) => setTaskPriority(e.target.value as TaskPriority)}
+                  className="rounded-md border bg-background px-3 py-2 text-sm"
+                >
+                  {(Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[]).map((p) => (
+                    <option key={p} value={p}>
+                      {TASK_PRIORITY_LABELS[p]} priority
+                    </option>
+                  ))}
+                </select>
                 <Button
                   onClick={handleAddTask}
                   disabled={!taskTitle.trim() || !taskDue || isCreatingTask}
@@ -642,6 +855,74 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                 </Button>
               </div>
             </div>
+
+            {/* Log a meeting: logMeeting has written meeting_type, time and
+                place since the hook was written, with no way to reach it. */}
+            {meetingOpen ? (
+              <div className="space-y-2 rounded-lg border p-3">
+                <Label className="text-xs uppercase tracking-wide">Log a meeting</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <select
+                    aria-label="Meeting type"
+                    value={meetingType}
+                    onChange={(e) => setMeetingType(e.target.value as MeetingType)}
+                    className="rounded-md border bg-background px-3 py-2 text-sm"
+                  >
+                    {(Object.keys(MEETING_TYPE_LABELS) as MeetingType[]).map((t) => (
+                      <option key={t} value={t}>
+                        {MEETING_TYPE_LABELS[t]}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="datetime-local"
+                    aria-label="Meeting date and time"
+                    value={meetingAt}
+                    onChange={(e) => setMeetingAt(e.target.value)}
+                    className="rounded-md border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <input
+                  aria-label="Meeting location"
+                  value={meetingLocation}
+                  onChange={(e) => setMeetingLocation(e.target.value)}
+                  placeholder={
+                    meetingType === 'in_person'
+                      ? '123 Main St, or the office'
+                      : 'Link or number (optional)'
+                  }
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <Textarea
+                  aria-label="Meeting notes"
+                  value={meetingNotes}
+                  onChange={(e) => setMeetingNotes(e.target.value)}
+                  placeholder="What you covered (optional)"
+                  rows={2}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleLogMeeting}
+                    disabled={!meetingAt || isLoggingMeeting}
+                  >
+                    Save meeting
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={resetMeetingForm}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => setMeetingOpen(true)}
+              >
+                <CalendarClock className="h-4 w-4" /> Log a meeting
+              </Button>
+            )}
 
             {/* Add Note */}
             <div className="space-y-2">
@@ -685,6 +966,12 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                       <Icon className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{activityHeadline(a)}</p>
+                        {a.activity_type === 'meeting' && a.meeting_location && (
+                          <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="break-words">{a.meeting_location}</span>
+                          </p>
+                        )}
                         {a.content && (
                           <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-0.5">
                             {a.content}
@@ -692,15 +979,14 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                         )}
                         <p className="text-xs text-muted-foreground mt-1">
                           {a.activity_type === 'task' && a.task_due_date
-                            ? `${a.task_completed_at ? 'Completed' : 'Due'} ${formatDistanceToNow(
+                            ? `${a.task_completed_at ? 'Completed' : 'Due'} ${formatDistanceToNowWithSuffix(
                                 (a.task_completed_at
                                   ? new Date(a.task_completed_at)
-                                  : taskDueAt(a.task_due_date)) ?? new Date(a.task_due_date),
-                                { addSuffix: true }
+                                  : taskDueAt(a.task_due_date)) ?? new Date(a.task_due_date)
                               )}`
-                            : formatDistanceToNow(new Date(a.activity_at ?? a.created_at), {
-                                addSuffix: true,
-                              })}
+                            : formatDistanceToNowWithSuffix(
+                                new Date(a.activity_at ?? a.created_at)
+                              )}
                         </p>
                         {a.activity_type === 'task' && !a.task_completed_at && (
                           <Button
@@ -713,6 +999,17 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                           </Button>
                         )}
                       </div>
+                      {canDeleteActivity(a, currentUserId) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-11 w-11 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                          aria-label={`Delete ${activityHeadline(a)}`}
+                          onClick={() => setPendingDelete(a)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   );
                 })
@@ -720,6 +1017,32 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
             </div>
           </div>
         </div>
+
+        <AlertDialog
+          open={!!pendingDelete}
+          onOpenChange={(next) => {
+            if (!next) setPendingDelete(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this entry?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingDelete ? `“${activityHeadline(pendingDelete)}” ` : ''}
+                will be removed from {lead.name}’s timeline. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep it</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

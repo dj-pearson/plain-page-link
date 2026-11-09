@@ -65,3 +65,71 @@ describe('ProfileHeader trust badges', () => {
     expect(screen.queryByText(/Available Now/i)).not.toBeInTheDocument();
   });
 });
+
+describe('ProfileHeader service area (US-281)', () => {
+  const withCities = (service_cities: string[]) =>
+    ({ ...profile, service_cities }) as unknown as PublicProfile;
+
+  it('names a single city', () => {
+    renderWithProviders(<ProfileHeader profile={withCities(['Austin'])} />);
+    expect(screen.getByText(/^Serving/)).toHaveTextContent('Serving Austin');
+  });
+
+  it('names both of two cities', () => {
+    renderWithProviders(<ProfileHeader profile={withCities(['Austin', 'Round Rock'])} />);
+    expect(screen.getByText(/^Serving/)).toHaveTextContent('Serving Austin and Round Rock');
+  });
+
+  it('names every one of three or more cities instead of "+N more"', () => {
+    renderWithProviders(
+      <ProfileHeader profile={withCities(['Austin', 'Round Rock', 'Cedar Park'])} />
+    );
+    expect(screen.getByText(/^Serving/)).toHaveTextContent(
+      'Serving Austin, Round Rock and Cedar Park'
+    );
+    expect(screen.queryByText(/more$/)).not.toBeInTheDocument();
+  });
+
+  it('shows nothing when the list is empty or only blanks', () => {
+    renderWithProviders(<ProfileHeader profile={withCities(['', '  '])} />);
+    expect(screen.queryByText(/^Serving/)).not.toBeInTheDocument();
+  });
+});
+
+describe('ProfileHeader brokerage (US-383)', () => {
+  const withBrokerage = (fields: Partial<PublicProfile>) =>
+    ({ ...profile, ...fields }) as PublicProfile;
+
+  it('shows an uploaded logo even when no brokerage name is set', () => {
+    renderWithProviders(
+      <ProfileHeader profile={withBrokerage({ brokerage_logo: 'https://cdn.example/logo.png' })} />
+    );
+    const logo = screen.getByRole('img', { name: 'Brokerage logo' });
+    expect(logo).toHaveAttribute('src', 'https://cdn.example/logo.png');
+  });
+
+  it('names the logo after the brokerage when both are set', () => {
+    renderWithProviders(
+      <ProfileHeader
+        profile={withBrokerage({
+          brokerage_name: 'Acme Realty',
+          brokerage_logo: 'https://cdn.example/logo.png',
+        })}
+      />
+    );
+    expect(screen.getByRole('img', { name: 'Acme Realty' })).toBeInTheDocument();
+  });
+
+  it('shows the name as text when there is no logo', () => {
+    renderWithProviders(
+      <ProfileHeader profile={withBrokerage({ brokerage_name: 'Acme Realty' })} />
+    );
+    expect(screen.getByText('Acme Realty')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /brokerage|Acme/i })).not.toBeInTheDocument();
+  });
+
+  it('renders no brokerage logo when neither field is set', () => {
+    renderWithProviders(<ProfileHeader profile={profile} />);
+    expect(screen.queryByRole('img', { name: /brokerage/i })).not.toBeInTheDocument();
+  });
+});

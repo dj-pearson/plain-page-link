@@ -116,3 +116,29 @@ describe('form field contrast (US-261)', () => {
     expect(contrast([214.3, 31.8, 91.4], [0, 0, 100])).toBeLessThan(3);
   });
 });
+
+/**
+ * US-351: the caution callout (ApiKeysPage's "copy this key now") was
+ * hard-coded amber-50/800 with no dark variant, so on the dark dashboard it
+ * was a glaring light patch. Its text must stay readable on its surface in
+ * both themes, and the surface must sit close to the page background.
+ */
+describe('--warning callout contrast (US-351)', () => {
+  for (const theme of [':root', '.dark'] as const) {
+    describe(theme === ':root' ? 'light theme' : 'dark theme', () => {
+      it('--warning-foreground is readable on --warning (4.5:1)', () => {
+        expect(
+          contrast(token(theme, 'warning-foreground'), token(theme, 'warning'))
+        ).toBeGreaterThanOrEqual(4.5);
+      });
+
+      it('--warning surface stays close to --background (no glaring patch)', () => {
+        expect(contrast(token(theme, 'warning'), token(theme, 'background'))).toBeLessThan(1.5);
+      });
+    });
+  }
+
+  it('measures the old amber-50 surface as glaring on the dark background', () => {
+    expect(contrast([48, 100, 96], token('.dark', 'background'))).toBeGreaterThan(1.5);
+  });
+});

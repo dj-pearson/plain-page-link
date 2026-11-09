@@ -40,6 +40,25 @@ export function validateUuid(value: unknown): boolean {
   return typeof value === 'string' && UUID_RE.test(value);
 }
 
+/**
+ * The visitor id to store on a new lead (US-531, US-276), or undefined.
+ *
+ * It is the browser's client-generated id (getVisitorId), sent so the lead can
+ * be joined to that browser's listing_view events. A value that is not a uuid
+ * is dropped rather than refused: losing the join is fine, losing the lead is
+ * not. An open house kiosk sign-in never carries one, because the kiosk is a
+ * single shared tablet and every visitor who signs in on it would otherwise
+ * be credited with each other's browsing.
+ */
+export function leadVisitorId(data: {
+  visitor_id?: unknown;
+  open_house_id?: unknown;
+  lead_type?: unknown;
+}): string | undefined {
+  if (data.open_house_id !== undefined || data.lead_type === 'open_house') return undefined;
+  return validateUuid(data.visitor_id) ? (data.visitor_id as string).toLowerCase() : undefined;
+}
+
 // Sanitize string (remove potentially dangerous characters and XSS vectors)
 export function sanitizeString(str: string): string {
   return str

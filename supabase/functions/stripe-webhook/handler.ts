@@ -222,6 +222,14 @@ export function toStoredStatus(subscription: Stripe.Subscription): string {
   }
 }
 
+/**
+ * Stored statuses that still owe the failed payment. A failure for a
+ * subscription Stripe now reports as active or trialing has since been paid,
+ * and one that is canceled cannot be rescued by a new card, so neither gets
+ * the in-app notice or the "update your payment method" email (US-593).
+ */
+export const DUNNING_STATUSES: ReadonlySet<string> = new Set(['past_due', 'incomplete']);
+
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
 
 /**
@@ -500,24 +508,23 @@ async function processEvent(event: Stripe.Event, deps: WebhookDeps): Promise<voi
       const subscriptionId = invoice.subscription as string | null;
       if (!subscriptionId) return;
 
-      // A late failure for a subscription that has since ended must not turn
-      // canceled back into past_due, which carries a seven-day grace (US-251).
-      must(
-        await db
-          .from('user_subscriptions')
-          .update({ status: 'past_due' })
-          .eq('stripe_subscription_id', subscriptionId)
-          .neq('status', 'canceled'),
-        'user_subscriptions past_due'
-      );
-      must(
-        await db
-          .from('subscriptions')
-          .update({ status: 'past_due' })
-          .eq('stripe_subscription_id', subscriptionId)
-          .neq('status', 'cancelled'),
-        'subscriptions past_due'
-      );
+      // US-593: like every other subscription event (US-251), write Stripe's
+      // current state rather than what the payload implies. Stripe delivers
+      // out of order and retries a failed delivery for days, so this event
+      // can land after the retry that paid the invoice: writing 'past_due'
+      // then left a paid-up agent recorded as in dunning (on grace, not on
+      // their plan) until the next renewal, posted a "Payment Failed" notice
+      // and emailed them to fix a card that had already worked.
+      // Stripe itself moves a subscription to past_due when a renewal
+      // payment fails, so the read is what the old blind write meant to say,
+      // and a canceled subscription stays canceled (the read handles that).
+      const status = await syncSubscription(deps, subscriptionId);
+      if (!DUNNING_STATUSES.has(status)) {
+        console.log(
+          `Payment failure for ${subscriptionId} (${invoice.id}) is stale: subscription is ${status}; no dunning sent`
+        );
+        return;
+      }
 
       const { data: sub } = must(
         await db.from('user_subscriptions').select('user_id').eq('stripe_subscription_id', subscriptionId).maybeSingle(),

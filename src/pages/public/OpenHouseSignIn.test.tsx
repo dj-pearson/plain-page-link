@@ -30,6 +30,13 @@ vi.mock('@/hooks/useOpenHouses', () => ({
     [l.address, l.city, [l.state, l.zip_code].filter(Boolean).join(' ')].filter(Boolean).join(', '),
 }));
 
+// The tablet's own zone (US-669): left on Denver, an hour behind the agent.
+let deviceZone: string | null = 'America/Denver';
+vi.mock('@/lib/timeZone', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/timeZone')>()),
+  detectBrowserTimeZone: () => deviceZone,
+}));
+
 import OpenHouseSignIn from './OpenHouseSignIn';
 
 const openHouseRow = {
@@ -91,6 +98,29 @@ describe('OpenHouseSignIn', () => {
     expect(screen.getByText(/street parking only/i)).toBeInTheDocument();
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     expect(screen.getByText(/Jane Doe may contact you/)).toBeInTheDocument();
+  });
+
+  // US-669: 18:00Z on Oct 3 is 1 PM at a Chicago property, noon in Denver.
+  it("shows the window in the agent's zone, not the tablet's", () => {
+    deviceZone = 'America/Denver';
+    hookResult = {
+      data: { ...openHouseRow, time_zone: 'America/Chicago' },
+      isLoading: false,
+      isError: false,
+    };
+    renderPage();
+    expect(screen.getByText(/Saturday, October 3.* · 1:00–3:00 PM CDT$/)).toBeInTheDocument();
+  });
+
+  it('shows no zone name on a tablet already in the agent zone', () => {
+    deviceZone = 'America/Chicago';
+    hookResult = {
+      data: { ...openHouseRow, time_zone: 'America/Chicago' },
+      isLoading: false,
+      isError: false,
+    };
+    renderPage();
+    expect(screen.getByText(/Saturday, October 3.* · 1:00–3:00 PM$/)).toBeInTheDocument();
   });
 
   it('sends the lead fields, the pre-approval mapping and hasAgent', async () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertDialog,
@@ -22,17 +22,49 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UsernameInput } from '@/components/UsernameInput';
 import { ProfileURLCard } from '@/components/settings/ProfileURLCard';
+import { PublishProfileCard } from '@/components/settings/PublishProfileCard';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { AvatarImage } from '@/components/profile/AvatarImage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileDisplaySettings } from '@/components/settings/ProfileDisplaySettings';
-import { SessionManagement } from '@/components/settings/SessionManagement';
-import { LeadNotificationPreferences } from '@/components/settings/LeadNotificationPreferences';
-import { NativeMFASettings } from '@/components/auth/mfa/NativeMFASettings';
-import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
-import { GDPRSettings } from '@/components/settings/GDPRSettings';
+import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
+import { useNearViewport } from '@/hooks/useNearViewport';
+
+// Everything under "Security & Privacy" is far below the fold. It loads as its
+// own chunk when the reader scrolls near it (US-516), not with the page.
+const SecurityPrivacySections = lazy(() => import('@/components/settings/SecurityPrivacySections'));
+
+/** Holds the space of the security sections while their chunk is on its way. */
+function SecuritySectionsSkeleton() {
+  return (
+    <div role="status" aria-live="polite" className="space-y-6">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="h-40 rounded-lg border border-border bg-muted/40 animate-pulse" />
+      ))}
+      <span className="sr-only">Loading security settings…</span>
+    </div>
+  );
+}
+
+function SecuritySectionsLoadError() {
+  return (
+    <div role="alert" className="rounded-lg border border-border bg-card p-6 text-foreground">
+      <p className="mb-4">
+        Your security and privacy settings could not be loaded. Check your connection and try again.
+      </p>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="min-h-[44px] rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-accent"
+      >
+        Reload
+      </button>
+    </div>
+  );
+}
 
 export default function Settings() {
   const user = useAuthStore((s) => s.user);
@@ -40,6 +72,8 @@ export default function Settings() {
   const { settings, updateSettings } = useSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [securityAnchor, setSecurityAnchor] = useState<HTMLDivElement | null>(null);
+  const securityNear = useNearViewport(securityAnchor);
 
   // US-224: email_leads, sms_leads and weekly_report were toggles here that no
   // code ever read. notify-lead honours LeadNotificationPreferences (below);
@@ -313,10 +347,17 @@ export default function Settings() {
         <CardContent className="space-y-6">
           <div className="flex items-center gap-6">
             <Avatar className="w-20 h-20">
-              <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="text-xl">
-                {profile?.full_name?.[0] || profile?.username?.[0] || 'U'}
-              </AvatarFallback>
+              {profile?.avatar_url ? (
+                <AvatarImage
+                  url={profile.avatar_url}
+                  alt=""
+                  className="aspect-square h-full w-full object-cover"
+                />
+              ) : (
+                <AvatarFallback className="text-xl">
+                  {profile?.full_name?.[0] || profile?.username?.[0] || 'U'}
+                </AvatarFallback>
+              )}
             </Avatar>
           </div>
 
@@ -407,6 +448,9 @@ export default function Settings() {
 
       {/* Profile URL Card */}
       {profile?.username && <ProfileURLCard username={profile.username} />}
+
+      {/* Whether /:username shows anything to visitors (US-265). */}
+      <PublishProfileCard />
 
       {/* Profile Display Settings */}
       <ProfileDisplaySettings />
@@ -701,20 +745,17 @@ export default function Settings() {
         </p>
       </div>
 
-      {/* Lead Notification Preferences */}
-      <LeadNotificationPreferences />
-
-      {/* Two-Factor Authentication */}
-      <NativeMFASettings />
-
-      {/* Session Management */}
-      <SessionManagement />
-
-      {/* Security Activity / Audit Logs */}
-      <AuditLogViewer />
-
-      {/* GDPR Settings (Data Export & Account Deletion) */}
-      <GDPRSettings />
+      <div ref={setSecurityAnchor} className="space-y-6">
+        {securityNear ? (
+          <LazyLoadErrorBoundary fallback={<SecuritySectionsLoadError />}>
+            <Suspense fallback={<SecuritySectionsSkeleton />}>
+              <SecurityPrivacySections />
+            </Suspense>
+          </LazyLoadErrorBoundary>
+        ) : (
+          <SecuritySectionsSkeleton />
+        )}
+      </div>
 
       {/* Everything the sidebar no longer carries.
           The dashboard nav had fifteen entries for a product aimed at people

@@ -270,7 +270,9 @@ class PageBuilderEngine {
         defaultConfig: {
           type: 'link',
           title: 'Click Here',
-          url: 'https://example.com',
+          // Empty, not https://example.com: a placeholder is never published,
+          // and the editor says so until the agent adds a URL (US-327).
+          url: '',
           style: 'button',
           openInNewTab: true,
         },
@@ -348,6 +350,9 @@ class PageBuilderEngine {
         defaultConfig: {
           type: 'testimonial',
           title: 'What Clients Say',
+          // The agent's published testimonials, not text typed into the
+          // block (US-305). The settings panel can switch to typed entries.
+          source: 'profile',
           testimonials: [],
           layout: 'slider',
         },

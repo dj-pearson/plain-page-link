@@ -6,7 +6,7 @@
  * meter that says "2 of 3" means the third will save.
  */
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/dateFormat';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -20,9 +20,28 @@ import {
   tierFor,
 } from '@/lib/planLimits';
 import { cn } from '@/lib/utils';
+import { SectionLoadError } from './SectionLoadError';
 
 export function PlanUsageCard() {
-  const { plan, status, isLoading } = usePlanUsage();
+  const { plan, status, isLoading, isError, refetch } = usePlanUsage();
+  // US-612: a failed read used to return null like loading does, so the agent
+  // lost sight of their limits without being told. Say so, with a retry.
+  if (isError && !plan) {
+    return (
+      <Card>
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">Your plan</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SectionLoadError
+            message="Your plan and usage did not load."
+            onRetry={() => void refetch()}
+            retryLabel="Retry loading your plan"
+          />
+        </CardContent>
+      </Card>
+    );
+  }
   if (isLoading || !plan) return null;
 
   const tier = tierFor(plan.plan_name);
@@ -43,7 +62,7 @@ export function PlanUsageCard() {
 
   const endsOn =
     plan.cancel_at_period_end && plan.current_period_end
-      ? format(new Date(plan.current_period_end), 'MMM d')
+      ? formatDate(new Date(plan.current_period_end), 'MMM d')
       : null;
 
   return (

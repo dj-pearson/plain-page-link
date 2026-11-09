@@ -1,0 +1,173 @@
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
+import { validateUpload } from '@/lib/fileValidation';
+import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
+import { storeAvatarVariant } from '@/lib/storeAvatarVariant';
+import { avatarObjectName } from '@/lib/avatarVariant';
+import {
+  PROFILE_IMAGE_CACHE_CONTROL,
+  shrinkProfileImage,
+  type ShrinkOptions,
+} from '@/lib/shrinkProfileImage';
+
+/** The profile columns that hold a single uploaded image. */
+export type ProfileImageColumn = 'avatar_url' | 'brokerage_logo';
+
+export interface ProfileImageUploadConfig {
+  /** Storage bucket (20260808000005). Its first path segment must be the uid. */
+  bucket: 'avatars' | 'brokerage-logos';
+  /** The profiles column the public URL is written to. */
+  column: ProfileImageColumn;
+  /** Object name prefix inside `<uid>/`. */
+  filePrefix: string;
+  /** MIME types accepted; the bucket's allowed_mime_types must cover them. */
+  accept: string[];
+  /** Must not exceed the bucket's file_size_limit. */
+  maxBytes: number;
+  /** Lower-case noun for messages, e.g. "profile picture". */
+  label: string;
+  /**
+   * Also store the image as square home-screen icons named after it
+   * (US-481), which the agent's page manifest lists. The avatar only.
+   */
+  appIcons?: boolean;
+  /**
+   * Downscale and re-encode in the browser before storing (US-591), so the
+   * public page is not served a multi-megabyte original for a 128px box.
+   */
+  shrink?: ShrinkOptions;
+  /**
+   * Also store a 256px WebP companion that the public page draws in place of
+   * the photo (US-604). The avatar only: the name scheme lives in
+   * src/lib/avatarVariant.ts and only knows the avatars bucket.
+   */
+  smallVariant?: boolean;
+}
+
+/**
+ * Upload one image to a profile column: validate (magic number, US-076),
+ * upload under a fresh timestamped name (US-107), point the profile at it,
+ * then delete the objects it replaced.
+ *
+ * The old objects are removed only after the profile points at the new one.
+ * useAvatarUpload used to delete first, so a failed upload left the profile
+ * pointing at an object that no longer existed — a broken image on the public
+ * page until the agent noticed.
+ */
+export function useProfileImageUpload(config: ProfileImageUploadConfig) {
+  const {
+    bucket,
+    column,
+    filePrefix,
+    accept,
+    maxBytes,
+    label,
+    appIcons = false,
+    shrink,
+    smallVariant = false,
+  } = config;
+  const user = useAuthStore((s) => s.user);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [uploading, setUploading] = useState(false);
+
+  const upload = async (file: File): Promise<string | null> => {
+    if (!user?.id) {
+      toast({
+        title: 'Error',
+        description: `You must be logged in to upload a ${label}`,
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    const validationError = await validateUpload(file, { accept, maxBytes });
+    if (validationError) {
+      toast({ title: 'Invalid file', description: validationError, variant: 'destructive' });
+      return null;
+    }
+
+    setUploading(true);
+    try {
+      // Validated as uploaded (magic number), then shrunk; the shrunk file is
+      // our own canvas output, so it needs no second check.
+      const stored = shrink ? await shrinkProfileImage(file, shrink) : file;
+      const fileExt = stored.name.split('.').pop() ?? 'jpg';
+      const stem = `${filePrefix}-${Date.now()}`;
+      // Stored first: the photo's name records whether it exists (US-604).
+      const variantName =
+        smallVariant && bucket === 'avatars'
+          ? await storeAvatarVariant(user.id, stem, stored)
+          : null;
+      const objectName = avatarObjectName(stem, fileExt, variantName !== null);
+      const path = `${user.id}/${objectName}`;
+
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, stored, {
+        cacheControl: PROFILE_IMAGE_CACHE_CONTROL,
+        contentType: stored.type || undefined,
+        upsert: true,
+      });
+      if (uploadError) throw uploadError;
+
+      // Before the profile points at the photo, so the manifest never sees
+      // the new avatar_url without its icons when the icons could be made.
+      const iconNames = appIcons
+        ? await storeAvatarAppIcons(bucket, user.id, objectName, file)
+        : [];
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(path);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ [column]: publicUrl })
+        .eq('id', user.id)
+        .select('id')
+        .single();
+      if (updateError) throw updateError;
+
+      // Best effort: a leftover object costs storage, not correctness.
+      try {
+        const { data: existing } = await supabase.storage.from(bucket).list(user.id);
+        const stale = (existing ?? [])
+          .filter(
+            (f) => f.name !== objectName && f.name !== variantName && !iconNames.includes(f.name)
+          )
+          .map((f) => `${user.id}/${f.name}`);
+        if (stale.length > 0) await supabase.storage.from(bucket).remove(stale);
+      } catch (cleanupError) {
+        logger.warn(`Could not remove the previous ${label}`, { error: cleanupError });
+      }
+
+      // US-237: patch only this column in the cached profile. Invalidating it
+      // handed the editor a new object and reset every unsaved field.
+      queryClient.setQueryData<Record<string, unknown> | null | undefined>(
+        ['profile', user.id],
+        (old) => (old ? { ...old, [column]: publicUrl } : old)
+      );
+      queryClient.invalidateQueries({ queryKey: ['public-profile'] });
+
+      const noun = label.charAt(0).toUpperCase() + label.slice(1);
+      toast({ title: 'Success', description: `${noun} updated successfully` });
+
+      return publicUrl;
+    } catch (error) {
+      logger.error(`Error uploading ${label}`, error);
+      toast({
+        title: 'Error',
+        description: `Failed to upload ${label}. Please try again.`,
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return { upload, uploading, acceptedTypes: accept.join(', '), maxSize: maxBytes };
+}

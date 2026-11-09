@@ -37,11 +37,12 @@
 # explicitly, as /features is.
 #
 # The other bare segments RESERVED_SEGMENTS lists but App.tsx does not route
-# (/legal, /about, /contact, /help, /support, /api) are left alone: none is
-# linked from anywhere, none has ever been a URL here, and each would be one
-# more rule to keep true. functions/[username].ts treats them as reserved and
-# they fall through to the SPA, which renders its 404 body under a 200. Worth
-# knowing about; not worth six rules.
+# (/legal, /about, /contact, /help, /support, /api, and the bare prefixes /auth,
+# /onboarding, /assets, /icons) need no rule here: functions/[username].ts runs
+# before these rules and answers each with dist/404.html and a 404 (US-435).
+# They used to fall through to the /:username rewrite below and answer 200 with
+# the homepage. src/spa-routes.test.ts holds every reserved segment to a route,
+# a 301 here, or that 404.
 /for / 301
 
 # --- Routes the SPA owns and the build does not prerender --------------------
@@ -82,3 +83,7 @@
 # real URL under those prefixes is prerendered to a file.
 /:username        /index.html 200
 /:username/review /index.html 200
+
+# US-275: one listing on a profile. functions/[username]/listing/[listingId].ts
+# gives crawlers the listing's share card; everyone else gets the SPA.
+/:username/listing/:listingId /index.html 200

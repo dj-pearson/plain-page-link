@@ -18,6 +18,8 @@ import { BlogListSEO } from '@/components/blog/BlogListSEO';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { useArticleAuthors } from '@/hooks/useArticleAuthors';
+import { ArticleCardByline } from '@/components/blog/ArticleCardByline';
 
 export default function Blog() {
   /**
@@ -68,6 +70,9 @@ export default function Blog() {
       return data;
     },
   });
+
+  // Card bylines: one batched profiles lookup for the whole list (US-399).
+  const authors = useArticleAuthors(articles);
 
   // The filter list and the category pages read the same registry (US-166).
   // This was a second hardcoded copy of it, in agreement with BlogCategory's by
@@ -245,6 +250,9 @@ export default function Blog() {
                         <CardDescription className="line-clamp-3">
                           {article.excerpt}
                         </CardDescription>
+                        <ArticleCardByline
+                          author={article.author_id ? authors.get(article.author_id) : undefined}
+                        />
                       </CardHeader>
                       <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">

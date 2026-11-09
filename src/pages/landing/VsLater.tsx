@@ -1,14 +1,58 @@
-import { Check, X, ArrowRight, Star, TrendingUp } from 'lucide-react';
-import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
+import { Check, X, ArrowRight, Star, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
-import { getBaseUrl, getCanonicalUrl, getOgImageUrl } from '@/config/seo.config';
-import { PRICING_PLANS } from '@/config/pricing-plans';
-import { COMPETITORS } from '@/config/competitors';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { PRICING_PLANS, linkAllowanceSummary } from '@/config/pricing-plans';
+import { publisherOrganization } from '@/config/site-entities';
+import {
+  COMPETITORS,
+  COMPETITORS_VERIFIED_LABEL,
+  COMPETITOR_CELLS_NOTE,
+  competitorCell,
+} from '@/config/competitors';
+import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+
+/**
+ * One array for the visible FAQ and its FAQPage schema, as on /vs/linktree and
+ * /vs/beacons (US-157). The two copies this page kept had already drifted: the
+ * visible answer to the second question mentioned a lead inbox the schema did
+ * not (US-519).
+ */
+const FAQ_ENTRIES: FaqEntry[] = [
+  {
+    question: "What's the main difference between AgentBio and Later?",
+    answer:
+      'AgentBio is built specifically for real estate agents with features like property listings, buyer and seller lead capture forms, and open house sign-in. Later is primarily a social media scheduling tool with a link in bio feature as a secondary offering. AgentBio focuses on lead generation, while Later focuses on content scheduling.',
+  },
+  {
+    question: 'Can I use Later for real estate link in bio?',
+    answer:
+      "Yes. Later's Linkin.bio is one feature of a larger scheduling tool and is not built around real estate, so check later.com for what it shows today. AgentBio's page is built around property listing cards, buyer and seller forms and a lead inbox; you can keep Later for scheduling and point the bio link at AgentBio.",
+  },
+  {
+    question: 'Does AgentBio include social media scheduling like Later?',
+    answer:
+      'No. AgentBio is the page your bio link opens: listings, lead forms, reviews and booking. If you schedule posts, keep a tool such as Buffer, Hootsuite or Later for that and point its link at AgentBio.',
+  },
+  {
+    question: 'Which is better for real estate agents: AgentBio or Later?',
+    // Was "with 3-5x higher conversion rates" — a measurement of a product
+    // nobody has measured, and in a FAQPage answer, which Google renders as a
+    // rich result (US-173).
+    answer:
+      'They do different jobs. Later schedules and plans social content; AgentBio is a link-in-bio built around lead capture, property listings and booking. Many agents use both: Later for scheduling, AgentBio for what happens after somebody taps the link.',
+  },
+  {
+    question: 'Can I migrate from Later to AgentBio?',
+    // Was "migration takes 10-15 minutes": nothing timed it (US-519).
+    answer:
+      'Yes. There is no automatic import, so recreate your links in AgentBio, add your listings, then change the URL in your Instagram bio. You can keep Later for scheduling while you do.',
+  },
+];
 
 export default function VsLater() {
   const canonicalUrl = getCanonicalUrl('/vs/later');
@@ -39,97 +83,31 @@ export default function VsLater() {
         url: toolUrl,
         name: 'AgentBio vs Later: Real Estate Link in Bio Comparison',
         description:
-          "Compare AgentBio and Later for real estate agents. See why real estate professionals choose AgentBio's specialized features over Later's social media scheduling tools.",
-        publisher: {
-          '@type': 'Organization',
-          name: 'AgentBio',
-        },
+          'Compare AgentBio and Later for real estate agents. Later schedules social content; AgentBio captures leads from the link in your bio.',
+        // The site Organization by @id, not an anonymous one (US-491).
+        publisher: publisherOrganization(getBaseUrl()),
       },
-      {
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: "What's the main difference between AgentBio and Later?",
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'AgentBio is built specifically for real estate agents with features like property listings, lead capture forms, and CRM integration. Later is primarily a social media scheduling tool with a link in bio feature as a secondary offering. AgentBio focuses on lead generation, while Later focuses on content scheduling.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Can I use Later for real estate link in bio?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "Yes, but Later's link in bio feature lacks real estate-specific capabilities like property listing cards, MLS integration, buyer/seller forms, and CRM syncing. Most real estate agents find they need additional tools to capture and convert leads effectively.",
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Does AgentBio include social media scheduling like Later?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'No, AgentBio focuses exclusively on optimizing your link in bio page for maximum lead conversion. For scheduling, agents typically use tools like Buffer, Hootsuite, or Later alongside AgentBio for the best of both worlds.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Which is better for real estate agents: AgentBio or Later?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              // Was "with 3-5x higher conversion rates" — a measurement of a
-              // product nobody has measured, and in a FAQPage answer, which
-              // Google renders as a rich result (US-173).
-              text: 'They do different jobs. Later schedules and plans social content; AgentBio is a link-in-bio built around lead capture, property listings and booking. Many agents use both: Later for scheduling, AgentBio for what happens after somebody taps the link.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Can I migrate from Later to AgentBio?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "Yes, migration takes 10-15 minutes. Simply recreate your links in AgentBio, update your Instagram bio URL, and optionally keep Later for social scheduling. You can run both platforms simultaneously if you need Later's scheduling features.",
-            },
-          },
-        ],
-      },
+      faqPageSchema(FAQ_ENTRIES),
     ],
   };
 
   return (
     <>
-      <Helmet>
-        <title>AgentBio vs Later: Real Estate Link in Bio Comparison 2025</title>
-        <meta
-          name="description"
-          content="Compare AgentBio and Later for real estate agents. Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
-        />
-        <link rel="canonical" href={canonicalUrl} />
-        {/* These three pages built their own <Helmet> and emitted no og:* at all,
-            so they shipped with index.html's static tags removed and nothing in
-            their place — link previews fell back to whatever the platform scraped,
-            and the surviving twitter:* tags still described the homepage. Found by
-            the US-174 og:image rule on its first run against a full build. */}
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={getCanonicalUrl('/vs/later')} />
-        <meta property="og:title" content="AgentBio vs Later for Real Estate Agents" />
-        <meta
-          property="og:description"
-          content="Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
-        />
-        <meta property="og:image" content={getOgImageUrl()} />
-        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
-        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
-        <meta property="og:image:alt" content={DEFAULT_SOCIAL_IMAGE.alt} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="AgentBio vs Later for Real Estate Agents" />
-        <meta
-          name="twitter:description"
-          content="Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
-        />
-        <meta name="twitter:image" content={getOgImageUrl()} />
-        <script type="application/ld+json">{JSON.stringify(schema)}</script>
-      </Helmet>
+      {/* A hand-built <Helmet> stood here, the last comparison page without
+          SEOHead, so it lacked og:site_name, og:locale and twitter:site
+          (US-519). */}
+      <SEOHead
+        title="AgentBio vs Later: Real Estate Link in Bio Comparison"
+        description="Compare AgentBio and Later for real estate agents. Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
+        keywords={[
+          'AgentBio vs Later',
+          'Later link in bio for real estate',
+          'Later alternative for realtors',
+          'real estate link in bio tool',
+        ]}
+        canonicalUrl={canonicalUrl}
+        schema={schema}
+      />
 
       <main
         id="main-content"
@@ -142,8 +120,10 @@ export default function VsLater() {
         <section className="container mx-auto px-4 pt-24 pb-16">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
-              <TrendingUp className="h-4 w-4" />
-              Trusted by 3,000+ Real Estate Agents
+              {/* Was "Trusted by 3,000+ Real Estate Agents", a count nothing
+                  measured (US-501). */}
+              <Home className="h-4 w-4" aria-hidden="true" />
+              Built for real estate agents
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-foreground">
@@ -175,16 +155,17 @@ export default function VsLater() {
             <p className="text-base md:text-lg text-gray-700 leading-relaxed">
               <strong>
                 AgentBio is a link in bio platform built specifically for real estate agents, while
-                Later is primarily a social media scheduling tool with a basic link in bio feature.
+                Later is primarily a social media scheduling tool with a link in bio feature.
               </strong>{' '}
               The key difference: AgentBio includes property listing showcases, built-in lead
-              capture forms, CRM integration, calendar booking, and real estate templates designed
-              to convert Instagram followers into clients. Later's link in bio is a secondary
-              feature focused on driving traffic to scheduled posts rather than capturing leads.
-              AgentBio's lead capture is built around what a real estate enquiry needs: MLS details,
-              buyer and seller qualification questions, and CRM syncing. If your priority is
-              scheduling Instagram content, Later excels. If your priority is converting followers
-              into qualified real estate leads, AgentBio is purpose-built for that goal.
+              capture forms, open house sign-in and Calendly booking, laid out to turn Instagram
+              followers into enquiries. Later's Linkin.bio is one feature of a much larger
+              publishing tool, built to send followers on from your posts. AgentBio's lead capture
+              is built around what a real estate enquiry needs: buyer and seller qualification
+              questions, and each new lead can be passed on to your CRM through a Zapier webhook. If
+              your priority is scheduling Instagram content, Later excels. If your priority is
+              converting followers into qualified real estate leads, AgentBio is purpose-built for
+              that goal.
             </p>
           </div>
         </section>
@@ -219,15 +200,15 @@ export default function VsLater() {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>CRM integration (auto-sync leads)</span>
+                    <span>New leads passed to your CRM via a Zapier webhook</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Real estate templates & branding</span>
+                    <span>Page themes with your headshot and brokerage details</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Calendar booking integration</span>
+                    <span>Calendly booking on your page</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
@@ -267,26 +248,23 @@ export default function VsLater() {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Basic link in bio page</span>
+                    <span>Link in bio page (Linkin.bio)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <span>Analytics for posts</span>
                   </li>
+                  {/* Was a cross beside "No property listing features" (US-648). */}
                   <li className="flex items-start gap-2">
-                    <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
-                    <span>No property listing features</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
-                    <span>No CRM integration</span>
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>Media library</span>
                   </li>
                 </ul>
 
                 <div className="bg-muted p-4 rounded-lg">
                   <p className="text-sm font-medium">Best For:</p>
                   <p className="text-sm text-muted-foreground">
-                    Agents who want content scheduling with basic link functionality
+                    Agents whose main job is planning and scheduling posts across networks
                   </p>
                 </div>
               </div>
@@ -300,8 +278,21 @@ export default function VsLater() {
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
               Feature-by-Feature Comparison
             </h2>
-            <p className="text-center text-muted-foreground mb-12 text-lg">
+            <p className="text-center text-muted-foreground mb-4 text-lg">
               See exactly what you get with each platform
+            </p>
+            <p className="text-center text-sm text-muted-foreground mb-12 max-w-3xl mx-auto">
+              Later&rsquo;s plans checked against{' '}
+              <a
+                href={COMPETITORS.later.homepage}
+                className="underline underline-offset-2"
+                rel="nofollow noopener"
+                target="_blank"
+              >
+                later.com
+              </a>{' '}
+              on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices, which change and vary
+              by region. {COMPETITOR_CELLS_NOTE}
             </p>
 
             <div className="glass-panel overflow-hidden">
@@ -315,82 +306,104 @@ export default function VsLater() {
                     </tr>
                   </thead>
                   <tbody>
-                    <ComparisonRow feature="Link in Bio Page" agentbio={true} later={true} />
-                    <ComparisonRow feature="Unlimited Links" agentbio={true} later={true} />
-                    <ComparisonRow feature="Custom Branding" agentbio={true} later="Limited" />
+                    <ComparisonRow
+                      feature="Link in Bio Page"
+                      agentbio={true}
+                      later={competitorCell('later', 'linkInBioPage')}
+                    />
+                    <ComparisonRow
+                      feature="Link Buttons"
+                      agentbio={linkAllowanceSummary()}
+                      later={competitorCell('later', 'linkButtons')}
+                    />
+                    <ComparisonRow
+                      feature="Custom Branding"
+                      agentbio={true}
+                      later={competitorCell('later', 'customBranding')}
+                    />
                     <ComparisonRow
                       feature="Property Listing Cards"
                       agentbio={true}
-                      later={false}
+                      later={competitorCell('later', 'listingGalleries')}
                       description="Showcase listings with photos, prices, and details"
-                    />
-                    <ComparisonRow
-                      feature="MLS/IDX Integration"
-                      agentbio={true}
-                      later={false}
-                      description="Auto-sync active listings from MLS"
                     />
                     <ComparisonRow
                       feature="Lead Capture Forms"
                       agentbio={true}
-                      later={false}
+                      later={competitorCell('later', 'realEstateLeadForms')}
                       description="Built-in buyer/seller qualification forms"
                     />
                     <ComparisonRow
-                      feature="CRM Integration"
-                      agentbio={true}
-                      later={false}
-                      description="Auto-send leads to Follow Up Boss, LionDesk, etc."
+                      feature="Leads Sent to Your CRM"
+                      agentbio="Via Zapier"
+                      later={competitorCell('later', 'leadsToCrm')}
+                      description="Each new lead is posted to your Zapier webhook; CSV export on paid plans"
                     />
                     <ComparisonRow
                       feature="Calendar Booking"
                       agentbio={true}
-                      later={false}
-                      description="Embedded appointment scheduling"
+                      later={competitorCell('later', 'calendarBooking')}
+                      description="Your Calendly booking page, opened from your profile"
                     />
+                    {/* A "Real Estate Templates: Pre-designed pages for agents" row
+                        stood here. AgentBio has general visual themes (themes.ts),
+                        not real estate templates, and whether Later has themes was
+                        never checked (US-519). */}
+                    {/* Was "Video Testimonials": testimonials have no video column. */}
                     <ComparisonRow
-                      feature="Real Estate Templates"
+                      feature="Client Reviews"
                       agentbio={true}
-                      later={false}
-                      description="Pre-designed pages for agents"
+                      later={competitorCell('later', 'testimonials')}
+                      description="Star-rated reviews clients submit from your review page"
                     />
-                    <ComparisonRow feature="Video Testimonials" agentbio={true} later="Basic" />
+                    {/* A "Lead Magnets/Downloads" row stood here; AgentBio has no
+                        downloadable-guide feature (US-501). */}
+                    {/* Was agentbio="Advanced" later="Basic": a ranking nobody
+                        measured. Say what AgentBio's Analytics page shows instead
+                        (US-519). */}
                     <ComparisonRow
-                      feature="Lead Magnets/Downloads"
+                      feature="Analytics"
                       agentbio={true}
-                      later="Via 3rd party"
-                      description="Offer free guides in exchange for emails"
+                      later={competitorCell('later', 'analyticsDashboard')}
+                      description="AgentBio: page views, link clicks, most-viewed listings and lead sources"
                     />
                     <ComparisonRow
-                      feature="Analytics & Tracking"
-                      agentbio="Advanced"
-                      later="Basic"
+                      feature="Mobile Optimization"
+                      agentbio={true}
+                      later={competitorCell('later', 'mobileOptimization')}
                     />
-                    <ComparisonRow feature="Mobile Optimization" agentbio={true} later={true} />
                     <ComparisonRow
                       feature="Social Media Scheduling"
                       agentbio={false}
-                      later={true}
+                      later={competitorCell('later', 'socialScheduling')}
                       description="Plan and auto-post Instagram content"
                     />
                     <ComparisonRow
                       feature="Visual Content Calendar"
                       agentbio={false}
-                      later={true}
+                      later={competitorCell('later', 'contentCalendar')}
                     />
                     <ComparisonRow
                       feature="Post Scheduling (Instagram)"
                       agentbio={false}
-                      later={true}
+                      later={competitorCell('later', 'instagramScheduling')}
                     />
                     <ComparisonRow
                       feature="Media Library"
                       agentbio={false}
-                      later={true}
+                      later={competitorCell('later', 'mediaLibrary')}
                       description="Store and organize content for scheduling"
                     />
-                    <ComparisonRow feature="Hashtag Suggestions" agentbio={false} later={true} />
-                    <ComparisonRow feature="Best Time to Post" agentbio={false} later={true} />
+                    <ComparisonRow
+                      feature="Hashtag Suggestions"
+                      agentbio={false}
+                      later={competitorCell('later', 'hashtagSuggestions')}
+                    />
+                    <ComparisonRow
+                      feature="Best Time to Post"
+                      agentbio={false}
+                      later={competitorCell('later', 'bestTimeToPost')}
+                    />
                     {/* Was agentbio="$19" later="$25-$80". $19 is not one of our
                         plans (0, 29, 49, 99, 299 in pricing-plans.ts) and the same
                         page said $29 lower down; Later's figure was unsourced and
@@ -431,8 +444,8 @@ export default function VsLater() {
                 <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg">
                   <p className="font-semibold text-primary">✓ Choose AgentBio</p>
                   <p className="text-sm mt-1">
-                    Purpose-built for lead capture with forms, CRM sync, property showcases, and
-                    calendar booking.
+                    Purpose-built for lead capture with forms, property showcases, open house
+                    sign-in, and calendar booking.
                   </p>
                 </div>
               </div>
@@ -450,8 +463,8 @@ export default function VsLater() {
                 <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
                   <p className="font-semibold text-purple-600">✓ Choose Later</p>
                   <p className="text-sm mt-1">
-                    Industry-leading scheduling tools, visual calendar, media library, and analytics
-                    for content performance. Perfect for content planning workflow.
+                    Scheduling across several networks, a visual content calendar, a media library
+                    and post analytics are what Later leads with. It is built for exactly this job.
                   </p>
                 </div>
               </div>
@@ -471,7 +484,6 @@ export default function VsLater() {
                   <p className="text-sm mt-1">
                     Later schedules the posts; AgentBio is what the link in them points at. They
                     solve different halves of the same problem, and plenty of agents pay for both.
-                    Many top agents run this combination.
                   </p>
                 </div>
               </div>
@@ -490,8 +502,7 @@ export default function VsLater() {
                   <p className="font-semibold text-primary">✓ Choose AgentBio</p>
                   <p className="text-sm mt-1">
                     Property listing cards display photos, addresses, prices, and link to full
-                    details. Update instantly when properties sell. Later has no listing showcase
-                    features.
+                    details. Mark a property sold and the card updates on your page.
                   </p>
                 </div>
               </div>
@@ -515,7 +526,7 @@ export default function VsLater() {
         <section className="container mx-auto px-4 py-16">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
-              Switch from Later to AgentBio in 15 Minutes
+              Switch from Later to AgentBio
             </h2>
             <p className="text-center text-muted-foreground mb-12 text-lg">
               Keep Later for scheduling, add AgentBio for lead generation
@@ -527,7 +538,7 @@ export default function VsLater() {
                   step: '1',
                   title: 'Sign Up for AgentBio',
                   description:
-                    'Create your free account at agentbio.io. Choose a username (agentbio.io/yourname).',
+                    'Create your free account at agentbio.net. Choose a username (agentbio.net/yourname).',
                 },
                 {
                   step: '2',
@@ -545,7 +556,7 @@ export default function VsLater() {
                   step: '4',
                   title: 'Create Lead Capture Forms',
                   description:
-                    'Set up buyer questionnaire, seller consultation form, and home valuation request. Connect to your CRM.',
+                    'Turn on the buyer inquiry, seller and home valuation request forms. Add a Zapier webhook if you want each new lead sent on to your CRM.',
                 },
                 {
                   step: '5',
@@ -584,72 +595,7 @@ export default function VsLater() {
           </div>
         </section>
 
-        {/* FAQ Section */}
-        <section className="container mx-auto px-4 py-16 bg-muted/30">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
-              Frequently Asked Questions
-            </h2>
-
-            <div className="space-y-6">
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  What's the main difference between AgentBio and Later?
-                </h3>
-                <p className="text-muted-foreground">
-                  AgentBio is built specifically for real estate agents with features like property
-                  listings, lead capture forms, and CRM integration. Later is primarily a social
-                  media scheduling tool with a link in bio feature as a secondary offering. AgentBio
-                  focuses on lead generation, while Later focuses on content scheduling.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Can I use Later for real estate link in bio?
-                </h3>
-                <p className="text-muted-foreground">
-                  Yes, but Later's link in bio feature lacks real estate-specific capabilities like
-                  property listing cards, buyer/seller forms, and a built-in lead inbox. Most
-                  real estate agents find they need additional tools to capture and convert leads
-                  effectively.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Does AgentBio include social media scheduling like Later?
-                </h3>
-                <p className="text-muted-foreground">
-                  No, AgentBio focuses exclusively on optimizing your link in bio page for maximum
-                  lead conversion. For scheduling, agents typically use tools like Buffer,
-                  Hootsuite, or Later alongside AgentBio for the best of both worlds.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Which is better for real estate agents: AgentBio or Later?
-                </h3>
-                <p className="text-muted-foreground">
-                  They do different jobs. Later schedules and plans social content; AgentBio is a
-                  link-in-bio built around lead capture, property listings and booking. Many agents
-                  use both: Later for scheduling, AgentBio for what happens after somebody taps the
-                  link.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">Can I migrate from Later to AgentBio?</h3>
-                <p className="text-muted-foreground">
-                  Yes, migration takes 10-15 minutes. Simply recreate your links in AgentBio, update
-                  your Instagram bio URL, and optionally keep Later for social scheduling. You can
-                  run both platforms simultaneously if you need Later's scheduling features.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+        <FaqSection entries={FAQ_ENTRIES} heading="Frequently Asked Questions" />
 
         {/* Final CTA */}
         <section className="container mx-auto px-4 py-16">
@@ -658,8 +604,8 @@ export default function VsLater() {
               Ready to Convert More Instagram Followers into Real Estate Leads?
             </h2>
             <p className="text-xl text-muted-foreground mb-8">
-              Join agents using AgentBio to capture leads, showcase listings, and book appointments
-              directly from Instagram.
+              Capture leads, showcase listings and book appointments from the link in your Instagram
+              bio.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button asChild size="lg" className="text-lg px-8">
@@ -673,7 +619,7 @@ export default function VsLater() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground mt-6">
-              No credit card required • Set up in 10 minutes • Cancel anytime
+              No credit card required • Cancel anytime
             </p>
           </div>
         </section>

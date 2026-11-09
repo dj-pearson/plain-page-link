@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Download,
@@ -22,15 +22,21 @@ import {
   AlertTriangle,
   Home,
   DoorOpen,
+  UserCheck,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useLeads, fetchAllLeads } from '@/hooks/useLeads';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { buildLeadStatusPatch } from '@/lib/leadStatus';
-import { exportToCSV } from '@/lib/exportUtils';
+import {
+  buildLeadStatusPatch,
+  LEAD_STATUSES,
+  LEAD_STATUS_GROUPS,
+  leadStatusLabel,
+  normalizeStatusFilter,
+  summarizeLeadStatuses,
+} from '@/lib/leadStatus';
 import { cn } from '@/lib/utils';
 import { useLeadContactAction } from '@/hooks/useLeadContactAction';
 import { useLeadsActivitySummaries } from '@/hooks/useLeadActivities';
@@ -38,12 +44,13 @@ import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
-import { UpgradeModal } from '@/components/UpgradeModal';
-import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
-import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
+import { leadAddressLabel } from '@/lib/leadAddressLabel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { LeadStatusPill } from '@/components/leads/LeadStatusPill';
 import {
   Select,
   SelectContent,
@@ -56,8 +63,44 @@ import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import type { LeadScore } from '@/hooks/useMLLeadScoring';
 import { logger } from '@/lib/logger';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
+import { timeAgo } from '@/lib/timeAgo';
 import { useLeadStats } from '@/hooks/useLeadStats';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useLeadAssignees } from '@/hooks/useLeadAssignees';
+import {
+  describeAssignee,
+  isNotTeammateError,
+  normalizeAssigneeFilter,
+  planBulkAssign,
+  summarizeBulkAssign,
+} from '@/lib/leadAssignee';
+import { planBulkDelete, summarizeBulkDelete, summarizeBulkStatus } from '@/lib/leadBulkActions';
+
+/*
+ * Every dialog on this page is closed on first render, so none of them ships
+ * with the route (US-476). The lead detail alone brought useContacts, the
+ * activity timeline, the listing card and key dates; Zapier brought useProfile
+ * and the webhook validator; the upgrade dialog brought the pricing table.
+ * Hovering or focusing a lead warms the detail chunk before the click.
+ */
+const loadLeadDetailModal = () => import('@/components/leads/LeadDetailModal');
+const LeadDetailModal = lazy(() =>
+  loadLeadDetailModal().then((m) => ({ default: m.LeadDetailModal }))
+);
+const ZapierIntegrationModal = lazy(() =>
+  import('@/components/integrations/ZapierIntegrationModal').then((m) => ({
+    default: m.ZapierIntegrationModal,
+  }))
+);
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+
+/** A failed prefetch is retried by the click that needs the chunk. */
+const preloadLeadDetail = () => void loadLeadDetailModal().catch(() => undefined);
+
+/** The bulk assign select's value for "nobody"; a Radix Select item cannot hold ''. */
+const BULK_UNASSIGNED = '__unassigned';
 
 export default function Leads() {
   // Search is local; status and type live in the URL so a filtered view is
@@ -73,6 +116,8 @@ export default function Leads() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [isBulkActing, setIsBulkActing] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date');
+  const upgradeModal = useMountOnFirstOpen(showUpgradeModal);
+  const zapierModal = useMountOnFirstOpen(showZapierModal);
   const { toast } = useToast();
   const user = useAuthStore((s) => s.user);
   const { subscription } = useSubscriptionLimits();
@@ -81,21 +126,50 @@ export default function Leads() {
   // Persisted on the profile, not in component state: it has to survive a
   // reload and be readable by the overdue-leads job (US-103).
   const [searchParams, setSearchParams] = useSearchParams();
-  const statusFilter = searchParams.get('status') ?? 'all';
+  // A single status or a group (US-439); an unknown value reads as 'all'.
+  const statusFilter = normalizeStatusFilter(searchParams.get('status'));
   const typeFilter = searchParams.get('type') ?? 'all';
   const assignedToMe = searchParams.get('assigned') === 'me';
+  // US-515: the owner's split of their team's leads ('unassigned' or a
+  // teammate's id). A malformed value reads as everyone.
+  const assigneeFilter = normalizeAssigneeFilter(searchParams.get('assignee'));
 
-  const setFilter = (key: 'status' | 'type' | 'assigned', value: string) => {
+  const setFilter = (key: 'status' | 'type' | 'assigned' | 'assignee', value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value === 'all') next.delete(key);
     else next.set(key, value);
+    // Both narrow assigned_to; together they would AND into an empty list.
+    if (value !== 'all' && key === 'assigned') next.delete('assignee');
+    if (value !== 'all' && key === 'assignee') next.delete('assigned');
     setSearchParams(next, { replace: true });
     setSelectedLeadIds(new Set());
   };
 
   const { slaHours, update: updatePreferences } = useNotificationPreferences();
-  const setSlaHours = (hours: number) => updatePreferences.mutate({ sla_hours: hours });
-  const { stats: serverStats } = useLeadStats({ slaHours });
+  // US-612: a refused save (including one refused because the settings never
+  // loaded) used to fail silently and leave the old window in place.
+  const setSlaHours = (hours: number) =>
+    updatePreferences.mutate(
+      { sla_hours: hours },
+      {
+        onError: (error: unknown) =>
+          toast({
+            title: 'Response window not saved',
+            description: error instanceof Error ? error.message : 'Please try again.',
+            variant: 'destructive',
+          }),
+      }
+    );
+  // US-534: the chips and the Needs-attention badge count what the list shows
+  // under the assignee filters ("Assigned to me" is the same filter on my id).
+  // US-557: and under the type filter and the name search. Status is not
+  // passed: the chips are the status breakdown.
+  const { stats: serverStats } = useLeadStats({
+    slaHours,
+    assignee: assignedToMe ? (user?.id ?? null) : assigneeFilter,
+    leadType: typeFilter,
+    search: searchQuery,
+  });
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
 
   // The one reader of `leads`. useLeads owns the query, the cache key and the
@@ -114,8 +188,15 @@ export default function Leads() {
     hasNextPage,
     isFetchingNextPage,
     bulkUpdateStatus,
+    bulkAssign,
     bulkDelete,
-  } = useLeads({ status: statusFilter, leadType: typeFilter, search: searchQuery, assignedToMe });
+  } = useLeads({
+    status: statusFilter,
+    leadType: typeFilter,
+    search: searchQuery,
+    assignedToMe,
+    assignee: assigneeFilter,
+  });
 
   // Only teammates have leads assigned to them; the filter shows for them.
   const { data: assignedCount = 0 } = useQuery({
@@ -131,6 +212,34 @@ export default function Leads() {
       return count ?? 0;
     },
   });
+
+  // Who holds each lead (US-497). The roster is the owner's own team; a
+  // teammate viewing leads assigned to them gets an empty one.
+  const { teamId: ownedTeamId, assignees, refetch: refetchAssignees } = useLeadAssignees();
+  const assigneeText = (lead: Lead): string | null => {
+    const text = describeAssignee(lead, user?.id ?? null, assignees, !!ownedTeamId);
+    // 'Unassigned' on every row of a team owner's list is noise; the detail
+    // dialog says it, next to the control that changes it.
+    return text === 'Unassigned' ? null : text;
+  };
+  // Shown to a team owner with someone to hand leads to, and kept while a
+  // link's filter is applied so it can be cleared.
+  const showAssigneeFilter = !!ownedTeamId && (assignees.length > 0 || !!assigneeFilter);
+  const hasActiveFilters =
+    statusFilter !== 'all' ||
+    typeFilter !== 'all' ||
+    assignedToMe ||
+    !!assigneeFilter ||
+    !!searchQuery.trim() ||
+    needsAttentionOnly;
+  const clearFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    for (const key of ['status', 'type', 'assigned', 'assignee']) next.delete(key);
+    setSearchParams(next, { replace: true });
+    setSearchInput('');
+    setNeedsAttentionOnly(false);
+    setSelectedLeadIds(new Set());
+  };
 
   // Tapping a lead's email or phone number on the card records the response,
   // the same way the detail modal does (US-101).
@@ -196,8 +305,9 @@ export default function Leads() {
       return {
         total: 0,
         new: 0,
-        contacted: 0,
-        converted: 0,
+        inProgress: 0,
+        won: 0,
+        lost: 0,
         hot: 0,
         avgResponse: null as number | null,
         needsAttention: 0,
@@ -205,12 +315,12 @@ export default function Leads() {
 
     let respondedCount = 0;
     let respondedTotalMs = 0;
+    const loadedByStatus: Record<string, number> = {};
     const acc = leads.reduce(
       (a, lead) => {
         a.total++;
-        if (lead.status === 'new') a.new++;
-        else if (lead.status === 'contacted') a.contacted++;
-        else if (lead.status === 'converted') a.converted++;
+        const st = lead.status ?? 'new';
+        loadedByStatus[st] = (loadedByStatus[st] ?? 0) + 1;
         const score = leadScores.get(lead.id);
         if (score?.priority === 'hot') a.hot++;
         if (isNeedsAttention(lead)) a.needsAttention++;
@@ -221,11 +331,14 @@ export default function Leads() {
         }
         return a;
       },
-      { total: 0, new: 0, contacted: 0, converted: 0, hot: 0, needsAttention: 0 }
+      { total: 0, hot: 0, needsAttention: 0 }
     );
 
+    // US-439: the chips are status groups, so qualified, nurturing and closed
+    // leads are counted — they used to fall out of every number on the page.
     const loaded = {
       ...acc,
+      ...summarizeLeadStatuses(loadedByStatus),
       avgResponse: respondedCount > 0 ? respondedTotalMs / respondedCount : null,
     };
     // US-225: every count except "hot" comes from lead_stats(), over all of the
@@ -236,9 +349,7 @@ export default function Leads() {
     return {
       ...loaded,
       total: serverStats.total,
-      new: serverStats.byStatus.new ?? 0,
-      contacted: serverStats.byStatus.contacted ?? 0,
-      converted: serverStats.byStatus.converted ?? 0,
+      ...summarizeLeadStatuses(serverStats.byStatus),
       needsAttention: serverStats.needsAttention,
       avgResponse: serverStats.avgResponseMs,
     };
@@ -297,14 +408,21 @@ export default function Leads() {
       // ['conversion-funnel'] by prefix. This used to hit supabase directly and
       // refetch only ['leads'], so Overview kept contradicting this page for up
       // to five minutes (US-104).
-      await bulkUpdateStatus.mutateAsync({
+      const updated = await bulkUpdateStatus.mutateAsync({
         ids: Array.from(selectedLeadIds),
         patch: { ...buildLeadStatusPatch(newStatus) },
       });
 
+      // US-588: what the server changed, not the size of the selection.
+      const summary = summarizeBulkStatus(
+        selectedLeadIds.size,
+        updated.length,
+        leadStatusLabel(newStatus)
+      );
       toast({
-        title: 'Status updated',
-        description: `Updated ${selectedLeadIds.size} lead(s) to ${newStatus}`,
+        title: summary.title,
+        description: summary.description,
+        variant: summary.partial ? 'destructive' : undefined,
       });
       setSelectedLeadIds(new Set());
     } catch (error) {
@@ -319,12 +437,65 @@ export default function Leads() {
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (selectedLeadIds.size === 0) return;
+  // US-573: hand the selected leads to a teammate (or to nobody) in one go.
+  // Only the owner's own leads can move; the rest of the selection is
+  // reported rather than silently skipped.
+  const handleBulkAssign = async (value: string) => {
+    if (selectedLeadIds.size === 0 || !user?.id) return;
+    const next = value === BULK_UNASSIGNED ? null : value;
+    const target =
+      next === null
+        ? null
+        : next === user.id
+          ? 'you'
+          : (assignees.find((a) => a.userId === next)?.label ?? 'that teammate');
+    const plan = planBulkAssign(selectedLeadIds, leads ?? [], user.id, next);
 
+    setIsBulkActing(true);
+    try {
+      const updated = await bulkAssign.mutateAsync({ ids: plan.toUpdate, assignedTo: next });
+      const summary = summarizeBulkAssign(plan, updated.length, target);
+      toast({
+        title: summary.title,
+        description: summary.description,
+        variant: summary.partial ? 'destructive' : undefined,
+      });
+      setSelectedLeadIds(new Set());
+    } catch (error) {
+      logger.error('Bulk assign failed', error as Error);
+      const notTeammate = isNotTeammateError(error);
+      toast({
+        title: 'Leads not reassigned',
+        description: notTeammate
+          ? `${target ?? 'That person'} is no longer an accepted member of your team, so no lead was changed. Refresh and try again.`
+          : 'Couldn’t change who holds the selected leads. Please try again.',
+        variant: 'destructive',
+      });
+      if (notTeammate) void refetchAssignees();
+    } finally {
+      setIsBulkActing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLeadIds.size === 0 || !user?.id) return;
+    // US-588: leads another agent assigned to the viewer are theirs to keep;
+    // say so up front and in the result, instead of reporting them deleted.
+    const plan = planBulkDelete(selectedLeadIds, leads ?? [], user.id);
+    if (plan.toDelete.length === 0) {
+      toast({
+        title: 'No leads deleted',
+        description: summarizeBulkDelete(plan, 0).description,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const kept =
+      plan.notOwned > 0 ? ` ${plan.notOwned} assigned to you by another agent will be kept.` : '';
     if (
       !confirm(
-        `Are you sure you want to delete ${selectedLeadIds.size} lead(s)? This action cannot be undone.`
+        `Are you sure you want to delete ${plan.toDelete.length} lead(s)? This action cannot be undone.${kept}`
       )
     ) {
       return;
@@ -332,11 +503,13 @@ export default function Leads() {
 
     setIsBulkActing(true);
     try {
-      await bulkDelete.mutateAsync(Array.from(selectedLeadIds));
+      const deleted = await bulkDelete.mutateAsync(plan.toDelete);
 
+      const summary = summarizeBulkDelete(plan, deleted.length);
       toast({
-        title: 'Leads deleted',
-        description: `Deleted ${selectedLeadIds.size} lead(s)`,
+        title: summary.title,
+        description: summary.description,
+        variant: summary.partial ? 'destructive' : undefined,
       });
       setSelectedLeadIds(new Set());
     } catch (error) {
@@ -364,13 +537,21 @@ export default function Leads() {
     setIsExporting(true);
     let exportLeads: Lead[];
     let truncated = false;
+    let exportToCSV: (typeof import('@/lib/exportUtils'))['exportToCSV'];
     try {
-      const all = await fetchAllLeads(user.id, {
-        status: statusFilter,
-        leadType: typeFilter,
-        search: searchQuery,
-        assignedToMe,
-      });
+      // The CSV writer is only needed here, so it loads with the leads it
+      // writes rather than with the page (US-476).
+      const [all, exportUtils] = await Promise.all([
+        fetchAllLeads(user.id, {
+          status: statusFilter,
+          leadType: typeFilter,
+          search: searchQuery,
+          assignedToMe,
+          assignee: assigneeFilter,
+        }),
+        import('@/lib/exportUtils'),
+      ]);
+      exportToCSV = exportUtils.exportToCSV;
       truncated = all.truncated;
       exportLeads = needsAttentionOnly ? all.leads.filter(isNeedsAttention) : all.leads;
     } catch (err) {
@@ -448,20 +629,6 @@ export default function Leads() {
         ? `Exported the newest ${exportLeads.length} leads — narrow the filters to export the rest.`
         : `Exported ${exportLeads.length} leads to CSV`,
     });
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<
-      string,
-      { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }
-    > = {
-      new: { variant: 'default', label: 'New' },
-      contacted: { variant: 'secondary', label: 'Contacted' },
-      qualified: { variant: 'outline', label: 'Qualified' },
-      converted: { variant: 'default', label: 'Converted' },
-    };
-    const config = statusMap[status] || { variant: 'outline', label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const getLeadTypeIcon = (type: string) => {
@@ -609,41 +776,43 @@ export default function Leads() {
         </button>
         <button
           type="button"
-          onClick={() => setFilter('status', statusFilter === 'contacted' ? 'all' : 'contacted')}
-          aria-pressed={statusFilter === 'contacted'}
+          onClick={() =>
+            setFilter('status', statusFilter === 'in_progress' ? 'all' : 'in_progress')
+          }
+          aria-pressed={statusFilter === 'in_progress'}
+          title="Contacted, qualified or nurturing"
           className="text-left"
         >
           <Card
             className={cn(
               'hover:shadow-md transition-shadow h-full',
-              statusFilter === 'contacted' && 'ring-2 ring-primary'
+              statusFilter === 'in_progress' && 'ring-2 ring-primary'
             )}
           >
             <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
               <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                {leadStats.contacted}
+                {leadStats.inProgress}
               </div>
-              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Contacted</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">In progress</div>
             </CardContent>
           </Card>
         </button>
         <button
           type="button"
-          onClick={() => setFilter('status', statusFilter === 'converted' ? 'all' : 'converted')}
-          aria-pressed={statusFilter === 'converted'}
+          onClick={() => setFilter('status', statusFilter === 'won' ? 'all' : 'won')}
+          aria-pressed={statusFilter === 'won'}
+          title="Converted or closed"
           className="text-left"
         >
           <Card
             className={cn(
               'hover:shadow-md transition-shadow h-full',
-              statusFilter === 'converted' && 'ring-2 ring-primary'
+              statusFilter === 'won' && 'ring-2 ring-primary'
             )}
           >
             <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-              <div className="text-xl sm:text-2xl font-bold text-primary">
-                {leadStats.converted}
-              </div>
-              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Converted</div>
+              <div className="text-xl sm:text-2xl font-bold text-primary">{leadStats.won}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Won</div>
             </CardContent>
           </Card>
         </button>
@@ -681,6 +850,30 @@ export default function Leads() {
               className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base min-h-[44px]"
             />
           </div>
+          {/* US-439: the chips only reach new / in progress / won, so every
+              status (qualified, nurturing, closed and lost among them) is
+              filterable here. Same URL param as the chips. */}
+          <Select value={statusFilter} onValueChange={(v) => setFilter('status', v)}>
+            <SelectTrigger
+              className="w-[150px] min-h-[44px] flex-shrink-0"
+              aria-label="Filter by status"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {LEAD_STATUS_GROUPS.map((g) => (
+                <SelectItem key={g.value} value={g.value}>
+                  {g.label}
+                </SelectItem>
+              ))}
+              {LEAD_STATUSES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {/* Type filter — pushed into the query, not applied client-side. */}
           <Select value={typeFilter} onValueChange={(v) => setFilter('type', v)}>
             <SelectTrigger
@@ -698,6 +891,37 @@ export default function Leads() {
               <SelectItem value="open_house">Open house</SelectItem>
             </SelectContent>
           </Select>
+          {/* US-515: a team owner can see who holds what. Solo agents, and
+              teammates (who see only their own and assigned leads), have
+              nobody to filter by. */}
+          {showAssigneeFilter && (
+            <Select value={assigneeFilter ?? 'all'} onValueChange={(v) => setFilter('assignee', v)}>
+              <SelectTrigger
+                className="w-[170px] min-h-[44px] flex-shrink-0"
+                aria-label="Filter by assignee"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Everyone</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {assignees.map((a) => (
+                  <SelectItem key={a.userId} value={a.userId}>
+                    {a.label}
+                  </SelectItem>
+                ))}
+                {/* A link to someone who has since left keeps working, and
+                    the trigger says so instead of going blank. */}
+                {assigneeFilter &&
+                  assigneeFilter !== 'unassigned' &&
+                  !assignees.some((a) => a.userId === assigneeFilter) && (
+                    <SelectItem value={assigneeFilter}>
+                      {assigneeFilter === user?.id ? 'Me' : 'Not on your team'}
+                    </SelectItem>
+                  )}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             variant={sortBy === 'score' ? 'default' : 'outline'}
             onClick={() => setSortBy(sortBy === 'date' ? 'score' : 'date')}
@@ -781,13 +1005,37 @@ export default function Leads() {
                       <SelectValue placeholder="Update status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="contacted">Contacted</SelectItem>
-                      <SelectItem value="qualified">Qualified</SelectItem>
-                      <SelectItem value="converted">Converted</SelectItem>
-                      <SelectItem value="lost">Lost</SelectItem>
+                      {LEAD_STATUSES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  {ownedTeamId && (
+                    <Select
+                      // Remounted after each use so the same choice can be made again.
+                      key={isBulkActing ? 'assigning' : 'idle'}
+                      onValueChange={handleBulkAssign}
+                      disabled={isBulkActing}
+                    >
+                      <SelectTrigger
+                        className="w-[140px] sm:w-[160px] min-h-[44px] bg-white"
+                        aria-label="Assign selected leads to"
+                      >
+                        <SelectValue placeholder="Assign to…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={BULK_UNASSIGNED}>Unassigned</SelectItem>
+                        {user?.id && <SelectItem value={user.id}>Me</SelectItem>}
+                        {assignees.map((a) => (
+                          <SelectItem key={a.userId} value={a.userId}>
+                            {a.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Button
                     variant="destructive"
                     size="sm"
@@ -883,6 +1131,8 @@ export default function Leads() {
               key={lead.id}
               className="hover:shadow-md active:shadow-lg transition-all cursor-pointer"
               onClick={() => handleLeadClick(lead)}
+              onPointerEnter={preloadLeadDetail}
+              onFocus={preloadLeadDetail}
             >
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
@@ -913,10 +1163,19 @@ export default function Leads() {
                           {lead.name}
                         </h3>
                         {getScoreBadge(lead.id)}
-                        {getStatusBadge(lead.status ?? 'new')}
+                        {/* US-663: the same grouped tones as Overview (new / in progress /
+                            won / lost), with dark pairs. The Badge mapping here
+                            gave 'closed' the same black pill as 'new'. */}
+                        <LeadStatusPill status={lead.status} />
                         <Badge variant="outline" className="capitalize text-xs">
                           {lead.lead_type}
                         </Badge>
+                        {assigneeText(lead) && (
+                          <Badge variant="secondary" className="gap-1 text-xs font-normal">
+                            <UserCheck className="h-3 w-3" aria-hidden="true" />
+                            {assigneeText(lead)}
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="space-y-1.5 text-xs sm:text-sm text-muted-foreground">
@@ -965,18 +1224,22 @@ export default function Leads() {
                         {lastContactByLead.has(lead.id) && (
                           <div className="flex items-center gap-2 min-h-[32px]">
                             <MessageSquare className="h-3 w-3 flex-shrink-0" />
-                            <span>
-                              Last contacted{' '}
-                              {formatDistanceToNow(new Date(lastContactByLead.get(lead.id)!), {
-                                addSuffix: true,
-                              })}
-                            </span>
+                            <span>Last contacted {timeAgo(lastContactByLead.get(lead.id)!)}</span>
                           </div>
                         )}
                         {lead.property_address && (
-                          <div className="flex items-center gap-2 min-h-[32px]">
+                          <div className="flex items-center gap-2 min-h-[32px] min-w-0">
                             <Home className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">{lead.property_address}</span>
+                            <span className="truncate">
+                              {/* Whose address this is (US-264): the listing a
+                                  buyer asked about, or a seller's own home. */}
+                              {leadAddressLabel(lead) && (
+                                <span className="text-muted-foreground">
+                                  {leadAddressLabel(lead)}{' '}
+                                </span>
+                              )}
+                              {lead.property_address}
+                            </span>
                           </div>
                         )}
                         {lead.message && !lead.contact_locked && (
@@ -1032,12 +1295,28 @@ export default function Leads() {
               <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-accent rounded-full mb-3 sm:mb-4">
                 <MessageSquare className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
-                No leads yet
-              </h3>
-              <p className="text-sm sm:text-base text-muted-foreground max-w-sm mx-auto">
-                Leads will appear here when visitors contact you through your profile
-              </p>
+              {/* A filtered view with no rows is not an account with no
+                  leads: an owner filtering to a teammate holding nothing
+                  used to read "No leads yet". */}
+              {hasActiveFilters ? (
+                <>
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+                    No leads match these filters
+                  </h3>
+                  <Button variant="outline" onClick={clearFilters} className="min-h-[44px] mt-2">
+                    Clear filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+                    No leads yet
+                  </h3>
+                  <p className="text-sm sm:text-base text-muted-foreground max-w-sm mx-auto">
+                    Leads will appear here when visitors contact you through your profile
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
@@ -1059,26 +1338,48 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        open={showUpgradeModal}
-        onOpenChange={setShowUpgradeModal}
-        feature="lead_export"
-        currentPlan={subscription?.plan_name || 'Free'}
-        requiredPlan="Starter"
-      />
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowUpgradeModal(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={showUpgradeModal}
+            onOpenChange={setShowUpgradeModal}
+            feature="lead_export"
+            currentPlan={subscription?.plan_name || 'Free'}
+            requiredPlan="Starter"
+          />
+        </LazyModal>
+      )}
 
-      {/* Zapier Integration Modal */}
-      <ZapierIntegrationModal open={showZapierModal} onOpenChange={setShowZapierModal} />
+      {zapierModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowZapierModal(false);
+            zapierModal.unmount();
+          }}
+        >
+          <ZapierIntegrationModal open={showZapierModal} onOpenChange={setShowZapierModal} />
+        </LazyModal>
+      )}
 
-      {/* Lead Detail Modal */}
       {selectedLead && (
-        <LeadDetailModal
-          lead={selectedLead}
-          open={showLeadDetail}
-          onOpenChange={setShowLeadDetail}
-          onLeadUpdated={() => refetch()}
-        />
+        <LazyModal
+          onClose={() => {
+            setShowLeadDetail(false);
+            setSelectedLead(null);
+          }}
+        >
+          <LeadDetailModal
+            lead={selectedLead}
+            open={showLeadDetail}
+            onOpenChange={setShowLeadDetail}
+            onLeadUpdated={() => refetch()}
+          />
+        </LazyModal>
       )}
     </div>
   );

@@ -8,7 +8,8 @@ import type { PublicProfileListing } from '@/types';
 interface ListingGalleryProps {
   listings: PublicProfileListing[];
   title?: string;
-  onListingClick?: (listing: PublicProfileListing) => void;
+  /** Each card's link target — the listing's own page (US-408). */
+  listingHref?: (listing: PublicProfileListing) => string;
 }
 
 type SortOption = 'newest' | 'price-low' | 'price-high' | 'beds-high';
@@ -38,7 +39,7 @@ const SORT_LABELS: Record<SortOption, string> = {
   'beds-high': 'Most Bedrooms',
 };
 
-export default function ListingGallery({ listings, title, onListingClick }: ListingGalleryProps) {
+export default function ListingGallery({ listings, title, listingHref }: ListingGalleryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<PropertyTypeFilter>('all');
@@ -291,11 +292,7 @@ export default function ListingGallery({ listings, title, onListingClick }: List
       {filteredListings.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
           {filteredListings.map((listing) => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              onClick={() => onListingClick?.(listing)}
-            />
+            <ListingCard key={listing.id} listing={listing} href={listingHref?.(listing)} />
           ))}
         </div>
       ) : (

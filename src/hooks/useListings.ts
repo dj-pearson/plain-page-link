@@ -4,6 +4,15 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
 import { toStringList } from '@/types/profile';
 import { applySortOrderChanges, type SortOrderChange } from '@/lib/listingOrder';
+import { LISTING_PHOTO_BUCKET } from '@/lib/images';
+import { listingPhotoUrls, orphanedListingPhotoPaths } from '@/lib/listingPhotoCleanup';
+import { logger } from '@/lib/logger';
+import { OWNER_LISTING_COLUMNS } from '@/lib/listingColumns';
+import {
+  importCsvListings,
+  type CsvImportListing,
+  type CsvImportResult,
+} from '@/lib/listingCsvImport';
 import type { Database } from '@/integrations/supabase/types';
 
 type ListingRow = Database['public']['Tables']['listings']['Row'];
@@ -34,6 +43,27 @@ export type NewListing = Omit<Database['public']['Tables']['listings']['Insert']
 /** The columns a caller may change on an existing listing. */
 export type ListingUpdate = Database['public']['Tables']['listings']['Update'];
 
+/**
+ * Remove listing-photos objects that no listing refers to any more (US-451).
+ *
+ * Best-effort and never awaited by the caller's success path: the row write
+ * has already succeeded, and a storage hiccup must not turn a saved edit or a
+ * completed delete into an error toast. A failure is logged and the object
+ * simply stays, which is what always happened before.
+ */
+async function removeListingPhotoObjects(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    const { error } = await supabase.storage.from(LISTING_PHOTO_BUCKET).remove(paths);
+    if (error) throw error;
+  } catch (error) {
+    logger.warn('Could not remove orphaned listing photos', {
+      count: paths.length,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export function useListings() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
@@ -51,7 +81,8 @@ export function useListings() {
 
       const { data, error } = await supabase
         .from('listings')
-        .select('*')
+        // Named columns, not '*' (US-342): see OWNER_LISTING_COLUMNS.
+        .select(OWNER_LISTING_COLUMNS)
         .eq('user_id', user.id)
         // Same order the public gallery uses, so a reorder on the dashboard
         // shows the agent exactly what a visitor will see. It ordered by
@@ -72,6 +103,44 @@ export function useListings() {
     gcTime: 10 * 60 * 1000, // 10 minutes - cache retention
   });
 
+  /**
+   * Remove photos uploaded in a dialog that never reached a saved row (US-461).
+   *
+   * ListingPhotoManager uploads as soon as files are picked, and the add form
+   * uploads before its insert. A cancelled edit, a photo removed before the
+   * save, or an insert that fails (a plan limit, a dropped connection) left
+   * those objects public in the bucket for good, and a retry uploaded them
+   * again. Callers pass the URLs uploaded in the session that the save did not
+   * keep; addListing calls it itself when its insert fails.
+   *
+   * The listings are re-read rather than taken from the cache, which can be
+   * stale (a save that errored on the way back may still have landed): any
+   * object a stored row refers to is kept, and if that read fails nothing is
+   * removed. Best-effort like the rest of the cleanup; it never throws.
+   */
+  const discardUnsavedPhotos = async (urls: readonly string[]): Promise<void> => {
+    if (!user?.id || urls.length === 0) return;
+    const userId = user.id;
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('photos, image')
+        .eq('user_id', userId);
+      if (error) throw error;
+      const stored = (data ?? []).flatMap((row) =>
+        listingPhotoUrls({ photos: toStringList(row.photos), image: row.image })
+      );
+      await removeListingPhotoObjects(
+        orphanedListingPhotoPaths({ removed: urls, stillReferenced: stored, userId })
+      );
+    } catch (error) {
+      logger.warn('Could not check unsaved listing photos before removing them', {
+        count: urls.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   const addListing = useMutation({
     mutationFn: async (listingData: NewListing) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -82,10 +151,24 @@ export function useListings() {
           user_id: user.id,
           ...listingData,
         })
-        .select()
+        // Named columns, not a bare select() (= '*'): see OWNER_LISTING_COLUMNS.
+        .select(OWNER_LISTING_COLUMNS)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // The add form uploads before it inserts. Without a row those photos
+        // are public objects nothing points at, and a retry uploads them
+        // again (US-461). discardUnsavedPhotos only touches the agent's own
+        // listing-photos objects that no stored listing refers to, so an
+        // imported or hot-linked URL is never a candidate.
+        void discardUnsavedPhotos(
+          listingPhotoUrls({
+            photos: toStringList(listingData.photos ?? null),
+            image: listingData.image ?? null,
+          })
+        );
+        throw error;
+      }
       return data;
     },
     onSuccess: (data) => {
@@ -100,6 +183,9 @@ export function useListings() {
   const updateListing = useMutation({
     mutationFn: async ({ id, ...updates }: ListingUpdate & { id: string }) => {
       if (!user?.id) throw new Error('User not authenticated');
+      // Read before the write: the cached row is the only record of which
+      // photos this edit drops.
+      const before = queryClient.getQueryData<Listing[]>(['listings', user.id]) ?? [];
 
       // Security: Verify user owns this listing by requiring both id and user_id match
       const { data, error } = await supabase
@@ -107,10 +193,29 @@ export function useListings() {
         .update(updates)
         .eq('id', id)
         .eq('user_id', user.id)
-        .select()
+        // Named columns, not a bare select() (= '*'): see OWNER_LISTING_COLUMNS.
+        .select(OWNER_LISTING_COLUMNS)
         .single();
 
       if (error) throw error;
+
+      const previous = before.find((l) => l.id === id);
+      if (previous && ('photos' in updates || 'image' in updates)) {
+        const next = {
+          photos: 'photos' in updates ? toStringList(updates.photos ?? null) : previous.photos,
+          image: 'image' in updates ? (updates.image ?? null) : previous.image,
+        };
+        void removeListingPhotoObjects(
+          orphanedListingPhotoPaths({
+            removed: listingPhotoUrls(previous),
+            stillReferenced: [
+              ...listingPhotoUrls(next),
+              ...before.filter((l) => l.id !== id).flatMap(listingPhotoUrls),
+            ],
+            userId: user.id,
+          })
+        );
+      }
       return data;
     },
     onSuccess: (_data, variables) => {
@@ -168,18 +273,82 @@ export function useListings() {
     },
   });
 
+  /**
+   * Save the rows of a CSV import (US-597).
+   *
+   * The import went through addListing once per row, so every success
+   * invalidated the listings query and sent its own audit event: a 100-row
+   * file meant 100 inserts, 100 refetches of the whole list and 100 calls to
+   * the audit function. This inserts in chunks (see importCsvListings, which
+   * retries a refused chunk row by row so each refusal keeps its reason),
+   * audits once per saved chunk and refetches once at the end, whatever
+   * happened. CSV rows carry no uploaded photos, so there is nothing to clean
+   * up when one is refused.
+   */
+  const importListings = useMutation({
+    mutationFn: async ({
+      rows,
+      describeError,
+      today,
+    }: {
+      rows: readonly CsvImportListing[];
+      describeError: (error: unknown) => string;
+      today: string;
+    }): Promise<CsvImportResult> => {
+      if (!user?.id) throw new Error('User not authenticated');
+      const userId = user.id;
+      const insertRows = async (payloads: NewListing[]) => {
+        const { data, error } = await supabase
+          .from('listings')
+          .insert(payloads.map((payload) => ({ user_id: userId, ...payload })))
+          .select('id');
+        if (error) throw error;
+        const ids = (data ?? []).map((row) => row.id);
+        logAuditEvent('listing_import', {
+          resourceType: 'listing',
+          details: { count: ids.length, listing_ids: ids, source: 'csv' },
+        });
+      };
+      return importCsvListings(rows, {
+        insertMany: insertRows,
+        insert: (payload) => insertRows([payload]),
+        describeError,
+        today,
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['listings', user?.id] });
+    },
+  });
+
   const deleteListing = useMutation({
     mutationFn: async (id: string) => {
       if (!user?.id) throw new Error('User not authenticated');
+      const before = queryClient.getQueryData<Listing[]>(['listings', user.id]) ?? [];
 
       // Security: Verify user owns this listing by requiring both id and user_id match
-      const { error } = await supabase
+      const { data: removedRows, error } = await supabase
         .from('listings')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
 
       if (error) throw error;
+
+      // The row is gone; its photos should not outlive it on a public URL.
+      // Only when the delete really removed it: RLS turns a refused delete
+      // into zero rows, not an error.
+      const deleted = before.find((l) => l.id === id);
+      if (deleted && (removedRows ?? []).length > 0) {
+        void removeListingPhotoObjects(
+          orphanedListingPhotoPaths({
+            removed: listingPhotoUrls(deleted),
+            stillReferenced: before.filter((l) => l.id !== id).flatMap(listingPhotoUrls),
+            userId: user.id,
+          })
+        );
+      }
     },
     onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['listings', user?.id] });
@@ -199,6 +368,8 @@ export function useListings() {
     addListing,
     updateListing,
     reorderListings,
+    importListings,
     deleteListing,
+    discardUnsavedPhotos,
   };
 }

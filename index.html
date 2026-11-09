@@ -9,7 +9,7 @@
     <!-- TODO: Implement nonce-based CSP for style-src when inline styles are fully refactored -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' https://www.googletagmanager.com https://esm.sh https://static.cloudflareinsights.com https://assets.calendly.com;
+      script-src 'self' https://www.googletagmanager.com https://static.cloudflareinsights.com https://assets.calendly.com;
       style-src 'self' 'unsafe-inline' https://assets.calendly.com;
       img-src 'self' data: https: blob:;
       font-src 'self' data:;
@@ -79,10 +79,12 @@
          reads truthfully and dev serves the right thing, but that file is the
          source — editing them here alone will be silently overwritten. -->
     <meta name="description" content="The link in bio built for real estate agents and realtors. Show your listings, capture buyer and seller leads, and take bookings straight from Instagram." />
-    <meta name="theme-color" content="#0ea5e9" />
+    <meta name="theme-color" content="#2563eb" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- The home-screen label iOS offers; without it Safari proposes the full SEO title. -->
+    <meta name="apple-mobile-web-app-title" content="AgentBio" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />

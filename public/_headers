@@ -1,6 +1,7 @@
-# Defaults for everything. Cloudflare Pages applies every matching rule and a
-# later rule wins for a header it repeats, so this Cache-Control is the floor
-# and the asset rules further down raise it for hashed files.
+# Defaults for everything. Cloudflare Pages applies every matching rule, and a
+# header two rules both set is joined with a comma rather than replaced, so a
+# rule further down that changes this Cache-Control detaches it first with
+# `! Cache-Control` (US-381; see the cache section near the end).
 #
 # The only HTML rule here used to be `/index.html` — a path no visitor requests
 # once every page is prerendered to its own directory — so the policy it looked
@@ -15,7 +16,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com https://esm.sh https://static.cloudflareinsights.com https://assets.calendly.com; style-src 'self' 'unsafe-inline' https://assets.calendly.com https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.agentbio.net https://functions.agentbio.net https://*.agentbio.net https://www.google-analytics.com https://api.stripe.com https://raw.githack.com https://raw.githubusercontent.com wss://api.agentbio.net wss://*.agentbio.net https://cloudflareinsights.com; frame-src 'self' https://js.stripe.com https://calendly.com https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; form-action 'self'; base-uri 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com https://static.cloudflareinsights.com https://assets.calendly.com; style-src 'self' 'unsafe-inline' https://assets.calendly.com https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.agentbio.net https://functions.agentbio.net https://*.agentbio.net https://www.google-analytics.com https://api.stripe.com https://raw.githack.com https://raw.githubusercontent.com wss://api.agentbio.net wss://*.agentbio.net https://cloudflareinsights.com; frame-src 'self' https://js.stripe.com https://calendly.com https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; form-action 'self'; base-uri 'self'; upgrade-insecure-requests
 
 # Auth pages carry noindex in their HTML too (US-151), but a header covers every
 # /auth/ URL whether or not it was prerendered — including the OAuth callbacks,
@@ -61,77 +62,104 @@
 /:username/review
   X-Robots-Tag: noindex, follow
 
-# Everything else under /assets/ carries a content hash in its name, so a year
-# is right and immutable is honest.
-# /*.tsx and /*.ts stood here too, declaring TypeScript source to be
-# application/javascript and cacheable for a year. Nothing in dist/ has ever had
-# either extension — the build compiles them away, and US-160 stopped the source
-# maps that were the only other way source reached the deploy. A rule that
-# serves source code as executable script is only ever wrong, whether or not
-# anything currently matches it. /*.mjs went with them; nothing emits one
-# (US-183).
+# ---------------------------------------------------------------------------
+# Cache policy above the floor (US-381).
+#
+# Cloudflare Pages does NOT let a later rule win. Every matching rule applies,
+# and a header two of them set is joined with a comma
+# (developers.cloudflare.com/pages/configuration/headers). This file used to
+# assume the opposite, so a hashed chunk was sent
+#     Cache-Control: public, max-age=0, must-revalidate, public, max-age=31536000, immutable
+# and a cache uses the first max-age it reads (RFC 9111 4.2.1), so the year
+# never applied. A rule here that replaces the floor's Cache-Control therefore
+# detaches it first with `! Cache-Control`. scripts/check-route-weight.mjs
+# resolves this file with Pages' semantics and src/deployed-files.test.ts checks
+# the result for every file in public/.
+#
+# Each path appears once: Pages keys rules by path, so a second block for the
+# same pattern would not simply add to the first.
+# ---------------------------------------------------------------------------
+
+# JavaScript and CSS outside /assets/ are the service worker and public/scripts,
+# both handled below; the year for hashed chunks comes from /assets/*.
+# /*.tsx and /*.ts stood here once, declaring TypeScript source to be
+# application/javascript. Nothing in dist/ has ever had either extension — the
+# build compiles them away, and US-160 stopped the source maps that were the
+# only other way source reached the deploy. A rule that serves source code as
+# executable script is only ever wrong, whether or not anything currently
+# matches it. /*.mjs went with them; nothing emits one (US-183).
 /*.js
   Content-Type: application/javascript
-  Cache-Control: public, max-age=31536000, immutable
 
 /*.css
   Content-Type: text/css
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.png
-  Content-Type: image/png
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.webp
-  Content-Type: image/webp
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.jpg
-  Content-Type: image/jpeg
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.jpeg
-  Content-Type: image/jpeg
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.svg
-  Content-Type: image/svg+xml
-  Cache-Control: public, max-age=31536000, immutable
 
 /*.woff2
   Content-Type: font/woff2
-  Cache-Control: public, max-age=31536000, immutable
 
 /*.woff
   Content-Type: font/woff
+
+# Images outside /assets/ are copied verbatim from public/ with no hash in their
+# names: the manifest and home-screen icons under /icons/, and Icon, logo, Cover
+# and the listing placeholder at the root (US-301). They were declared immutable
+# for a year alongside the hashed files, so a new icon or social image was meant
+# never to reach a returning visitor and an installed PWA to keep its old
+# home-screen icon. A day, then a revalidation that is a 304 when nothing
+# changed. /assets/* below comes later and detaches this, so an imported image
+# Vite hashed still gets the year.
+/*.png
+  Content-Type: image/png
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+
+/*.webp
+  Content-Type: image/webp
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+
+/*.jpg
+  Content-Type: image/jpeg
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+
+/*.jpeg
+  Content-Type: image/jpeg
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+
+/*.svg
+  Content-Type: image/svg+xml
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+
+# Everything under /assets/ carries a content hash in its name — Vite's chunks,
+# stylesheets, fonts and imported images — so a year is right and immutable is
+# honest. Nothing outside it gets either.
+/assets/*
+  ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
 
 # Prerendered pages (US-147) are served at extensionless URLs — /pricing,
 # /blog/{slug}, /tools — each backed by dist/<route>/index.html. `/*.html`
 # covers a direct request for one of those files; the extensionless URLs are
-# covered by the `/*` block at the top of this file, whose Cache-Control the
-# asset rules above deliberately override (US-183).
+# covered by the `/*` block at the top of this file. Both keep the floor's
+# revalidate-every-time policy, so this block sets only the Content-Type.
 /*.html
   Content-Type: text/html; charset=utf-8
+
+# public/scripts/ is copied verbatim, so its file names carry no content hash
+# (US-272). /scripts/analytics.js is the cookie-consent gate in front of Google
+# Analytics: a fix to it must reach a returning visitor on their next load. The
+# floor already says that; it is restated, detached so it is not joined, so a
+# later change to the floor cannot quietly loosen it.
+/scripts/*
+  ! Cache-Control
   Cache-Control: public, max-age=0, must-revalidate
 
-# The service workers, last on purpose.
-#
-# A service worker decides what a returning visitor is served, and its URL never
-# changes — so the immutable rule for /*.js above was telling caches never to
-# revalidate the one file that controls updating. Browsers cap service-worker
-# script caching at 24 hours regardless, so this was bounded rather than fatal;
-# it was still the opposite of what the file needs (US-183).
-#
-# Placed after /*.js deliberately, and the ordering is the point: Cloudflare
-# applies every matching rule, and for a header two rules both set, the later
-# one wins. A reading where the more specific path wins instead gives the same
-# result here, so this position is correct under either — which is what you want
-# from a rule you cannot test from the repository.
+# The service worker. It decides what a returning visitor is served and its URL
+# never changes, so it revalidates on every update check (US-183). Its
+# Content-Type comes from /*.js; setting it here as well would send it twice.
 /sw.js
-  Content-Type: application/javascript
-  Cache-Control: public, max-age=0, must-revalidate
-
-/firebase-messaging-sw.js
-  Content-Type: application/javascript
+  ! Cache-Control
   Cache-Control: public, max-age=0, must-revalidate

@@ -14,6 +14,10 @@ export interface EmailOptions {
    * lead answering the auto-reply wrote to nobody.
    */
   replyTo?: string
+  /**
+   * Extra message headers, e.g. List-Unsubscribe on marketing email (US-425).
+   */
+  headers?: Record<string, string>
 }
 
 // Escape user-controlled values before interpolating them into HTML email
@@ -82,6 +86,7 @@ export async function sendEmail(options: EmailOptions): Promise<SendEmailResult>
         // wrapping it so user-controlled content can't inject markup.
         html: options.html || `<p>${escapeHtml(options.body).replace(/\n/g, '<br>')}</p>`,
         ...(options.replyTo ? { reply_to: options.replyTo } : {}),
+        ...(options.headers && Object.keys(options.headers).length > 0 ? { headers: options.headers } : {}),
       }),
     })
 
@@ -102,22 +107,47 @@ export async function sendEmail(options: EmailOptions): Promise<SendEmailResult>
   }
 }
 
-// Branded, responsive HTML template for the agent lead notification.
-// Subject: "New Lead: {name} is interested in {listing}"
+/** A plain address a reply can go to: no display name, no header injection. */
+const REPLY_TO_RE = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/
+
+/**
+ * The agent's new-lead email — for most agents, the first and often only
+ * thing they read before deciding how to answer.
+ *
+ * It used to say who, but not what: never which listing the visitor asked
+ * about (leads.listing_id was not read), never a seller's or valuation's own
+ * address, never the price range, timeline, financing or anything else the
+ * form asked (US-264 put those on the lead detail; the email kept none of
+ * them). Reply went to noreply@, and the button opened the list rather than
+ * the lead. Now the email carries what the visitor told the agent, Reply
+ * answers the visitor, and the button opens that lead (US-409).
+ *
+ * Every interpolated value is visitor- or agent-supplied, so all of it is
+ * escaped.
+ */
 export function createLeadNotificationEmail(data: {
   agentEmail: string
   name: string
   email: string
   phone?: string
   message?: string
+  /** What kind of enquiry, in words ("buying a home"). */
   listing?: string
+  /** The listing the visitor asked about, as "address, city". */
+  listingAddress?: string
+  /** A seller's or valuation's own home (leads.property_address). */
+  propertyAddress?: string
+  /** describeLeadAnswers output: price range, timeline, financing, ... */
+  answers?: Array<{ label: string; value: string }>
   sourcePage?: string
   leadScore?: number | null
   dashboardUrl?: string
   /**
    * The lead is past the plan's monthly allowance (20260923000003): say a lead
    * arrived and who, but not how to reach them. Contact details and message
-   * are dropped here, not merely hidden, so the email cannot leak them.
+   * are dropped here, not merely hidden, so the email cannot leak them, and
+   * Reply does not reach the visitor either. What they asked about and their
+   * answers stay, as they do on the dashboard's locked lead.
    */
   locked?: boolean
   upgradeUrl?: string
@@ -129,6 +159,7 @@ export function createLeadNotificationEmail(data: {
   const dashboardUrl =
     data.dashboardUrl ||
     `${getSiteUrl()}/dashboard/leads`
+  const replyTo = data.email && REPLY_TO_RE.test(data.email) ? data.email : undefined
   const scoreBadge =
     typeof data.leadScore === 'number'
       ? `<span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:600;">Lead score: ${data.leadScore}</span>`
@@ -138,63 +169,78 @@ export function createLeadNotificationEmail(data: {
   const lockedNotice = data.locked
     ? `You've reached this month's lead allowance on your plan. ${data.name}'s enquiry is saved, and their contact details unlock as soon as you upgrade (or when your allowance resets next month).`
     : ''
+  const replyNote = replyTo ? `Reply to this email to answer ${data.name} directly.` : ''
+
   const rows: Array<[string, string | undefined]> = [
     ['Name', data.name],
     ['Email', data.email],
     ['Phone', data.phone],
     ['Interested in', data.listing],
+    ['Asked about', data.listingAddress],
+    ['Their property', data.propertyAddress],
+    ...(data.answers ?? []).map(({ label, value }): [string, string] => [label, value]),
     ['Source page', data.sourcePage],
   ]
-  const rowsHtml = rows
-    .filter(([, v]) => v)
+  const filled = rows.filter((row): row is [string, string] => Boolean(row[1]))
+  const rowsHtml = filled
     .map(
       ([label, value]) =>
-        `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:120px;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#1f2937;font-size:14px;font-weight:600;">${escapeHtml(value)}</td></tr>`
+        `<tr><td style="padding:6px 12px 6px 0;color:#52606d;font-size:14px;width:140px;vertical-align:top;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#1f2933;font-size:14px;font-weight:600;">${escapeHtml(value)}</td></tr>`
     )
     .join('')
+
+  const headline = data.locked
+    ? `${data.name} sent an enquiry`
+    : data.listingAddress
+      ? `${data.name} asked about ${data.listingAddress}`
+      : `${data.name} is interested in ${listing}`
+
+  const text = [
+    'New lead captured on AgentBio:',
+    lockedNotice ? `\n${lockedNotice}\nUpgrade: ${upgradeUrl}\n` : '',
+    ...filled.map(([label, value]) => `${label}: ${value}`),
+    typeof data.leadScore === 'number' ? `Lead score: ${data.leadScore}` : '',
+    data.message ? `\nMessage:\n${data.message}` : '',
+    '',
+    replyNote,
+    `View this lead: ${dashboardUrl}`,
+    '',
+    '— AgentBio',
+  ]
+    .filter((line, i, all) => line !== '' || (all[i - 1] ?? '') !== '')
+    .join('\n')
 
   return {
     to: data.agentEmail,
     subject: data.locked
       ? `New Lead: ${data.name} — upgrade to see their contact details`
-      : `New Lead: ${data.name} is interested in ${listing}`,
-    body: `New lead captured on AgentBio:
-${lockedNotice ? `\n${lockedNotice}\nUpgrade: ${upgradeUrl}\n` : ''}
-Name: ${data.name}
-Email: ${data.email}
-${data.phone ? `Phone: ${data.phone}\n` : ''}${data.listing ? `Interested in: ${data.listing}\n` : ''}${data.sourcePage ? `Source page: ${data.sourcePage}\n` : ''}${typeof data.leadScore === 'number' ? `Lead score: ${data.leadScore}\n` : ''}${data.message ? `\nMessage:\n${data.message}\n` : ''}
-View this lead: ${dashboardUrl}
-
-— AgentBio`,
+      : `New Lead: ${headline}`,
+    body: text,
+    replyTo,
     html: `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-  <div style="max-width:600px;margin:0 auto;">
-    <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:32px 30px;text-align:center;">
-      <h1 style="margin:0;font-size:22px;font-weight:600;">🔔 New Lead Captured</h1>
-      <p style="margin:8px 0 0;opacity:.95;font-size:15px;">${escapeHtml(data.name)} is interested in ${escapeHtml(listing)}</p>
-    </div>
-    <div style="background:#fff;padding:30px;">
-      ${scoreBadge ? `<p style="margin:0 0 16px;">${scoreBadge}</p>` : ''}
-      ${
-        lockedNotice
-          ? `<div style="margin:0 0 20px;padding:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;"><p style="margin:0 0 12px;color:#78350f;font-size:14px;">${escapeHtml(lockedNotice)}</p><a href="${upgradeUrl}" style="display:inline-block;background:#1f2937;color:#fff;padding:10px 20px;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">See plans</a></div>`
-          : ''
-      }
-      <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
-      ${
-        data.message
-          ? `<div style="margin:20px 0;padding:16px;background:#f9fafb;border-left:4px solid #667eea;border-radius:8px;"><p style="margin:0 0 6px;color:#6b7280;font-size:13px;font-weight:600;">MESSAGE</p><p style="margin:0;color:#1f2937;font-size:14px;white-space:pre-wrap;">${escapeHtml(data.message)}</p></div>`
-          : ''
-      }
-      <div style="text-align:center;margin-top:24px;">
-        <a href="${dashboardUrl}" style="display:inline-block;background:#667eea;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:600;">View Lead in Dashboard →</a>
-      </div>
-    </div>
-    <div style="background:#f9fafb;padding:24px;text-align:center;color:#6b7280;font-size:13px;">
-      <p style="margin:0;"><strong>AgentBio</strong> — respond fast to convert more leads.</p>
-    </div>
+<body style="margin:0;padding:24px;background:#f6f5f2;font-family:Arial,Helvetica,sans-serif;color:#1f2933;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;">
+    <p style="margin:0 0 4px;color:#52606d;font-size:14px;">New lead</p>
+    <h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;font-weight:700;">${escapeHtml(headline)}</h1>
+    ${scoreBadge ? `<p style="margin:0 0 16px;">${scoreBadge}</p>` : ''}
+    ${
+      lockedNotice
+        ? `<div style="margin:0 0 20px;padding:16px;background:#fffbeb;border-radius:8px;"><p style="margin:0 0 12px;color:#78350f;font-size:14px;">${escapeHtml(lockedNotice)}</p><a href="${escapeHtml(upgradeUrl)}" style="display:inline-block;background:#1f2933;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">See plans</a></div>`
+        : ''
+    }
+    <table role="presentation" style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
+    ${
+      data.message
+        ? `<div style="margin:20px 0;padding:16px;background:#f6f5f2;border-radius:8px;"><p style="margin:0 0 6px;color:#52606d;font-size:13px;font-weight:600;">Their message</p><p style="margin:0;color:#1f2933;font-size:15px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(data.message)}</p></div>`
+        : ''
+    }
+    <p style="margin:24px 0 0;">
+      <a href="${escapeHtml(dashboardUrl)}" style="display:inline-block;background:#1f2933;color:#ffffff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Open this lead</a>
+    </p>
+    ${replyNote ? `<p style="margin:16px 0 0;color:#52606d;font-size:14px;">${escapeHtml(replyNote)}</p>` : ''}
+    <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e5e7eb;color:#52606d;font-size:13px;">AgentBio. The first agent to answer usually wins the client.</p>
   </div>
 </body>
 </html>`,

@@ -5,6 +5,14 @@
 
 import DOMPurify from 'dompurify';
 
+/**
+ * The URL helpers live in ./sanitizeUrl so that a link check does not load
+ * DOMPurify (US-455). Re-exported for compatibility; new code should import
+ * them from '@/utils/sanitizeUrl', because importing them from here still
+ * pulls in DOMPurify.
+ */
+export { sanitizeUrl, sanitizeExternalUrl } from './sanitizeUrl';
+
 export interface SanitizeOptions {
   allowedTags?: string[];
   /**
@@ -105,39 +113,6 @@ export const sanitizeRichContent = (content: string): string => {
     allowedTags: ['p', 'br', 'strong', 'em', 'u', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote'],
     allowedAttributes: [],
   });
-};
-
-/**
- * Sanitize URLs to prevent javascript: and data: URI XSS
- * @param url - Untrusted URL string
- * @returns Safe URL or empty string if invalid
- */
-export const sanitizeUrl = (url: string): string => {
-  const trimmed = url.trim().toLowerCase();
-
-  // Block dangerous protocols
-  if (
-    trimmed.startsWith('javascript:') ||
-    trimmed.startsWith('data:') ||
-    trimmed.startsWith('vbscript:') ||
-    trimmed.startsWith('file:')
-  ) {
-    return '';
-  }
-
-  // Allow http, https, mailto, tel
-  if (
-    trimmed.startsWith('http://') ||
-    trimmed.startsWith('https://') ||
-    trimmed.startsWith('mailto:') ||
-    trimmed.startsWith('tel:') ||
-    trimmed.startsWith('/')
-  ) {
-    return url.trim();
-  }
-
-  // Default to https for domain-only URLs
-  return url.trim();
 };
 
 /**

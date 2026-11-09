@@ -17,6 +17,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { STATIC_ROUTES, locationRoutes } from './config/prerender-routes';
+import { RESERVED_SEGMENT_NAMES, isReservedNonRoute } from '../functions/_lib/social-meta';
 
 const ROOT = join(__dirname, '..');
 
@@ -141,6 +142,54 @@ describe('the redirect rules', () => {
       'a 200 rewrite for a path with no route behind it recreates the soft 404 ' +
         'this story removed'
     ).toEqual([]);
+  });
+});
+
+/**
+ * The words the profile route refuses to look up as usernames (US-435).
+ *
+ * functions/[username].ts runs before _redirects for every single-segment URL.
+ * A reserved segment either falls through (a route, or a prefix _redirects
+ * sends home with a 301) or, if nothing serves it, answers dist/404.html. Each
+ * entry has to be exactly one of those, or a bare /about is a 200 homepage
+ * again, or a real page is a 404.
+ */
+describe('reserved username segments', () => {
+  const routes = new Set(appRoutes());
+  const permanentRedirects = new Set(
+    redirectRules()
+      .filter((rule) => rule.status === '301')
+      .map((rule) => rule.from)
+  );
+  // Names with a dot are files (robots.txt, sw.js); the static asset server
+  // answers them before any function runs.
+  const named = RESERVED_SEGMENT_NAMES.filter((name) => !name.includes('.'));
+
+  it('finds the reserved names at all', () => {
+    expect(named).toContain('dashboard');
+    expect(named).toContain('about');
+  });
+
+  it('marks a segment a 404 only when nothing serves it', () => {
+    const served = named
+      .filter((name) => isReservedNonRoute(name))
+      .filter((name) => routes.has(`/${name}`) || permanentRedirects.has(`/${name}`));
+    expect(served, 'these are real pages but the profile route 404s them').toEqual([]);
+  });
+
+  it('leaves no reserved segment answering 200 with the homepage', () => {
+    const soft404 = named
+      .filter((name) => !isReservedNonRoute(name))
+      .filter((name) => !routes.has(`/${name}`) && !permanentRedirects.has(`/${name}`));
+    expect(soft404, 'not a route and not redirected: add to RESERVED_NON_ROUTE_SEGMENTS').toEqual(
+      []
+    );
+  });
+
+  it('includes the six bare words that were soft 404s', () => {
+    for (const name of ['legal', 'about', 'contact', 'help', 'support', 'api']) {
+      expect(isReservedNonRoute(name), name).toBe(true);
+    }
   });
 });
 

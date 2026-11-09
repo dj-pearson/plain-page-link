@@ -483,7 +483,7 @@ export const UserManagementPanel = () => {
 
       {/* User Details Dialog */}
       <Dialog open={showUserDetails} onOpenChange={setShowUserDetails}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] supports-[height:100dvh]:max-h-[80dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>User Details</DialogTitle>
             <DialogDescription>

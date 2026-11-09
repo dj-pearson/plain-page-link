@@ -18,11 +18,8 @@ export const mockLead: Lead = {
   message: "I'm interested in the Maple Avenue listing. Is it still available?",
   status: 'new',
   source: 'public_profile',
-  notes: null,
   form_data: { listing_id: 1, budget: '400000-450000' },
-  email_hash: null,
-  update_token_hash: null,
-  update_token_expires_at: null,
+  visitor_id: null,
 
   assigned_to: null,
   listing_id: null,
@@ -76,5 +73,13 @@ export const makeLead = (overrides: Partial<Lead> = {}): Lead => ({
  */
 export const mockLeadRow: LeadRow = (() => {
   const { email, phone, ...rest } = mockLead;
-  return { ...rest, encrypted_email: email, encrypted_phone: phone };
+  return {
+    ...rest,
+    encrypted_email: email,
+    encrypted_phone: phone,
+    phone_hash: null,
+    email_hash: null,
+    update_token_hash: null,
+    update_token_expires_at: null,
+  };
 })();

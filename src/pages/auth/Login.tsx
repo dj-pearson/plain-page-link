@@ -133,11 +133,15 @@ export default function Login() {
         toast({
           title: 'Connection Issue Detected',
           description:
-            'Your browser cache may be interfering. Try refreshing the page or clearing your browser cache.',
+            "We couldn't reach the sign-in service. Check your connection and try again.",
           variant: 'destructive',
         });
+        // A leftover legacy service worker (the cause of the original
+        // auth-caching incident) is the one case a reload fixes. cleanupAndReload
+        // reloads only when it finds one, so a flaky phone connection keeps
+        // what was typed into the form (US-357).
         setTimeout(() => {
-          cleanupAndReload();
+          void cleanupAndReload();
         }, 3000);
       }
 

@@ -7,42 +7,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
-
-interface AuditLogRequest {
-  action: string;
-  status: 'success' | 'failure' | 'blocked';
-  resourceType?: string;
-  resourceId?: string;
-  details?: Record<string, unknown>;
-  riskLevel?: 'low' | 'medium' | 'high' | 'critical';
-}
-
-interface GetLogsRequest {
-  action?: string;
-  resourceType?: string;
-  startDate?: string;
-  endDate?: string;
-  limit?: number;
-  offset?: number;
-}
-
-// Actions that are considered high/critical risk
-const HIGH_RISK_ACTIONS = [
-  'password_change',
-  'email_change',
-  'mfa_disable',
-  'session_revoke',
-  'revoke_all_sessions',
-  'api_key_create',
-  'api_key_delete',
-];
-
-const CRITICAL_RISK_ACTIONS = [
-  'account_deletion_request',
-  'account_deletion_cancelled',
-  'gdpr_export_request',
-  'admin_action',
-];
+import { parseClientAuditEvent, parseLogPage } from './policy.ts';
 
 serve(async (req: Request) => {
   // Per request, from the Origin header. This was the module-level static
@@ -71,28 +36,17 @@ serve(async (req: Request) => {
     const userAgent = req.headers.get('user-agent') || '';
 
     if (req.method === 'POST') {
-      // Log an audit event
-      const body: AuditLogRequest = await req.json();
-      const { action, status, resourceType, resourceId, details, riskLevel } = body;
-
-      if (!action || !status) {
+      // Log an audit event the browser reports. Only the actions the app
+      // itself reports are accepted, risk is decided server-side and the row
+      // is tagged client_reported (see policy.ts).
+      const parsed = parseClientAuditEvent(await req.json().catch(() => null));
+      if (!parsed.ok) {
         return new Response(
-          JSON.stringify({ error: 'action and status are required' }),
+          JSON.stringify({ error: parsed.error }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         );
       }
-
-      // Determine risk level if not provided
-      let calculatedRiskLevel = riskLevel || 'low';
-      if (!riskLevel) {
-        if (CRITICAL_RISK_ACTIONS.includes(action)) {
-          calculatedRiskLevel = 'critical';
-        } else if (HIGH_RISK_ACTIONS.includes(action)) {
-          calculatedRiskLevel = 'high';
-        } else if (status === 'failure' || status === 'blocked') {
-          calculatedRiskLevel = 'medium';
-        }
-      }
+      const event = parsed.event;
 
       // Use service role for inserting logs
       const serviceSupabase = createClient(
@@ -103,14 +57,16 @@ serve(async (req: Request) => {
       const { data, error } = await serviceSupabase
         .rpc('log_audit_event', {
           p_user_id: user.id,
-          p_action: action,
-          p_status: status,
-          p_resource_type: resourceType || null,
-          p_resource_id: resourceId || null,
+          p_action: event.action,
+          p_status: event.status,
+          p_resource_type: event.resourceType,
+          p_resource_id: event.resourceId,
           p_ip_address: clientIP,
           p_user_agent: userAgent,
-          p_details: details ? JSON.stringify(details) : null,
-          p_risk_level: calculatedRiskLevel,
+          // An object, so the jsonb column holds an object. This was
+          // the stringified details, which stored a JSON *string* (US-657).
+          p_details: event.details,
+          p_risk_level: event.riskLevel,
         });
 
       if (error) {
@@ -134,8 +90,10 @@ serve(async (req: Request) => {
       const resourceType = url.searchParams.get('resourceType');
       const startDate = url.searchParams.get('startDate');
       const endDate = url.searchParams.get('endDate');
-      const limit = parseInt(url.searchParams.get('limit') || '50', 10);
-      const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+      const { limit, offset } = parseLogPage(
+        url.searchParams.get('limit'),
+        url.searchParams.get('offset')
+      );
 
       let query = supabase
         .from('audit_logs')

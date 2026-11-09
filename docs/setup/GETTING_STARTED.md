@@ -242,7 +242,6 @@ php artisan serve
 -   **State:** Zustand or Redux Toolkit
 -   **Router:** React Router 6+
 -   **PWA:** Workbox (via Vite plugin)
--   **Offline Storage:** IndexedDB (idb library)
 
 ### Backend
 

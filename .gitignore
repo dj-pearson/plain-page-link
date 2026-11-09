@@ -50,3 +50,6 @@ deno.lock
 
 # Created by deno check --node-modules-dir=auto
 supabase/functions/node_modules/
+
+# Agent worktrees from improvement-loop rounds
+.claude/worktrees/

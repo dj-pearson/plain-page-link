@@ -23,7 +23,9 @@ import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
 import { getCanonicalUrl, getOgImageUrl } from '@/config/seo.config';
-import { PRICING_PLANS } from '@/config/pricing-plans';
+import { PRICING_PLANS, listingAllowanceSummary } from '@/config/pricing-plans';
+
+const FREE_PLAN = PRICING_PLANS.find((plan) => plan.price_monthly === 0);
 
 const PATH = '/press';
 const CANONICAL = getCanonicalUrl(PATH);
@@ -42,7 +44,7 @@ const CAPABILITIES: { name: string; what: string; page: string }[] = [
   },
   {
     name: 'Calendar booking',
-    what: 'Showing and consultation appointments booked from the page itself.',
+    what: 'Showings and consultations booked through the agent’s own Calendly, embedded on the page; each booking is saved as a lead.',
     page: '/features/calendar-booking',
   },
   {
@@ -70,8 +72,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   },
   {
     question: 'Is there a free plan?',
-    answer:
-      'Yes. The free plan covers a published page with a limited number of listings and links. Paid plans add unlimited listings, lead capture and booking. Current prices are on the pricing page.',
+    answer: `Yes. The free plan includes a published page, lead capture and booking, with ${FREE_PLAN?.limits.listings} listings, ${FREE_PLAN?.limits.links} links and ${FREE_PLAN?.limits.leadsPerMonth} leads a month. Paid plans raise those allowances (${listingAllowanceSummary()}). Current prices are on the pricing page.`,
   },
   {
     question: 'Who is it for?',

@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { decryptContactDetails, encryptPIIBatch } from '@/lib/pii';
+import { decryptContactDetails, encryptPIIBatch, indexOwnContacts } from '@/lib/pii';
 import { errorHandler } from '@/lib/errorHandler';
 
 type ContactRow = Database['public']['Tables']['contacts']['Row'];
@@ -76,6 +76,14 @@ export interface HouseholdMember {
 const SUMMARY_COLUMNS =
   'id, lead_id, first_name, last_name, relationship, preferred_contact, city, household, interests, tags, touch_frequency_days, last_contacted_at, next_touch_at, created_at, updated_at';
 
+/**
+ * The columns the detail view selects: every column the browser may read.
+ * Not `*`: contacts carries a column grant (20261108000629), and the lookup
+ * fingerprints (email_hash, phone_hash, lookup_hashed_at) are not in it.
+ */
+const DETAIL_COLUMNS =
+  'id, user_id, lead_id, first_name, last_name, encrypted_email, encrypted_phone, relationship, preferred_contact, address, city, state, zip_code, occupation, employer, referred_by, source, household, interests, tags, notes, touch_frequency_days, last_contacted_at, next_touch_at, created_at, updated_at';
+
 export type ContactSummary = Pick<
   ContactRow,
   | 'id'
@@ -95,7 +103,15 @@ export type ContactSummary = Pick<
 > & { household: HouseholdMember[] };
 
 /** A contact as the detail view consumes it: the row, decrypted. */
-export type Contact = Omit<ContactRow, 'encrypted_email' | 'encrypted_phone' | 'household'> & {
+export type Contact = Omit<
+  ContactRow,
+  | 'encrypted_email'
+  | 'encrypted_phone'
+  | 'household'
+  | 'email_hash'
+  | 'phone_hash'
+  | 'lookup_hashed_at'
+> & {
   email: string | null;
   phone: string | null;
   household: HouseholdMember[];
@@ -237,7 +253,12 @@ export function useContacts() {
       if (error) throw error;
       return data.id as string;
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      // US-640: fingerprint the new contact now, so converting a lead with
+      // the same email or phone finds it. Best-effort; never awaited.
+      void indexOwnContacts();
+    },
     onError: (error) =>
       errorHandler.captureException(error as Error, {
         action: 'create_contact',
@@ -256,7 +277,13 @@ export function useContacts() {
         .eq('user_id', user.id);
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onSuccess: (_data, { input }) => {
+      invalidate();
+      // US-640: a changed email or phone clears the contact's fingerprints
+      // (trigger, 20261108000629); recompute them now rather than leaving the
+      // contact invisible to the duplicate check until the next sweep.
+      if (input.email !== undefined || input.phone !== undefined) void indexOwnContacts();
+    },
     onError: (error) =>
       errorHandler.captureException(error as Error, {
         action: 'update_contact',
@@ -302,7 +329,7 @@ export function useContact(contactId: string | null | undefined) {
       if (!user?.id || !contactId) return null;
       const { data, error } = await supabase
         .from('contacts')
-        .select('*')
+        .select(DETAIL_COLUMNS)
         .eq('id', contactId)
         .eq('user_id', user.id)
         .maybeSingle();
@@ -436,7 +463,9 @@ export function useKeyDates(contactId?: string) {
   return {
     keyDates: query.data ?? [],
     isLoading: query.isLoading,
+    isError: query.isError,
     error: query.error,
+    refetch: query.refetch,
     addKeyDate,
     updateKeyDate,
     deleteKeyDate,
@@ -505,12 +534,25 @@ export function useContactInteractions(contactId: string | null | undefined) {
         .eq('user_id', user.id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contact-interactions'] }),
+    onSuccess: () => {
+      // Deleting the latest touch rolls last_contacted_at (and so
+      // next_touch_at) back to the latest remaining one (US-610), so the
+      // contact, the Clients list and the "due" lists are stale too.
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['contact-interactions'] });
+    },
+    onError: (error) =>
+      errorHandler.captureException(error as Error, {
+        action: 'delete_interaction',
+        component: 'useContactInteractions',
+      }),
   });
 
   return {
     interactions: query.data ?? [],
     isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
     logInteraction,
     deleteInteraction,
   };

@@ -6,16 +6,25 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
-import { getCanonicalUrl } from '@/config/seo.config';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { generateFAQSchema, generateCombinedSchema, FEATURE_FAQS } from '@/lib/faq-schema';
 
 export default function LeadCapture() {
   // Generate FAQ schema for AI search optimization
   const faqSchema = generateFAQSchema(FEATURE_FAQS.leadCapture);
 
+  const canonicalUrl = getCanonicalUrl('/features/lead-capture');
+
+  // Named by the canonical URL, the id SEOHead merges its speakable block
+  // into, so the page is one WebPage node rather than two anonymous halves
+  // (US-480).
   const pageSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
+    '@id': canonicalUrl,
+    url: canonicalUrl,
+    isPartOf: { '@id': websiteId(getBaseUrl()) },
     name: 'Lead Capture Forms for Real Estate Agents - AgentBio',
     description:
       'Capture qualified buyer and seller leads with pre-built forms. Buyer inquiries, seller leads, and home valuation requests—all optimized for real estate.',
@@ -28,9 +37,9 @@ export default function LeadCapture() {
         'Buyer inquiry forms with pre-qualification questions',
         'Seller lead forms with timeline and motivation tracking',
         'Home valuation request forms',
-        'Email notifications for instant follow-up',
+        'An email to the agent for each new lead',
         'Lead scoring: Hot, Warm, Cold',
-        'CRM integration ready',
+        'CSV export and a Zapier webhook',
       ],
     },
   };
@@ -53,7 +62,7 @@ export default function LeadCapture() {
           'home valuation request',
           'real estate lead generation',
         ]}
-        canonicalUrl={getCanonicalUrl('/features/lead-capture')}
+        canonicalUrl={canonicalUrl}
         schema={schema}
         aiSearchOptimized={true}
         speakableSelectors={['h1', 'h2', '.glass-body']}
@@ -96,7 +105,7 @@ export default function LeadCapture() {
                 with pre-built forms for buyer inquiries, seller leads, and home valuation requests.
                 Unlike generic contact forms, each form includes pre-qualification questions like
                 budget, timeline, and motivation—giving you the information needed to prioritize hot
-                leads and follow up effectively with instant email notifications.
+                leads and follow up quickly, with an email for every new lead.
               </p>
             </div>
           </div>
@@ -137,11 +146,11 @@ export default function LeadCapture() {
                 title="Buyer Inquiry Form"
                 description="Capture serious buyers with pre-qualification questions"
                 fields={[
-                  'Budget range (prevents unqualified leads)',
-                  'Timeline to purchase (urgent vs browsing)',
-                  'Pre-approval status (ready to buy?)',
-                  'Property preferences (beds/baths/location)',
-                  'Contact info and best time to call',
+                  'Name and an email or phone number',
+                  'Price range',
+                  'When they plan to buy (ASAP to 6+ months, or just looking)',
+                  'Pre-approval status, including cash buyers',
+                  'Property type and bedrooms',
                 ]}
                 useCase="When buyers click on a listing, they can immediately submit their interest with budget and timeline details—helping you prioritize hot leads."
               />
@@ -151,11 +160,11 @@ export default function LeadCapture() {
                 title="Seller Lead Form"
                 description="Qualify sellers by motivation and timeline"
                 fields={[
+                  'Name and an email or phone number',
                   'Property address (for CMA preparation)',
-                  'Timeline to sell (ready now vs exploring)',
-                  'Motivation to sell (job, downsize, upgrade)',
-                  'Current home value estimate',
-                  'Contact preferences',
+                  'When they want to sell (ASAP to 6+ months, or just exploring)',
+                  'Reason for selling (upsizing, downsizing, relocation and more)',
+                  'Property type, bedrooms and bathrooms',
                 ]}
                 useCase="Sellers exploring their options can request a market analysis. You get their address and timeline—perfect for follow-up with a CMA."
               />
@@ -165,13 +174,12 @@ export default function LeadCapture() {
                 title="Home Valuation Request"
                 description="Attract seller leads with free valuations"
                 fields={[
+                  'Name and an email or phone number',
                   'Property address',
-                  'Beds/baths/square footage',
-                  'Reason for valuation request',
-                  'Timeline if considering selling',
-                  'Email for delivery',
+                  'Property type and condition',
+                  'Bedrooms, bathrooms, square footage and year built',
                 ]}
-                useCase="The #1 lead magnet for seller leads. Homeowners request free valuations, you capture their info and deliver a CMA to start the relationship."
+                useCase="Homeowners ask what their home is worth. You get their address and the facts you need, then prepare and send the valuation yourself to start the relationship."
               />
             </div>
           </div>
@@ -207,8 +215,8 @@ export default function LeadCapture() {
                   </h3>
                   <ul className="space-y-2 text-sm glass-body">
                     <li>• Budget and pre-approval status</li>
-                    <li>• Exact timeline (30, 60, 90+ days)</li>
-                    <li>• Motivation and urgency level</li>
+                    <li>• Timeline (ASAP, 1-3, 3-6 or 6+ months)</li>
+                    <li>• Why a seller is moving</li>
                     <li>• Property preferences</li>
                     <li>• Enough info to qualify before calling</li>
                   </ul>
@@ -221,7 +229,7 @@ export default function LeadCapture() {
                 </p>
                 <p className="glass-body text-muted-foreground">
                   Pre-approved buyer looking in 30 days? Call immediately. Browsing with no
-                  timeline? Nurture campaign.
+                  timeline? Check in later.
                 </p>
               </div>
             </div>
@@ -246,14 +254,14 @@ export default function LeadCapture() {
 
               <StepCard
                 number={2}
-                title="You Get Email Notification Immediately"
-                description="Email arrives within seconds with all lead details: name, budget, timeline, pre-approval status, and message."
+                title="You Get an Email"
+                description="It names the lead and gives their email, phone, message and the listing or page they came from. Their answers to the qualifying questions are on the lead in your dashboard. Prefer fewer emails? Switch to a morning digest."
               />
 
               <StepCard
                 number={3}
                 title="Lead Appears in Your Dashboard"
-                description="Access all leads from your AgentBio dashboard. Sort by date, lead type, or status. Export to your CRM anytime."
+                description="Filter leads by status or lead type and sort them by date or score. Send each new lead to your CRM through a Zapier webhook, or on paid plans export them as a CSV."
               />
 
               <StepCard
@@ -273,7 +281,9 @@ export default function LeadCapture() {
                 <span className="glass-heading">Automatic Lead Scoring: Hot, Warm, or Cold</span>
               </h2>
               <p className="text-xl glass-body max-w-3xl mx-auto">
-                AgentBio automatically scores leads based on their responses
+                Each lead gets a score from what it tells you: pre-approval, whether a timeline was
+                given, the kind of enquiry, whether a phone number was left, how much they wrote and
+                where they came from. It is a fixed set of rules, not a trained model.
               </p>
             </header>
 
@@ -286,10 +296,10 @@ export default function LeadCapture() {
                 </div>
                 <h3 className="text-xl font-light text-foreground mb-3">Ready to Transact</h3>
                 <ul className="space-y-2 text-sm glass-body">
-                  <li>• Pre-approved buyers</li>
-                  <li>• 0-30 day timeline</li>
-                  <li>• Specific property interest</li>
-                  <li>• High motivation to sell</li>
+                  <li>• Pre-approved or cash</li>
+                  <li>• Gave a timeline</li>
+                  <li>• Left a phone number</li>
+                  <li>• Wrote about what they need</li>
                 </ul>
                 <p className="text-sm text-red-700 mt-4 font-light">→ Call within 5 minutes</p>
               </div>
@@ -302,10 +312,9 @@ export default function LeadCapture() {
                 </div>
                 <h3 className="text-xl font-light text-foreground mb-3">Actively Looking</h3>
                 <ul className="space-y-2 text-sm glass-body">
-                  <li>• 30-90 day timeline</li>
-                  <li>• Budget defined</li>
-                  <li>• General area interest</li>
-                  <li>• Considering selling</li>
+                  <li>• Answered some questions</li>
+                  <li>• Reachable, not yet pre-approved</li>
+                  <li>• A short message</li>
                 </ul>
                 <p className="text-sm text-yellow-700 mt-4 font-light">→ Call within 24 hours</p>
               </div>
@@ -318,12 +327,11 @@ export default function LeadCapture() {
                 </div>
                 <h3 className="text-xl font-light text-foreground mb-3">Early Research</h3>
                 <ul className="space-y-2 text-sm glass-body">
-                  <li>• 90+ day timeline</li>
-                  <li>• Just browsing</li>
-                  <li>• Budget undefined</li>
-                  <li>• Information gathering</li>
+                  <li>• Skipped the optional questions</li>
+                  <li>• No timeline given</li>
+                  <li>• Little or no message</li>
                 </ul>
-                <p className="text-sm text-blue-700 mt-4 font-light">→ Add to nurture campaign</p>
+                <p className="text-sm text-blue-700 mt-4 font-light">→ Check in later</p>
               </div>
             </div>
           </div>
@@ -365,7 +373,7 @@ export default function LeadCapture() {
               <span className="glass-accent">Start Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
-              No credit card required • All 3 form types included • Instant notifications
+              No credit card required • All 3 form types included • An email for every lead
             </p>
           </div>
         </section>

@@ -1,28 +1,32 @@
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
+import { LEGAL_PAGE_DATES, formatLegalDate } from '@/config/legal-dates';
 import { SkipNavContent } from '@/components/ui/skip-nav';
 
 export default function AccessibilityStatement() {
-  const lastUpdated = 'January 12, 2026';
+  const dates = LEGAL_PAGE_DATES.accessibility;
+  const lastUpdated = formatLegalDate(dates.modified);
 
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    '@id': 'https://agentbio.net/accessibility#webpage',
-    url: 'https://agentbio.net/accessibility',
+    '@id': `${getCanonicalUrl('/accessibility')}#webpage`,
+    url: getCanonicalUrl('/accessibility'),
     name: 'Accessibility Statement - AgentBio',
     description:
       "AgentBio's commitment to digital accessibility. Learn about our WCAG 2.1 AA conformance, accessibility features, and how to report accessibility issues.",
     isPartOf: {
-      '@id': 'https://agentbio.net/#website',
+      '@id': websiteId(getBaseUrl()),
     },
     about: {
       '@type': 'Thing',
       name: 'Accessibility Statement',
     },
-    datePublished: '2026-01-12',
-    dateModified: lastUpdated,
+    datePublished: dates.published,
+    dateModified: dates.modified,
     inLanguage: 'en-US',
   };
 
@@ -40,7 +44,7 @@ export default function AccessibilityStatement() {
           'keyboard navigation',
           'accessible real estate platform',
         ]}
-        canonicalUrl="https://agentbio.net/accessibility"
+        canonicalUrl={getCanonicalUrl('/accessibility')}
         schema={schema}
       />
       <PublicHeader />
@@ -50,7 +54,9 @@ export default function AccessibilityStatement() {
             <h1 className="text-4xl font-bold mb-8">Accessibility Statement</h1>
 
             <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
-              <p className="text-muted-foreground mb-6">Last updated: {lastUpdated}</p>
+              <p className="text-muted-foreground mb-6">
+                Last updated: <time dateTime={dates.modified}>{lastUpdated}</time>
+              </p>
 
               {/* Commitment Section */}
               <section aria-labelledby="commitment-heading">

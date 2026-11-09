@@ -9,6 +9,14 @@ import { useAuthStore } from '@/stores/useAuthStore';
  * paged lead list happened to be loaded — 50 rows, filtered by the status in
  * the URL — so the numbers changed with scrolling and filtering. lead_stats()
  * counts every lead the agent owns, optionally since a date.
+ *
+ * US-534: with `assignee` set ('unassigned' or a user id) it counts the leads
+ * the Leads list shows under that filter instead — the caller's own leads and
+ * the ones assigned to them, held by that person — so the status chips and the
+ * Needs-attention badge stop describing leads the list is not showing.
+ *
+ * US-557: `leadType` and `search` narrow the counts the same way the list's
+ * type filter and name search do. Blank or 'all' means no filter.
  */
 export interface LeadStats {
   total: number;
@@ -40,18 +48,32 @@ export function parseLeadStats(raw: unknown): LeadStats {
 export const useLeadStats = ({
   since,
   slaHours = 24,
-}: { since?: Date; slaHours?: number } = {}) => {
+  assignee = null,
+  leadType = null,
+  search = null,
+}: {
+  since?: Date;
+  slaHours?: number;
+  assignee?: string | null;
+  leadType?: string | null;
+  search?: string | null;
+} = {}) => {
   const user = useAuthStore((s) => s.user);
   const sinceIso = since ? since.toISOString().slice(0, 10) : null;
+  const type = leadType && leadType !== 'all' ? leadType : null;
+  const term = search?.trim() || null;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['lead-stats', user?.id, sinceIso, slaHours],
+    queryKey: ['lead-stats', user?.id, sinceIso, slaHours, assignee, type, term],
     enabled: !!user?.id,
     staleTime: 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('lead_stats', {
         p_since: sinceIso ?? undefined,
         p_sla_hours: slaHours,
+        p_assignee: assignee ?? undefined,
+        p_lead_type: type ?? undefined,
+        p_search: term ?? undefined,
       });
       if (error) throw error;
       return parseLeadStats(data);

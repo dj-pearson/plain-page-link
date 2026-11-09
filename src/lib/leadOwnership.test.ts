@@ -67,7 +67,7 @@ describe('the public review page', () => {
   const page = readFileSync(join(process.cwd(), 'src/pages/public/SubmitReview.tsx'), 'utf8');
 
   it('submits through the submit-review edge function, not a direct insert', () => {
-    expect(page).toMatch(/functions\.invoke\('submit-review'/);
+    expect(page).toMatch(/callEdgeFunction<[^>]*>\('submit-review'/);
     expect(page).not.toMatch(/from\(['"]testimonials['"]\)/);
   });
 });

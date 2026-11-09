@@ -5,12 +5,31 @@ import { getDeviceClass, getVisitorId, recordAnalyticsEvent } from '@/lib/analyt
 import { getLeadAttribution } from '@/lib/attribution';
 
 /**
+ * Profiles already counted in this page session.
+ *
+ * Since US-275 a listing is a page of its own, so a visitor browsing five homes
+ * goes profile -> listing -> Back to profile five times, and the profile
+ * remounts each time. Each remount inserted another view: one visit read as six
+ * in Analytics (the US-092 throttle allows 30 a minute, so it never bit). The
+ * modal never remounted the profile, which is why this was not needed before.
+ * In memory, not storage: a reload is still a view, as it always was.
+ */
+const viewedProfiles = new Set<string>();
+
+/** Test seam: forget which profiles were counted. */
+export function resetProfileViewDedupeForTests(): void {
+  viewedProfiles.clear();
+}
+
+/**
  * Hook to track profile page views
  * Call this on the public profile page to track analytics
  */
 export function useProfileTracking(userId: string | undefined, username: string) {
   useEffect(() => {
     if (!userId) return;
+    if (viewedProfiles.has(userId)) return;
+    viewedProfiles.add(userId);
 
     const trackView = async () => {
       try {

@@ -547,7 +547,7 @@ export default function InstagramBioAnalyzer() {
 
               <div className="grid md:grid-cols-3 gap-6 mb-8">
                 {[
-                  'Auto-updated MLS listings',
+                  'Active and sold listing showcases',
                   'Built-in lead capture forms',
                   'Advanced analytics & tracking',
                   'QR codes for offline marketing',

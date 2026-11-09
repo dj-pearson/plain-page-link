@@ -1011,6 +1011,7 @@ export type Database = {
           address: string | null;
           city: string | null;
           created_at: string;
+          email_hash: string | null;
           employer: string | null;
           encrypted_email: string | null;
           encrypted_phone: string | null;
@@ -1021,9 +1022,11 @@ export type Database = {
           last_contacted_at: string | null;
           last_name: string | null;
           lead_id: string | null;
+          lookup_hashed_at: string | null;
           next_touch_at: string | null;
           notes: string | null;
           occupation: string | null;
+          phone_hash: string | null;
           preferred_contact: string | null;
           referred_by: string | null;
           relationship: string;
@@ -1039,6 +1042,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           created_at?: string;
+          email_hash?: string | null;
           employer?: string | null;
           encrypted_email?: string | null;
           encrypted_phone?: string | null;
@@ -1049,9 +1053,11 @@ export type Database = {
           last_contacted_at?: string | null;
           last_name?: string | null;
           lead_id?: string | null;
+          lookup_hashed_at?: string | null;
           next_touch_at?: string | null;
           notes?: string | null;
           occupation?: string | null;
+          phone_hash?: string | null;
           preferred_contact?: string | null;
           referred_by?: string | null;
           relationship?: string;
@@ -1067,6 +1073,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           created_at?: string;
+          email_hash?: string | null;
           employer?: string | null;
           encrypted_email?: string | null;
           encrypted_phone?: string | null;
@@ -1077,9 +1084,11 @@ export type Database = {
           last_contacted_at?: string | null;
           last_name?: string | null;
           lead_id?: string | null;
+          lookup_hashed_at?: string | null;
           next_touch_at?: string | null;
           notes?: string | null;
           occupation?: string | null;
+          phone_hash?: string | null;
           preferred_contact?: string | null;
           referred_by?: string | null;
           relationship?: string;
@@ -1246,6 +1255,51 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      digest_runs: {
+        Row: {
+          completed_at: string;
+          digest_date: string;
+          profiles: number;
+          sent: number;
+          slot: string;
+        };
+        Insert: {
+          completed_at?: string;
+          digest_date: string;
+          profiles?: number;
+          sent?: number;
+          slot?: string;
+        };
+        Update: {
+          completed_at?: string;
+          digest_date?: string;
+          profiles?: number;
+          sent?: number;
+          slot?: string;
+        };
+        Relationships: [];
+      };
+      email_suppressions: {
+        Row: {
+          created_at: string;
+          email_hash: string;
+          method: string;
+          source: string;
+        };
+        Insert: {
+          created_at?: string;
+          email_hash: string;
+          method: string;
+          source: string;
+        };
+        Update: {
+          created_at?: string;
+          email_hash?: string;
+          method?: string;
+          source?: string;
+        };
+        Relationships: [];
       };
       encrypted_pii_config: {
         Row: {
@@ -2730,14 +2784,14 @@ export type Database = {
           listing_id: string | null;
           message: string | null;
           name: string;
-          notes: string | null;
           open_house_id: string | null;
+          phone_hash: string | null;
           preapproved: boolean | null;
           price_range: string | null;
           property_address: string | null;
           referrer_url: string | null;
           source: string | null;
-          status: string | null;
+          status: string;
           timeline: string | null;
           update_token_expires_at: string | null;
           update_token_hash: string | null;
@@ -2746,6 +2800,7 @@ export type Database = {
           utm_campaign: string | null;
           utm_medium: string | null;
           utm_source: string | null;
+          visitor_id: string | null;
         };
         Insert: {
           assigned_to?: string | null;
@@ -2764,14 +2819,14 @@ export type Database = {
           listing_id?: string | null;
           message?: string | null;
           name: string;
-          notes?: string | null;
           open_house_id?: string | null;
+          phone_hash?: string | null;
           preapproved?: boolean | null;
           price_range?: string | null;
           property_address?: string | null;
           referrer_url?: string | null;
           source?: string | null;
-          status?: string | null;
+          status?: string;
           timeline?: string | null;
           update_token_expires_at?: string | null;
           update_token_hash?: string | null;
@@ -2780,6 +2835,7 @@ export type Database = {
           utm_campaign?: string | null;
           utm_medium?: string | null;
           utm_source?: string | null;
+          visitor_id?: string | null;
         };
         Update: {
           assigned_to?: string | null;
@@ -2798,14 +2854,14 @@ export type Database = {
           listing_id?: string | null;
           message?: string | null;
           name?: string;
-          notes?: string | null;
           open_house_id?: string | null;
+          phone_hash?: string | null;
           preapproved?: boolean | null;
           price_range?: string | null;
           property_address?: string | null;
           referrer_url?: string | null;
           source?: string | null;
-          status?: string | null;
+          status?: string;
           timeline?: string | null;
           update_token_expires_at?: string | null;
           update_token_hash?: string | null;
@@ -2814,6 +2870,7 @@ export type Database = {
           utm_campaign?: string | null;
           utm_medium?: string | null;
           utm_source?: string | null;
+          visitor_id?: string | null;
         };
         Relationships: [
           {
@@ -3823,6 +3880,7 @@ export type Database = {
           specialties: Json | null;
           theme: string | null;
           tiktok_url: string | null;
+          timezone: string | null;
           title: string | null;
           updated_at: string | null;
           username: string;
@@ -3869,6 +3927,7 @@ export type Database = {
           specialties?: Json | null;
           theme?: string | null;
           tiktok_url?: string | null;
+          timezone?: string | null;
           title?: string | null;
           updated_at?: string | null;
           username: string;
@@ -3915,6 +3974,7 @@ export type Database = {
           specialties?: Json | null;
           theme?: string | null;
           tiktok_url?: string | null;
+          timezone?: string | null;
           title?: string | null;
           updated_at?: string | null;
           username?: string;
@@ -8131,6 +8191,7 @@ export type Database = {
           current_period_end: string | null;
           current_period_start: string | null;
           id: string;
+          past_due_since: string | null;
           plan_id: string | null;
           status: Database['public']['Enums']['subscription_status'] | null;
           stripe_customer_id: string | null;
@@ -8144,6 +8205,7 @@ export type Database = {
           current_period_end?: string | null;
           current_period_start?: string | null;
           id?: string;
+          past_due_since?: string | null;
           plan_id?: string | null;
           status?: Database['public']['Enums']['subscription_status'] | null;
           stripe_customer_id?: string | null;
@@ -8157,6 +8219,7 @@ export type Database = {
           current_period_end?: string | null;
           current_period_start?: string | null;
           id?: string;
+          past_due_since?: string | null;
           plan_id?: string | null;
           status?: Database['public']['Enums']['subscription_status'] | null;
           stripe_customer_id?: string | null;
@@ -9209,6 +9272,10 @@ export type Database = {
         Args: { p_user_id: string };
         Returns: Record<string, unknown>[];
       };
+      get_agent_contacts: {
+        Args: { p_user_ids: string[] };
+        Returns: Record<string, unknown>[];
+      };
       get_average_page_score: {
         Args: Record<PropertyKey, never>;
         Returns: number;
@@ -9279,6 +9346,7 @@ export type Database = {
           specialties: Json;
           theme: string;
           tiktok_url: string;
+          timezone: string;
           title: string;
           updated_at: string;
           username: string;
@@ -9311,6 +9379,7 @@ export type Database = {
         Args: { _open_house_id: string };
         Returns: Record<string, unknown>[];
       };
+      get_public_profile_page: { Args: { _username: string }; Returns: Json };
       get_scheduled_workflows: {
         Args: { p_limit?: number };
         Returns: Record<string, unknown>[];
@@ -9364,6 +9433,7 @@ export type Database = {
         Args: { p_device_fingerprint: string; p_user_id: string };
         Returns: boolean;
       };
+      is_external_agent_url: { Args: { p_url: string }; Returns: boolean };
       is_field_encrypted: {
         Args: { p_field_name: string; p_table_name: string };
         Returns: boolean;
@@ -9372,6 +9442,7 @@ export type Database = {
         Args: { credential_id: string };
         Returns: boolean;
       };
+      is_link_agent_url: { Args: { p_url: string }; Returns: boolean };
       is_mfa_locked: { Args: { p_user_id: string }; Returns: boolean };
       is_team_admin: {
         Args: { p_team_id: string; p_user_id: string };
@@ -9382,11 +9453,21 @@ export type Database = {
         Returns: boolean;
       };
       lead_stats: {
-        Args: { p_since?: string; p_sla_hours?: number };
+        Args: {
+          p_assignee?: string;
+          p_lead_type?: string;
+          p_search?: string;
+          p_since?: string;
+          p_sla_hours?: number;
+        };
         Returns: Json;
       };
       list_public_open_houses: {
         Args: { _user_id: string };
+        Returns: Record<string, unknown>[];
+      };
+      listing_view_stats: {
+        Args: Record<PropertyKey, never>;
         Returns: Record<string, unknown>[];
       };
       locked_lead_ciphertexts: {
@@ -9478,6 +9559,16 @@ export type Database = {
         Args: { _body?: string; _lead_id: string; _recipient: string; _subject: string };
         Returns: string;
       };
+      log_lead_meeting: {
+        Args: {
+          _lead_id: string;
+          _location?: string;
+          _meeting_type: string;
+          _notes?: string;
+          _scheduled_at?: string;
+        };
+        Returns: string;
+      };
       log_lead_status_change: {
         Args: { _lead_id: string; _new_status: string; _note?: string; _previous_status: string };
         Returns: string;
@@ -9502,6 +9593,7 @@ export type Database = {
         };
         Returns: string;
       };
+      normalize_agent_url: { Args: { p_url: string }; Returns: string };
       plan_limit: { Args: { _key: string; _user_id: string }; Returns: number };
       plan_limit_label: { Args: { _key: string }; Returns: string };
       plan_usage: {
@@ -9517,6 +9609,7 @@ export type Database = {
         Args: { _user_id: string };
         Returns: number;
       };
+      public_profile_custom_css: { Args: { _user_id: string }; Returns: string };
       queue_seo_notification: {
         Args: {
           p_channels: string[];
@@ -9590,6 +9683,10 @@ export type Database = {
       start_workflow_execution: {
         Args: { p_trigger_data?: Json; p_trigger_type: string; p_workflow_id: string };
         Returns: string;
+      };
+      top_listings: {
+        Args: { p_limit?: number; p_since: string };
+        Returns: Record<string, unknown>[];
       };
       top_slow_queries: {
         Args: { p_limit?: number };

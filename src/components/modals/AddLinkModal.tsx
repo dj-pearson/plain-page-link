@@ -48,10 +48,18 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { sanitizeUrl } from '@/utils/sanitizeUrl';
 
 const linkSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
-  url: z.string().min(1, 'URL is required'),
+  url: z
+    .string()
+    .min(1, 'URL is required')
+    // US-268: the same rule the public profile renders with, so a link that
+    // would be dropped from the page is refused here instead of saved.
+    .refine((value) => sanitizeUrl(value) !== '', {
+      message: 'Enter a web address (https://…), an email (mailto:…) or a phone number (tel:…)',
+    }),
   icon: z.string(),
   active: z.boolean(),
 });
@@ -318,11 +326,9 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
   const onSubmit = async (data: LinkFormData) => {
     try {
       setError(null);
-      // Auto-prepend https:// if missing for non-special protocols
-      let url = data.url.trim();
-      if (url && !url.match(/^(https?:\/\/|mailto:|tel:)/i)) {
-        url = `https://${url}`;
-      }
+      // sanitizeUrl puts https:// in front of a bare host ("zillow.com/me")
+      // and the schema has already refused anything it would blank.
+      const url = sanitizeUrl(data.url);
       await onSave?.({ ...data, url });
       onOpenChange(false);
       reset();
@@ -364,7 +370,7 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
               <DialogDescription>Choose a template or create a custom link</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-4 max-h-[60vh] supports-[height:100dvh]:max-h-[60dvh] overflow-y-auto pr-1">
               {/* Custom Link Button */}
               <button
                 onClick={handleCustomLink}

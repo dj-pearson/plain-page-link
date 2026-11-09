@@ -12,12 +12,56 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { logger } from '@/lib/logger';
 import { normalizeUsername } from '@/lib/username';
 import { SEOHead } from '@/components/SEOHead';
+import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunctions';
+import { AvatarImage } from '@/components/profile/AvatarImage';
+
+/**
+ * The limits submit-review enforces (validateReviewData in
+ * supabase/functions/_shared/validation.ts). Held here so the form stops the
+ * visitor at the limit instead of letting them write 2,500 characters and then
+ * refusing the lot.
+ */
+export const REVIEW_LIMITS = {
+  name: 100,
+  title: 100,
+  propertyType: 100,
+  review: 2000,
+} as const;
+
+interface ReviewProfile {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+}
+
+interface SubmitReviewResult {
+  id: string;
+  pendingApproval: boolean;
+  notified: boolean;
+}
+
+/**
+ * What to tell the visitor when the submission fails.
+ *
+ * A 4xx from submit-review is a sentence written for them: the field that is
+ * too long, "Too many review submissions", "This agent is not accepting
+ * reviews". Retrying cannot fix any of those, so the generic "please try
+ * again" sent them round in a loop. A 5xx or a network failure is the case
+ * where trying again is the right advice.
+ */
+export function reviewFailureMessage(error: unknown): string {
+  if (error instanceof EdgeFunctionError && error.status >= 400 && error.status < 500) {
+    return error.message;
+  }
+  return 'There was an error submitting your review. Please try again.';
+}
 
 export default function SubmitReview() {
   const { username } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ReviewProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -63,6 +107,7 @@ export default function SubmitReview() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profile) return;
 
     if (rating === 0) {
       toast({
@@ -77,10 +122,16 @@ export default function SubmitReview() {
 
     try {
       // Through the edge function, not a direct insert: it is what actually
-      // notifies the agent, which is what the success screen has always
-      // promised (US-113). The anon INSERT policy remains as the backstop, but
-      // a review nobody is told about stays unpublished forever.
-      const { data, error } = await supabase.functions.invoke('submit-review', {
+      // notifies the agent (US-113), and since the anon INSERT policy was
+      // dropped it is the only way in.
+      //
+      // callEdgeFunction, not supabase.functions.invoke (US-611). invoke()
+      // posts to ${VITE_SUPABASE_URL}/functions/v1, which Kong sends to the
+      // self-hosted edge runtime that has no functions deployed and answers
+      // every name with a 500 (docs/deploy/edge-functions.md). The functions
+      // are served at VITE_FUNCTIONS_URL, so every review sent the old way
+      // failed — and the error said "please try again".
+      await callEdgeFunction<SubmitReviewResult>('submit-review', {
         body: {
           user_id: profile.id,
           client_name: formData.client_name,
@@ -90,14 +141,8 @@ export default function SubmitReview() {
           property_type: formData.property_type || null,
           transaction_type: formData.transaction_type,
         },
+        auth: false,
       });
-
-      if (error) throw error;
-      // invoke() only rejects on transport failures; a 4xx comes back as a
-      // body with success:false, which used to read as a successful submit.
-      if (data && data.success === false) {
-        throw new Error(data.error?.message ?? 'The review could not be submitted');
-      }
 
       setSubmitted(true);
       toast({
@@ -108,7 +153,7 @@ export default function SubmitReview() {
       logger.error('Error submitting review', error as Error);
       toast({
         title: 'Submission failed',
-        description: 'There was an error submitting your review. Please try again.',
+        description: reviewFailureMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -199,9 +244,9 @@ export default function SubmitReview() {
           <CardHeader>
             <div className="flex items-center gap-4 mb-4">
               {profile.avatar_url && (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.full_name}
+                <AvatarImage
+                  url={profile.avatar_url}
+                  alt={profile.full_name ?? ''}
                   className="w-16 h-16 rounded-full object-cover"
                 />
               )}
@@ -268,6 +313,7 @@ export default function SubmitReview() {
                   value={formData.client_name}
                   onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                   placeholder="John Doe"
+                  maxLength={REVIEW_LIMITS.name}
                   required
                 />
               </div>
@@ -280,6 +326,7 @@ export default function SubmitReview() {
                   value={formData.client_title}
                   onChange={(e) => setFormData({ ...formData, client_title: e.target.value })}
                   placeholder="e.g., First-time Homebuyer, Real Estate Investor"
+                  maxLength={REVIEW_LIMITS.title}
                 />
               </div>
 
@@ -306,6 +353,7 @@ export default function SubmitReview() {
                   value={formData.property_type}
                   onChange={(e) => setFormData({ ...formData, property_type: e.target.value })}
                   placeholder="e.g., Single Family Home, Condo, Townhouse"
+                  maxLength={REVIEW_LIMITS.propertyType}
                 />
               </div>
 
@@ -318,12 +366,20 @@ export default function SubmitReview() {
                   onChange={(e) => setFormData({ ...formData, review: e.target.value })}
                   placeholder="Share your experience working with this agent..."
                   rows={6}
+                  maxLength={REVIEW_LIMITS.review}
+                  aria-describedby="review-help review-count"
                   required
                   className="resize-none"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Please be specific about what made your experience positive.
-                </p>
+                <div className="mt-1 flex justify-between gap-4 text-xs text-muted-foreground">
+                  <p id="review-help">
+                    Please be specific about what made your experience positive.
+                  </p>
+                  <p id="review-count" className="shrink-0 tabular-nums">
+                    {formData.review.length.toLocaleString()} /{' '}
+                    {REVIEW_LIMITS.review.toLocaleString()}
+                  </p>
+                </div>
               </div>
 
               {/* Submit Button */}

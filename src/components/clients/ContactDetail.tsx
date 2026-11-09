@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/dateFormat';
+import { formatDistanceToNowWithSuffix, formatDistanceToNowWords } from '@/lib/relativeTime';
 import {
   Calendar,
   Mail,
@@ -43,6 +44,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { SectionLoadError } from '@/components/dashboard/SectionLoadError';
 import {
   INTERACTION_KINDS,
   contactName,
@@ -103,7 +105,7 @@ function cadenceLabel(days: number | null): string {
 export function formatKeyDate(eventDate: string, yearKnown: boolean): string {
   const date = parseCalendarDate(eventDate);
   if (!date) return eventDate;
-  return format(date, yearKnown ? 'MMM d, yyyy' : 'MMM d');
+  return formatDate(date, yearKnown ? 'MMM d, yyyy' : 'MMM d');
 }
 
 const actionLinkClass =
@@ -130,7 +132,7 @@ export function ContactDetail({ contactId, open, onOpenChange }: ContactDetailPr
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="overflow-y-auto sm:max-w-3xl">
           {isLoading ? (
             <div className="flex justify-center py-12">
               <DialogTitle className="sr-only">Loading client</DialogTitle>
@@ -274,7 +276,7 @@ function ContactBody({
         </Fact>
         <Fact label="Last contacted">
           {contact.last_contacted_at
-            ? `${formatDistanceToNow(new Date(contact.last_contacted_at))} ago`
+            ? `${formatDistanceToNowWords(new Date(contact.last_contacted_at))} ago`
             : 'Not yet'}
         </Fact>
       </dl>
@@ -363,7 +365,7 @@ function KeyDatesPanel({
   contactId: string;
   householdNames: string[];
 }) {
-  const { keyDates, isLoading, deleteKeyDate } = useKeyDates(contactId);
+  const { keyDates, isLoading, isError, refetch, deleteKeyDate } = useKeyDates(contactId);
   // null: no form open; 'new': adding; otherwise the id being edited.
   const [editing, setEditing] = useState<string | null>(null);
   const today = new Date();
@@ -382,6 +384,18 @@ function KeyDatesPanel({
       <div className="flex justify-center py-6">
         <LoadingSpinner />
       </div>
+    );
+  }
+
+  // US-612: a failed read is not "No dates yet" — that invites re-entering a
+  // birthday that is already saved.
+  if (isError) {
+    return (
+      <SectionLoadError
+        message="This client's key dates did not load."
+        onRetry={() => void refetch()}
+        retryLabel="Retry loading key dates"
+      />
     );
   }
 
@@ -500,7 +514,7 @@ function occurredAt(day: string): string | undefined {
 }
 
 function ActivityPanel({ contactId }: { contactId: string }) {
-  const { interactions, isLoading, logInteraction, deleteInteraction } =
+  const { interactions, isLoading, isError, refetch, logInteraction, deleteInteraction } =
     useContactInteractions(contactId);
   const [kind, setKind] = useState<InteractionKind>('call');
   const [summary, setSummary] = useState('');
@@ -608,6 +622,13 @@ function ActivityPanel({ contactId }: { contactId: string }) {
         <div className="flex justify-center py-6">
           <LoadingSpinner />
         </div>
+      ) : isError ? (
+        // US-612: not "Nothing logged yet" when the history failed to load.
+        <SectionLoadError
+          message="This client's activity did not load."
+          onRetry={() => void refetch()}
+          retryLabel="Retry loading activity"
+        />
       ) : interactions.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing logged yet.</p>
       ) : (
@@ -622,7 +643,7 @@ function ActivityPanel({ contactId }: { contactId: string }) {
                 {item.summary && <p className="text-sm text-muted-foreground">{item.summary}</p>}
                 <p className="text-xs text-muted-foreground">
                   <time dateTime={item.occurred_at}>
-                    {formatDistanceToNow(new Date(item.occurred_at), { addSuffix: true })}
+                    {formatDistanceToNowWithSuffix(new Date(item.occurred_at))}
                   </time>
                 </p>
               </div>
@@ -690,7 +711,7 @@ function DetailsPanel({ contact }: { contact: Contact }) {
         <Fact label="Work">{work || '—'}</Fact>
         <Fact label="Referred by">{contact.referred_by || '—'}</Fact>
         <Fact label="Source">{contact.source || '—'}</Fact>
-        <Fact label="Client since">{format(new Date(contact.created_at), 'MMM d, yyyy')}</Fact>
+        <Fact label="Client since">{formatDate(new Date(contact.created_at), 'MMM d, yyyy')}</Fact>
       </dl>
 
       {contact.notes && (

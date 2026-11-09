@@ -6,7 +6,13 @@
  * Pending badge had nothing to render on.
  */
 import { describe, it, expect } from 'vitest';
-import { selectAvailableListings, selectSoldListings } from './publicListingVisibility';
+import {
+  selectAvailableListings,
+  reachableListingHref,
+  selectListingForPage,
+  selectVisibleProfileListings,
+  selectSoldListings,
+} from './publicListingVisibility';
 
 const l = (id: string, status: string) => ({ id, status });
 
@@ -59,5 +65,85 @@ describe('selectSoldListings', () => {
   it('returns only sold listings', () => {
     const result = selectSoldListings([l('a', 'active'), l('s', 'sold'), l('p', 'pending')]);
     expect(result.map((x) => x.id)).toEqual(['s']);
+  });
+});
+
+describe('selectListingForPage (US-275)', () => {
+  const all = [l('a', 'active'), l('p', 'pending'), l('s', 'sold'), l('d', 'draft')];
+  const shown = { show_listings: true, show_sold_properties: true };
+
+  it('finds an available listing by id', () => {
+    expect(selectListingForPage(all, 'a', shown)?.id).toBe('a');
+    expect(selectListingForPage(all, 'p', shown)?.id).toBe('p');
+  });
+
+  it('returns null for an unknown id, a missing id, or a draft', () => {
+    expect(selectListingForPage(all, 'zzz', shown)).toBeNull();
+    expect(selectListingForPage(all, undefined, shown)).toBeNull();
+    expect(selectListingForPage(all, 'd', shown)).toBeNull();
+  });
+
+  it('shows a sold listing only while the agent shows sold properties', () => {
+    expect(selectListingForPage(all, 's', shown)?.id).toBe('s');
+    expect(selectListingForPage(all, 's', { ...shown, show_sold_properties: false })).toBeNull();
+  });
+
+  it('shows nothing at all while the agent hides listings', () => {
+    expect(selectListingForPage(all, 'a', { show_listings: false })).toBeNull();
+  });
+
+  it('treats missing settings as the defaults (shown)', () => {
+    expect(selectListingForPage(all, 'a', null)?.id).toBe('a');
+    expect(selectListingForPage(all, 's', null)?.id).toBe('s');
+  });
+});
+
+describe('reachableListingHref (US-589)', () => {
+  it('links an available listing to its page', () => {
+    expect(reachableListingHref('jane', {})(l('a', 'active'))).toBe('/jane/listing/a');
+    expect(reachableListingHref('jane', null)(l('p', 'pending'))).toBe('/jane/listing/p');
+  });
+
+  it('does not link what the listing page would refuse', () => {
+    expect(
+      reachableListingHref('jane', { show_sold_properties: false })(l('s', 'sold'))
+    ).toBeNull();
+    expect(reachableListingHref('jane', { show_listings: false })(l('a', 'active'))).toBeNull();
+    expect(reachableListingHref('jane', {})(l('d', 'draft'))).toBeNull();
+  });
+
+  it('links a sold listing while sold properties are shown', () => {
+    expect(reachableListingHref('jane', { show_sold_properties: true })(l('s', 'sold'))).toBe(
+      '/jane/listing/s'
+    );
+  });
+});
+
+describe('selectVisibleProfileListings (US-586)', () => {
+  const rows = [
+    l('s1', 'sold'),
+    l('p1', 'pending'),
+    l('d1', 'draft'),
+    l('a1', 'active'),
+    l('u1', 'under_contract'),
+  ];
+
+  it('lists available homes first, then sold, and drops what is not public', () => {
+    expect(selectVisibleProfileListings(rows, {}).map((r) => r.id)).toEqual([
+      'a1',
+      'p1',
+      'u1',
+      's1',
+    ]);
+  });
+
+  it('drops sold homes while the agent hides sold properties', () => {
+    expect(
+      selectVisibleProfileListings(rows, { show_sold_properties: false }).map((r) => r.id)
+    ).toEqual(['a1', 'p1', 'u1']);
+  });
+
+  it('is empty while the agent hides listings', () => {
+    expect(selectVisibleProfileListings(rows, { show_listings: false })).toEqual([]);
   });
 });

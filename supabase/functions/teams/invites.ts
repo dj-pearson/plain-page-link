@@ -81,3 +81,39 @@ export function teamNameForEmail(name: string): string {
     .trim();
   return cleaned || 'their team';
 }
+
+// ---------------------------------------------------------------------------
+// Leaving a team (US-430, from US-419)
+//
+// 'remove' needs is_team_admin, so a plain member could not take their own
+// seat back. 'leave' deletes only the caller's own accepted, non-owner row.
+// ---------------------------------------------------------------------------
+
+export interface LeaveRefusal {
+  message: string;
+  code: string;
+  status: number;
+}
+
+/**
+ * Why a leave request is refused, or null when the caller's row was removed.
+ * The owner cannot leave: the team, its seats and its billing hang off
+ * teams.owner_id, and nobody would be left to manage it.
+ */
+export function leaveTeamRefusal(outcome: {
+  teamExists: boolean;
+  isOwner: boolean;
+  rowsRemoved: number;
+}): LeaveRefusal | null {
+  if (outcome.teamExists && outcome.isOwner) {
+    return {
+      message: 'The owner can’t leave their own team',
+      code: 'OWNER_CANNOT_LEAVE',
+      status: 409,
+    };
+  }
+  if (!outcome.teamExists || outcome.rowsRemoved === 0) {
+    return { message: 'You’re not a member of this team', code: 'NOT_FOUND', status: 404 };
+  }
+  return null;
+}

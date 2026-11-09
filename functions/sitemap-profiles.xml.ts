@@ -8,13 +8,16 @@
  * in _lib/profile-sitemap.ts, where it is unit tested.
  */
 import { profileSitemapResponse, type ProfileSitemapEnv } from './_lib/profile-sitemap';
+import { siteOrigin } from './_lib/site-origin';
 
 interface PagesContext {
   request: Request;
   env: ProfileSitemapEnv;
 }
 
-export const onRequestGet = async ({ request, env }: PagesContext): Promise<Response> => {
-  const origin = new URL(request.url).origin;
-  return profileSitemapResponse(env, origin, (input, init) => fetch(input, init));
-};
+/**
+ * Every <loc> names the canonical origin, not the host that served the file
+ * (US-595): the sitemap must list the addresses the pages canonicalise to.
+ */
+export const onRequestGet = async ({ env }: PagesContext): Promise<Response> =>
+  profileSitemapResponse(env, siteOrigin(env), (input, init) => fetch(input, init));

@@ -9,7 +9,7 @@
  * waits for a yes.
  */
 import type { SubscriptionPlan } from '@/hooks/useSubscription';
-import { LIMIT_META, describeLimit, type PlanLimitKey } from '@/lib/planLimits';
+import { LIMIT_META, describeLimit, limitShips, type PlanLimitKey } from '@/lib/planLimits';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +37,11 @@ export interface PlanChangeConfirmDialogProps {
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** The plan's limits, in LIMIT_META order, with what the agent uses now. */
+/**
+ * The plan's limits, in LIMIT_META order, with what the agent uses now. Only
+ * limits on features that exist: a downgrade does not "cut" automated texts
+ * or CMA reports that no plan delivers (US-297).
+ */
 export function limitsAfterChange(
   plan: Pick<SubscriptionPlan, 'limits'>,
   usage: Partial<Record<PlanLimitKey, number>> = {}
@@ -45,7 +49,7 @@ export function limitsAfterChange(
   const limits = (plan.limits ?? {}) as Partial<Record<PlanLimitKey, unknown>>;
   return (Object.keys(LIMIT_META) as PlanLimitKey[]).flatMap((key) => {
     const limit = limits[key];
-    if (typeof limit !== 'number') return [];
+    if (typeof limit !== 'number' || !limitShips(key)) return [];
     const used = usage[key];
     const over = limit !== -1 && typeof used === 'number' && used > limit;
     return [{ key, text: describeLimit(key, limit), over, used }];

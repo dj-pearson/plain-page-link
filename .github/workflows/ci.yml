@@ -41,6 +41,13 @@ jobs:
         # ordinary check is the stronger one, so the ratchet is gone.
         run: npx tsc --noEmit
 
+      - name: Type check build config
+        # tsconfig.json covers src/ and functions/ only, so vite.config.ts —
+        # which decides vendor chunks and stamps the service worker version —
+        # was never type-checked. tsconfig.node.json had failed (TS6307,
+        # TS18028) for months without anyone seeing it (US-365).
+        run: npx tsc --noEmit -p tsconfig.node.json
+
   test:
     name: Test
     needs: typecheck
@@ -194,12 +201,23 @@ jobs:
           # With a DSN, the Sentry SDK and Session Replay used to add 81 KB gzip
           # to the entry chunk and nothing noticed. A dummy: no project behind it.
           VITE_SENTRY_DSN: https://public@o0.ingest.sentry.io/0
+          # US-535: write dist/.vite/manifest.json for the dashboard route
+          # check below. The Cloudflare Pages deploy does not set this.
+          BUILD_MANIFEST: 'true'
 
       - name: Check bundle size budgets
         run: npm run size-check
         env:
           # Tells the check to insist the SDK was compiled (lazily) at all.
           VITE_SENTRY_DSN: https://public@o0.ingest.sentry.io/0
+
+      - name: Check what each dashboard route loads beyond the layout
+        # US-535 (US-402). The route-weight job opens public routes in a
+        # browser; /dashboard/* needs a login it does not have. This weighs
+        # each dashboard route's static-import closure from the manifest,
+        # beyond the entry and DashboardLayout, against a per-route budget, and
+        # fails if one statically reaches form-vendor or charts-vendor again.
+        run: npm run dashboard-weight
 
   lint:
     name: Lint
@@ -223,9 +241,9 @@ jobs:
         run: npm ci
 
       # US-223: was --max-warnings=-1, which let the count only grow. This is
-      # the count after the 2026-09-30 roadmap loop; lower it whenever a change removes warnings.
+      # the count on 2026-11-07 (US-352; was 673); lower it whenever a change removes warnings.
       - name: Run ESLint
-        run: npx eslint src/ --max-warnings=673
+        run: npx eslint src/ --max-warnings=527
 
   security:
     name: Security Audit
@@ -252,7 +270,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Run ESLint
-        run: npx eslint src/ --max-warnings=673
+        run: npx eslint src/ --max-warnings=527
 
   e2e:
     name: End-to-End (Playwright)

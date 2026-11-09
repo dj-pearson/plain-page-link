@@ -7,8 +7,9 @@
  */
 
 import { useState } from 'react';
-import { Loader2, Plus, Trash2, GitBranch } from 'lucide-react';
+import { Loader2, Plus, Trash2, GitBranch, UserX } from 'lucide-react';
 import { useLeadRouting } from '@/hooks/useLeadRouting';
+import { describeRuleAssignee, type RosterEntry } from '@/lib/routingRuleAssignee';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,21 +22,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-interface Member {
-  user_id: string | null;
-  email: string | null;
-}
+import { SectionLoadError } from '@/components/dashboard/SectionLoadError';
 
 interface LeadRoutingRulesProps {
   teamId: string;
-  members: Member[];
+  members: RosterEntry[];
 }
 
 const LEAD_TYPES = ['any', 'buyer', 'seller', 'valuation', 'contact', 'open_house'];
 
 export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
-  const { rules, isLoading, createRule, toggleRule, deleteRule } = useLeadRouting(teamId);
+  const { rules, isLoading, isError, refetch, createRule, toggleRule, deleteRule } =
+    useLeadRouting(teamId);
   const { toast } = useToast();
 
   const [name, setName] = useState('');
@@ -84,9 +82,6 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
       }
     );
   };
-
-  const memberLabel = (userId: string | null) =>
-    members.find((m) => m.user_id === userId)?.email ?? 'Unassigned';
 
   return (
     <Card>
@@ -165,44 +160,75 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
           <div className="flex items-center text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
           </div>
+        ) : isError ? (
+          // US-612: not "No routing rules yet" — that reads as "leads
+          // round-robin" when rules the agent set may be routing them.
+          <SectionLoadError
+            message="Your routing rules did not load."
+            onRetry={() => void refetch()}
+            retryLabel="Retry loading routing rules"
+          />
         ) : rules.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">
             No routing rules yet — leads round-robin across the team by default.
           </p>
         ) : (
           <ul className="divide-y divide-border">
-            {rules.map((rule) => (
-              <li key={rule.id} className="flex items-center justify-between gap-3 py-3">
-                <div>
-                  <div className="font-medium text-foreground">
-                    {rule.name}
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      priority {rule.priority}
-                    </span>
+            {rules.map((rule) => {
+              const assignee = describeRuleAssignee(rule.assigned_to, members);
+              // US-454: a departed teammate's rule is paused and routes nothing
+              // even if switched on, so turning it back on is not offered.
+              const cannotResume = assignee.kind === 'departed' && !rule.is_active;
+              return (
+                <li key={rule.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-foreground">
+                      {rule.name}
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        priority {rule.priority}
+                        {!rule.is_active && ' · paused'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {rule.criteria.lead_type ? `${rule.criteria.lead_type} → ` : 'any → '}
+                      {assignee.kind === 'member'
+                        ? assignee.email
+                        : assignee.kind === 'round_robin'
+                          ? 'round-robin'
+                          : 'unassigned'}
+                    </div>
+                    {assignee.kind === 'departed' && (
+                      <p className="mt-1 flex items-start gap-1.5 text-xs text-foreground">
+                        <UserX className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>
+                          The teammate this rule assigned to has left the team, so it no longer
+                          assigns leads. Delete it and add a new rule for someone on the team.
+                        </span>
+                      </p>
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {rule.criteria.lead_type ? `${rule.criteria.lead_type} → ` : 'any → '}
-                    {rule.assigned_to ? memberLabel(rule.assigned_to) : 'round-robin'}
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      aria-label={`${rule.is_active ? 'Pause' : 'Resume'} rule ${rule.name}`}
+                      checked={rule.is_active}
+                      disabled={cannotResume}
+                      onCheckedChange={(checked) =>
+                        toggleRule.mutate({ id: rule.id, is_active: checked })
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Delete rule ${rule.name}`}
+                      className="text-destructive hover:bg-destructive/10"
+                      onClick={() => deleteRule.mutate(rule.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={rule.is_active}
-                    onCheckedChange={(checked) =>
-                      toggleRule.mutate({ id: rule.id, is_active: checked })
-                    }
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:bg-red-50"
-                    onClick={() => deleteRule.mutate(rule.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>

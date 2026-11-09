@@ -1,8 +1,12 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { HOMEPAGE_SEO } from './src/config/homepage-seo';
+import { buildIdFromFileNames, stampServiceWorkerVersion } from './src/config/sw-version';
+import { vendorChunkFor } from './src/config/vendor-chunks';
 // Cache bust: 2026-01-02 - Performance optimization
 
 // Bundle size baseline (2026-05-17, production build, minified, pre-gzip).
@@ -14,7 +18,7 @@ import { HOMEPAGE_SEO } from './src/config/homepage-seo';
 //                            loaded on hero sections, never on first paint)
 //   export-vendor  594 KB  (jspdf/html2canvas; lazy, under vendor budget)
 //   index          407 KB  (entry)
-//   charts-vendor  402 KB  (recharts; lazy, dashboard only)
+//   charts-vendor  402 KB  (recharts; lazy, admin screens only since US-395)
 //   supabase       175 KB  | react-vendor 164 KB | animation-vendor 185 KB
 // ANALYZE=true `vite build` writes dist/stats.html and opens it.
 const ANALYZE = process.env.ANALYZE === 'true';
@@ -39,131 +43,10 @@ const ANALYZE = process.env.ANALYZE === 'true';
 // dist without that flag set.
 const BUILD_SOURCEMAPS = process.env.BUILD_SOURCEMAPS === 'true';
 
-// Vendor chunk groupings, applied by the manualChunks function below.
-//
-// Matched on the package directory a module resolves into, so a package's own
-// files all land together. Transitive dependencies are deliberately NOT pulled
-// in: recharts' d3-* packages, for instance, get their own chunks rather than
-// being welded into charts-vendor, which is what the old object form did.
-//
-// Order matters only in that the first match wins; the lists are disjoint.
-const VENDOR_CHUNKS: readonly (readonly [string, readonly string[]])[] = [
-  // React core - rarely changes, caches well.
-  //
-  // clsx, tailwind-merge and class-variance-authority are here for the same
-  // reason the preload helper is (US-164). They are a few KB each, every
-  // component in the app calls cn() from src/lib/utils.ts, and recharts happens
-  // to depend on clsx too — so Rollup, having no instruction, filed clsx into
-  // charts-vendor and the ENTRY chunk then emitted
-  // `import{e as Tr}from"./charts-vendor-<hash>.js"` to get it. 394 KB of
-  // dashboard charting library on the critical path of the marketing landing
-  // page, for one 500-byte function. Same shape as US-163, one layer down:
-  // a tiny shared module with no home, adopted by the largest chunk that
-  // happened to want it. Name them, and they land where they are needed.
-  [
-    'react-vendor',
-    [
-      'react',
-      'react-dom',
-      'react-router-dom',
-      'react-router',
-      'clsx',
-      'tailwind-merge',
-      'class-variance-authority',
-      // Same story again, and the reason three-vendor was reaching into
-      // charts-vendor: @babel/runtime's helpers (_extends and friends) are a
-      // few hundred bytes, and both recharts and @react-three/drei depend on
-      // them. Rollup put them in charts-vendor, so loading a 3D profile theme
-      // pulled in 394 KB of charting library to get Object.assign.
-      '@babel/runtime',
-      // And once more, for Radix (US-244). Button is on every page and imports
-      // Slot from @radix-ui/react-slot, which was listed in ui-vendor — so the
-      // entry chunk statically imported all of ui-vendor (dialog, select,
-      // dropdown, tabs, popover, accordion, toast... 37 KB gzip) to render a
-      // <button>. Slot and the compose-refs helper it is built on are about a
-      // kilobyte; they live with React, and ui-vendor loads only on the pages
-      // that open a dialog or a menu.
-      '@radix-ui/react-slot',
-      '@radix-ui/react-compose-refs',
-    ],
-  ],
-  // Supabase client - used everywhere
-  ['supabase', ['@supabase/supabase-js']],
-  // UI framework - Radix components
-  [
-    'ui-vendor',
-    [
-      '@radix-ui/react-dialog',
-      '@radix-ui/react-dropdown-menu',
-      '@radix-ui/react-tabs',
-      '@radix-ui/react-select',
-      '@radix-ui/react-popover',
-      '@radix-ui/react-accordion',
-      '@radix-ui/react-checkbox',
-      '@radix-ui/react-switch',
-      '@radix-ui/react-toast',
-      '@radix-ui/react-label',
-      '@radix-ui/react-progress',
-      '@radix-ui/react-separator',
-      '@radix-ui/react-alert-dialog',
-    ],
-  ],
-  // Heavy 3D libraries - lazy loaded, and they must STAY lazy: see the
-  // preload-helper note in manualChunks below.
-  ['three-vendor', ['three', '@react-three/fiber', '@react-three/drei']],
-  // Charts - dashboard only
-  ['charts-vendor', ['recharts']],
-  // Animation libraries, in two chunks (US-244). They were one
-  // animation-vendor chunk, so the public profile — which uses framer-motion
-  // and nothing else — downloaded GSAP too (67 KB gzip together). GSAP is
-  // used by the landing hero alone.
-  ['motion-vendor', ['framer-motion']],
-  ['gsap-vendor', ['gsap', '@gsap/react']],
-  // Markdown rendering - blog only
-  ['markdown-vendor', ['react-markdown', 'remark-gfm']],
-  // Form handling
-  ['form-vendor', ['react-hook-form', '@hookform/resolvers', 'zod']],
-  // State management
-  ['state-vendor', ['zustand', '@tanstack/react-query']],
-  // Date utilities
-  ['date-vendor', ['date-fns']],
-  // Error monitoring (US-255). Both are reached only through dynamic imports
-  // in src/lib/sentry.ts -> sentry-sdk.ts -> sentry-replay.ts, and are named so
-  // scripts/check-bundle-size.mjs can prove they stay off the first-paint
-  // graph. Replay (rrweb inside it) is the larger half and loads last.
-  [
-    'sentry-vendor',
-    [
-      '@sentry/react',
-      '@sentry/browser',
-      '@sentry/core',
-      '@sentry-internal/browser-utils',
-      '@sentry-internal/feedback',
-    ],
-  ],
-  ['sentry-replay-vendor', ['@sentry-internal/replay', '@sentry-internal/replay-canvas']],
-];
-
-// jspdf / jspdf-autotable are deliberately absent from the table above
-// (US-162). They are reached only through the `await import('jspdf')` inside
-// src/lib/exportUtils.ts, so Rollup already gives them their own async chunk.
-// Naming them here forced that chunk into existence eagerly and made it the
-// preload helper's home. html2canvas was listed too and is not a dependency of
-// this project at all; jspdf only references it optionally.
-
-/**
- * The package a module id belongs to, or undefined for first-party source.
- * Handles scoped names, and the last node_modules segment so a nested
- * dependency is attributed to itself rather than to its parent.
- */
-function packageOf(id: string): string | undefined {
-  const marker = 'node_modules/';
-  const last = id.lastIndexOf(marker);
-  if (last === -1) return undefined;
-
-  const rest = id.slice(last + marker.length).split('/');
-  return rest[0].startsWith('@') ? `${rest[0]}/${rest[1]}` : rest[0];
-}
+// US-535: scripts/check-dashboard-weight.mjs reads .vite/manifest.json to weigh
+// each dashboard route. Written only when asked for (CI's bundle-size job), so
+// the deployed site does not publish its chunk map at /.vite/manifest.json.
+const BUILD_MANIFEST = process.env.BUILD_MANIFEST === 'true';
 
 export default defineConfig(({ mode }) => {
   // '' as the prefix so .env files are read whole; only VITE_GA_MEASUREMENT_ID
@@ -249,14 +132,30 @@ export default defineConfig(({ mode }) => {
       // Security headers plugin for development
       {
         name: 'security-headers',
-        configureServer(server) {
-          server.middlewares.use((req, res, next) => {
+        configureServer(server: ViteDevServer) {
+          server.middlewares.use((_req, res, next) => {
             res.setHeader('X-Frame-Options', 'SAMEORIGIN');
             res.setHeader('X-Content-Type-Options', 'nosniff');
             res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
             res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
             next();
           });
+        },
+      },
+      // Gives dist/sw.js a VERSION that changes with the deployed code (US-272).
+      // Without it the worker is byte-identical on every deploy, the browser
+      // never installs a new one, and the precached offline shell stays the
+      // copy from a visitor's first visit. See src/config/sw-version.ts.
+      {
+        name: 'sw-build-version',
+        apply: 'build' as const,
+        writeBundle(options: { dir?: string }, bundle: Record<string, unknown>) {
+          const target = path.join(options.dir ?? path.resolve(__dirname, 'dist'), 'sw.js');
+          if (!existsSync(target)) return;
+          const buildId = buildIdFromFileNames(Object.keys(bundle), (input) =>
+            createHash('sha256').update(input).digest('hex')
+          );
+          writeFileSync(target, stampServiceWorkerVersion(readFileSync(target, 'utf8'), buildId));
         },
       },
       // Bundle visualizer — only when ANALYZE=true (off in CI/normal builds)
@@ -279,6 +178,7 @@ export default defineConfig(({ mode }) => {
       // it does NOT stop anyone requesting the .map directly, which is why the
       // default is false and the deploy guard exists.
       sourcemap: BUILD_SOURCEMAPS ? 'hidden' : false,
+      manifest: BUILD_MANIFEST,
       rollupOptions: {
         output: {
           format: 'es',
@@ -304,13 +204,9 @@ export default defineConfig(({ mode }) => {
             // "vite" package`. A function can match the virtual id directly.
             if (id.includes('vite/preload-helper')) return 'react-vendor';
 
-            const pkg = packageOf(id);
-            if (!pkg) return undefined;
-
-            for (const [chunk, packages] of VENDOR_CHUNKS) {
-              if (packages.includes(pkg)) return chunk;
-            }
-            return undefined;
+            // The vendor table and its matching rule are in
+            // src/config/vendor-chunks.ts, where they are unit-tested.
+            return vendorChunkFor(id);
           },
         },
       },

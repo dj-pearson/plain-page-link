@@ -1,5 +1,6 @@
 /**
- * US-114: a listing had no URL.
+ * US-114: a listing had no URL. US-275: it has a page of its own now, and the
+ * old ?listing= links redirect to it.
  *
  * The detail modal was component state, so every share button shared
  * window.location.href — the profile. The recipient landed at the top of a
@@ -100,50 +101,65 @@ async function setupMocks(page: Page) {
   );
 }
 
-const dialog = (page: Page) => page.getByRole('dialog');
+const heading = (page: Page) => page.getByRole('heading', { level: 1 });
 
-test.describe('Listing deep link', () => {
-  test('?listing=<id> opens that property on load', async ({ page }) => {
+test.describe('Listing page (US-275)', () => {
+  test('/:username/listing/:id renders that property as a page', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto(`/${AGENT.username}/listing/${SECOND.id}`);
+
+    await expect(heading(page)).toContainText(SECOND.address);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByText('Equal Housing Opportunity')).toBeVisible();
+  });
+
+  test('an old ?listing=<id> link redirects to the listing page', async ({ page }) => {
     await setupMocks(page);
     await page.goto(`/${AGENT.username}?listing=${SECOND.id}`);
 
-    await expect(dialog(page)).toBeVisible();
-    await expect(dialog(page).getByText(SECOND.address).first()).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/${AGENT.username}/listing/${SECOND.id}$`));
+    await expect(heading(page)).toContainText(SECOND.address);
   });
 
-  test('an id that matches nothing renders the profile rather than an error', async ({ page }) => {
+  test("an id that matches nothing points the visitor at the agent's listings", async ({
+    page,
+  }) => {
     await setupMocks(page);
-    await page.goto(`/${AGENT.username}?listing=deleted-long-ago`);
+    await page.goto(`/${AGENT.username}/listing/deleted-long-ago`);
 
-    await expect(page.getByText(AGENT.fullName).first()).toBeVisible();
-    await expect(dialog(page)).toHaveCount(0);
-  });
-
-  test('opening a listing puts it in the URL, and Back closes it', async ({ page }) => {
-    await setupMocks(page);
-    await page.goto(`/${AGENT.username}`);
-
-    await page
-      .getByRole('button', { name: new RegExp(`View listing:\\s*${FIRST.address}`) })
-      .first()
-      .click();
-
-    await expect(dialog(page)).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`\\?listing=${FIRST.id}$`));
-
-    await page.goBack();
-    await expect(dialog(page)).toHaveCount(0);
+    await expect(heading(page)).toHaveText('This home is no longer listed');
+    await page.getByRole('link', { name: /listings/ }).click();
     await expect(page).toHaveURL(new RegExp(`/${AGENT.username}$`));
   });
 
-  test('the share button copies the listing URL, not the profile URL', async ({
+  test('opening a listing navigates to its page, and Back returns to the profile', async ({
+    page,
+  }) => {
+    await setupMocks(page);
+    await page.goto(`/${AGENT.username}`);
+
+    // A real <a href> (US-408): crawlable, and openable in a new tab.
+    const card = page
+      .getByRole('link', { name: new RegExp(`View listing:\\s*${FIRST.address}`) })
+      .first();
+    await expect(card).toHaveAttribute('href', `/${AGENT.username}/listing/${FIRST.id}`);
+    await card.click();
+
+    await expect(page).toHaveURL(new RegExp(`/${AGENT.username}/listing/${FIRST.id}$`));
+    await expect(heading(page)).toContainText(FIRST.address);
+
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`/${AGENT.username}$`));
+  });
+
+  test('the share button copies the listing page URL, not the profile URL', async ({
     page,
     context,
   }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await setupMocks(page);
-    await page.goto(`/${AGENT.username}?listing=${FIRST.id}`);
-    await expect(dialog(page)).toBeVisible();
+    await page.goto(`/${AGENT.username}/listing/${FIRST.id}`);
+    await expect(heading(page)).toContainText(FIRST.address);
 
     // navigator.share exists on the mobile emulation Playwright ships, and the
     // component prefers it; remove it so the clipboard branch is the one under
@@ -153,10 +169,9 @@ test.describe('Listing deep link', () => {
       delete navigator.share;
     });
 
-    await dialog(page).getByRole('button', { name: /share/i }).first().click();
+    await page.getByRole('button', { name: 'Share property', exact: true }).first().click();
 
     const copied = await page.evaluate(() => navigator.clipboard.readText());
-    expect(copied).toContain(`/${AGENT.username}`);
-    expect(copied).toContain(`listing=${FIRST.id}`);
+    expect(copied).toMatch(new RegExp(`/${AGENT.username}/listing/${FIRST.id}$`));
   });
 });

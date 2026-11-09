@@ -17,11 +17,125 @@
  */
 import type { Lead } from '@/types/lead';
 
+/**
+ * The one lead status vocabulary (US-278 / US-428).
+ *
+ * Migration 20261107000428 adds `leads_status_check` with exactly these
+ * values, in this order; leadStatus.test.ts reads the migration and holds the
+ * two together. Every picker (the lead modal, the bulk action, the workflow
+ * builder's update_lead step) and every badge reads this list, so a status
+ * cannot be offered in one place and unknown in another — which is what had
+ * happened: the UI offered new/contacted/qualified/converted/lost while this
+ * file also honoured nurturing and closed, and nothing in the database stopped
+ * any other string.
+ *
+ *   converted  the lead became a client (the agent's win)
+ *   closed     the deal itself completed
+ *   nurturing  a long-horizon lead the agent keeps warm
+ *   lost       did not convert
+ */
+export const LEAD_STATUSES = [
+  { value: 'new', label: 'New' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'qualified', label: 'Qualified' },
+  { value: 'nurturing', label: 'Nurturing' },
+  { value: 'converted', label: 'Converted' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'lost', label: 'Lost' },
+] as const;
+
+export type LeadStatus = (typeof LEAD_STATUSES)[number]['value'];
+
+export const LEAD_STATUS_VALUES: readonly LeadStatus[] = LEAD_STATUSES.map((s) => s.value);
+
+export function isLeadStatus(value: unknown): value is LeadStatus {
+  return typeof value === 'string' && (LEAD_STATUS_VALUES as readonly string[]).includes(value);
+}
+
+/** The label for a stored status; an unexpected value is shown as-is. */
+export function leadStatusLabel(status: string | null | undefined): string {
+  const value = status ?? 'new';
+  return LEAD_STATUSES.find((s) => s.value === value)?.label ?? value;
+}
+
 /** Statuses that mean the lead is finished, one way or the other. */
-const CLOSED_STATUSES = new Set(['converted', 'lost', 'closed']);
+export const CLOSED_STATUSES: ReadonlySet<string> = new Set<LeadStatus>([
+  'converted',
+  'closed',
+  'lost',
+]);
 
 /** Statuses that mean the agent has made contact. */
-const CONTACTED_STATUSES = new Set(['contacted', 'qualified', 'nurturing', 'converted', 'closed']);
+export const CONTACTED_STATUSES: ReadonlySet<string> = new Set<LeadStatus>([
+  'contacted',
+  'qualified',
+  'nurturing',
+  'converted',
+  'closed',
+]);
+
+/**
+ * How the Leads KPI chips, the status filter and the funnels group the
+ * vocabulary (US-439).
+ *
+ * The chips read byStatus.new / .contacted / .converted and nothing else, so a
+ * lead moved to qualified, nurturing or closed dropped out of every count on
+ * the page, and a closed deal — the agent's actual win — was never counted as
+ * one. Every status belongs to exactly one group; leadStatus.test.ts holds
+ * that true as the vocabulary grows.
+ *
+ *   new          not yet responded to
+ *   in_progress  contacted, qualified, nurturing: the agent is working it
+ *   won          converted or closed
+ *   lost         did not convert
+ */
+export const IN_PROGRESS_STATUSES: readonly LeadStatus[] = ['contacted', 'qualified', 'nurturing'];
+export const WON_STATUSES: readonly LeadStatus[] = ['converted', 'closed'];
+
+/** The groups the `?status=` filter accepts besides a single status. */
+export const LEAD_STATUS_GROUPS = [
+  { value: 'in_progress', label: 'In progress', statuses: IN_PROGRESS_STATUSES },
+  { value: 'won', label: 'Won', statuses: WON_STATUSES },
+] as const;
+
+/**
+ * The `leads.status` values a `?status=` filter selects: one status, a group,
+ * or undefined for 'all'. An unrecognised value (a stale or hand-edited link)
+ * reads as 'all' rather than as a filter that silently matches nothing.
+ */
+export function statusFilterValues(
+  filter: string | null | undefined
+): readonly LeadStatus[] | undefined {
+  if (!filter || filter === 'all') return undefined;
+  if (isLeadStatus(filter)) return [filter];
+  return LEAD_STATUS_GROUPS.find((g) => g.value === filter)?.statuses;
+}
+
+/** The filter value to show for a `?status=` param; unknown values read as 'all'. */
+export function normalizeStatusFilter(filter: string | null | undefined): string {
+  return filter && statusFilterValues(filter) ? filter : 'all';
+}
+
+export interface LeadStatusSummary {
+  new: number;
+  inProgress: number;
+  won: number;
+  lost: number;
+}
+
+/** Folds per-status counts (lead_stats().by_status) into the chip groups. */
+export function summarizeLeadStatuses(
+  byStatus: Record<string, number | undefined> | null | undefined
+): LeadStatusSummary {
+  const count = (statuses: readonly string[]) =>
+    statuses.reduce((n, s) => n + Number(byStatus?.[s] ?? 0), 0);
+  return {
+    new: count(['new']),
+    inProgress: count(IN_PROGRESS_STATUSES),
+    won: count(WON_STATUSES),
+    lost: count(['lost']),
+  };
+}
 
 export interface LeadStatusPatch {
   status: string;

@@ -7,7 +7,17 @@ import { checkRateLimitDb, RATE_LIMITS, type RateLimitConfig } from '../_shared/
 import { getClientIP } from '../_shared/client-ip.ts'
 import { stripLinks, safeHtmlText, safeNumber } from '../_shared/public-email.ts'
 import { getErrorMessage } from '../_shared/errorHelpers.ts'
-import { getSiteUrl } from '../_shared/env.ts';
+import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts';
+import {
+  isSuppressed,
+  unsubscribeFooterHtml,
+  unsubscribeFooterText,
+  unsubscribeHeaders,
+  unsubscribeLinks,
+  unsubscribeSecret,
+  type UnsubscribeLinks,
+} from '../_shared/marketing-unsubscribe.ts';
+import { BIO_DRIP_SEQUENCE_NUMBERS, bioDripSubject } from '../_shared/bio-drip-emails.ts';
 
 interface BioAnalyzerEmailData {
   firstName: string
@@ -48,6 +58,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+    // US-425: no marketing email without a working opt-out.
+    const secret = unsubscribeSecret()
+    if (!secret) {
+      console.error('[send-bio-analyzer-email] PII_ENCRYPTION_KEY is not set; refusing to send without an unsubscribe link')
+      return json(503, { error: 'Email is temporarily unavailable.' })
+    }
+
     const ipLimit = await checkRateLimitDb(supabase, getClientIP(req), 'send-bio-analyzer-email', RATE_LIMITS.submission)
     if (!ipLimit.allowed) {
       return json(429, { error: 'Rate limit exceeded. Please try again later.' })
@@ -77,6 +94,13 @@ serve(async (req) => {
       return json(429, { error: 'This address has received enough email today.' })
     }
 
+    if (await isSuppressed(supabase, String(capture.email), secret)) {
+      // They opted out before (from either tool's emails): send nothing and
+      // schedule nothing. The visitor still has the results on screen.
+      await supabase.from('instagram_bio_email_captures').update({ email_sequence_completed: true }).eq('id', captureId)
+      return json(200, { success: true, sent: false })
+    }
+
     const { data: analysis } = capture.analysis_id
       ? await supabase.from('instagram_bio_analyses').select('result_data').eq('id', capture.analysis_id).maybeSingle()
       : { data: null }
@@ -101,11 +125,17 @@ serve(async (req) => {
     }
     const subject = `${plainData.firstName}, Your 3 Optimized Instagram Bios + Action Plan Inside`
 
+    const unsubscribe = await unsubscribeLinks('bio', captureId, secret, {
+      siteUrl: getSiteUrl(),
+      functionsUrl: getFunctionsUrl(),
+    })
+
     const sent = await sendEmail({
       to: capture.email,
       subject,
-      body: getEmail1PlainText(plainData),
-      html: getEmail1HTML(htmlData),
+      body: `${getEmail1PlainText(plainData)}\n\n${unsubscribeFooterText(unsubscribe, UNSUBSCRIBE_REASON)}`,
+      html: getEmail1HTML(htmlData, unsubscribe),
+      headers: unsubscribeHeaders(unsubscribe),
     })
     if (!sent.ok) {
       await supabase.from('instagram_bio_email_captures').update({ last_email_sent_at: null }).eq('id', captureId)
@@ -142,22 +172,20 @@ async function scheduleEmailSequence(
 ) {
   const now = new Date()
 
-  // Schedule emails 2-7 (will be sent by cron job)
-  const schedules = [
-    { day: 1, subject: "The Instagram bio mistake 73% of agents make" },
-    { day: 2, subject: "Your Instagram profile as a 24/7 showing scheduler" },
-    { day: 3, subject: `${firstName}, here's your 30-day Instagram content calendar` },
-    { day: 5, subject: "Real data: What converts Instagram followers to clients" },
-    { day: 6, subject: "Linktree vs AgentBio for real estate (honest comparison)" },
-    { day: 7, subject: `${firstName}, final call: 20% off + free setup (expires tonight)` }
-  ]
+  // Schedule emails 2-7 (sent by send-scheduled-bio-emails). The subjects come
+  // from the module that writes the emails, so what is recorded here is what
+  // is sent (US-415).
+  const schedules = BIO_DRIP_SEQUENCE_NUMBERS.map((sequence) => ({
+    sequence,
+    subject: bioDripSubject(sequence, firstName),
+  }))
 
   for (const schedule of schedules) {
     await supabase
       .from('instagram_bio_email_sequences')
       .insert({
         email_capture_id: captureId,
-        sequence_number: schedule.day + 1,
+        sequence_number: schedule.sequence,
         email_subject: schedule.subject,
         sent_at: null // Will be set when sent by cron
       })
@@ -188,16 +216,16 @@ ${data.bioRewrites[2] || 'Your third optimized bio'}
 QUICK IMPLEMENTATION CHECKLIST:
 ☐ Choose your favorite bio (or mix elements from each)
 ☐ Update your Instagram bio today
-☐ Update your link to ${siteUrl}/${data.firstName.toLowerCase()}
+☐ Point your bio link at a page built to capture leads (free to create at ${siteUrl}/auth/register)
 ☐ Post an announcement about your new optimized profile
 ☐ Track your results for 1-2 weeks
 
 YOUR QUICK WIN:
-Update your bio TODAY. Agents who implement within 24 hours see results within the first week.
+Update your bio today, then compare your profile visits and link taps a week or two later against what you see now.
 
 WANT TO MAXIMIZE EVERY INSTAGRAM CLICK?
 AgentBio gives you a professional link-in-bio built specifically for real estate agents:
-→ Auto-updated listings from your MLS
+→ Active and sold listing showcases
 → Built-in lead capture forms (home valuations, buyer consultations)
 → Analytics to track what's working
 → QR codes for your business cards and flyers
@@ -211,7 +239,9 @@ P.S. Reply to this email if you have questions about implementing your new bio!
   `.trim()
 }
 
-function getEmail1HTML(data: BioAnalyzerEmailData): string {
+const UNSUBSCRIBE_REASON = 'You received this email because you used our Instagram Bio Analyzer tool.'
+
+function getEmail1HTML(data: BioAnalyzerEmailData, unsubscribe: UnsubscribeLinks): string {
   const siteUrl = getSiteUrl()
 
   return `
@@ -221,31 +251,37 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-    .header { background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); color: white; padding: 40px 30px; text-align: center; }
-    .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
-    .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.95; }
-    .content { padding: 40px 30px; }
-    .score-badge { background: linear-gradient(135deg, #eef2ff 0%, #fce7f3 100%); border-left: 4px solid #9333ea; padding: 20px; margin: 25px 0; border-radius: 8px; text-align: center; }
-    .score-number { font-size: 48px; font-weight: bold; color: #9333ea; margin: 0; }
-    .bio-box { background: #f9fafb; border: 2px solid #e5e7eb; padding: 20px; margin: 20px 0; border-radius: 8px; }
-    .bio-label { font-weight: 600; color: #6b7280; font-size: 12px; text-transform: uppercase; margin-bottom: 10px; }
-    .bio-text { font-family: monospace; font-size: 14px; line-height: 1.8; color: #1f2937; white-space: pre-wrap; }
-    .checklist { margin: 25px 0; }
-    .checklist-item { padding: 12px; background: #f0fdf4; border-left: 3px solid #10b981; margin-bottom: 10px; border-radius: 4px; }
-    .cta-box { background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); color: white; padding: 30px; text-align: center; border-radius: 12px; margin: 30px 0; }
+    .header { padding: 32px 30px 20px; border-bottom: 1px solid #e5e7eb; }
+    .header .brand { margin: 0 0 6px 0; font-size: 14px; font-weight: 600; color: #6d28d9; }
+    .header h1 { margin: 0; font-size: 28px; font-weight: 600; color: #1f2937; line-height: 1.25; }
+    .header p { margin: 10px 0 0 0; font-size: 16px; color: #52606d; }
+    .content { padding: 32px 30px; }
+    .score-badge { background: #f5f3ff; border: 1px solid #ddd6fe; padding: 20px; margin: 25px 0; border-radius: 12px; text-align: center; }
+    .score-label { margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #4c1d95; }
+    .score-number { font-size: 48px; font-weight: bold; color: #4c1d95; margin: 0; }
+    .bio-box { background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; margin: 20px 0; border-radius: 12px; }
+    .bio-label { font-weight: 600; color: #52606d; font-size: 14px; margin-bottom: 10px; }
+    .bio-text { font-size: 15px; line-height: 1.7; color: #1f2937; white-space: pre-wrap; }
+    .checklist { margin: 25px 0; padding: 4px 20px; background: #f0fdf4; border-radius: 12px; }
+    .checklist-item { padding: 10px 0; color: #14532d; border-bottom: 1px solid #dcfce7; }
+    .checklist-item:last-child { border-bottom: 0; }
+    .quick-win { background: #fef3c7; border: 1px solid #fde68a; padding: 20px; margin: 25px 0; border-radius: 12px; }
+    .cta-box { background: #f5f3ff; color: #1f2937; padding: 30px; text-align: center; border-radius: 12px; margin: 30px 0; }
     .cta-box h3 { margin: 0 0 15px 0; font-size: 22px; }
+    .cta-box p, .cta-box li { color: #4c1d95; }
     .cta-box ul { text-align: left; max-width: 400px; margin: 20px auto; }
     .cta-box li { margin-bottom: 8px; }
-    .button { display: inline-block; background: white; color: #9333ea !important; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 15px 0; font-weight: 600; }
-    .button:hover { background: #f3f4f6; }
-    .footer { background: #f9fafb; padding: 30px; text-align: center; font-size: 14px; color: #6b7280; }
+    .button { display: inline-block; background: #6d28d9; color: #ffffff !important; padding: 14px 32px; text-decoration: none; border-radius: 12px; margin: 15px 0; font-weight: 600; }
+    .footer { padding: 24px 30px 30px; font-size: 14px; color: #52606d; border-top: 1px solid #e5e7eb; }
+    .footer a { color: #6d28d9; text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>✨ Your Optimized Instagram Bios Are Ready!</h1>
-      <p>3 professionally rewritten versions + action plan</p>
+      <p class="brand">AgentBio</p>
+      <h1>Your optimized Instagram bios are ready</h1>
+      <p>3 rewritten versions and an action plan</p>
     </div>
 
     <div class="content">
@@ -254,13 +290,13 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
       <p>Thanks for using the Instagram Bio Analyzer!</p>
 
       <div class="score-badge">
-        <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280; font-weight: 600;">YOUR EFFECTIVENESS SCORE</p>
+        <p class="score-label">Your effectiveness score</p>
         <div class="score-number">${data.score}/100</div>
       </div>
 
       <p>I've got your <strong>3 professionally optimized bio versions</strong> ready. Each is tailored to your market (${data.market}) and optimized for maximum lead conversion.</p>
 
-      <h2 style="color: #9333ea; margin-top: 30px;">Your Optimized Bios:</h2>
+      <h2 style="color: #1f2937; margin-top: 30px;">Your optimized bios</h2>
 
       <div class="bio-box">
         <div class="bio-label">Option 1 - Professional Authority</div>
@@ -282,21 +318,21 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
       <div class="checklist">
         <div class="checklist-item">✓ Choose your favorite bio (or mix elements from each)</div>
         <div class="checklist-item">✓ Update your Instagram bio today</div>
-        <div class="checklist-item">✓ Update your link to ${siteUrl}/${data.firstName.toLowerCase()}</div>
+        <div class="checklist-item">✓ Point your bio link at a page built to capture leads</div>
         <div class="checklist-item">✓ Post an announcement about your new optimized profile</div>
         <div class="checklist-item">✓ Track your results for 1-2 weeks</div>
       </div>
 
-      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 8px;">
+      <div class="quick-win">
         <p style="margin: 0; font-weight: 600; color: #92400e;">⚡ Your Quick Win:</p>
-        <p style="margin: 8px 0 0 0; color: #78350f;">Update your bio TODAY. Agents who implement within 24 hours see results within the first week.</p>
+        <p style="margin: 8px 0 0 0; color: #78350f;">Update your bio today, then compare your profile visits and link taps a week or two later against what you see now.</p>
       </div>
 
       <div class="cta-box">
         <h3>Want to Maximize Every Instagram Click?</h3>
         <p>AgentBio gives you a professional link-in-bio built specifically for real estate agents:</p>
         <ul>
-          <li>→ Auto-updated listings from your MLS</li>
+          <li>→ Active and sold listing showcases</li>
           <li>→ Built-in lead capture forms</li>
           <li>→ Analytics to track what's working</li>
           <li>→ QR codes for offline marketing</li>
@@ -316,13 +352,11 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
     <div class="footer">
       <p><strong>AgentBio</strong> - Link-in-Bio for Real Estate Agents</p>
       <p style="margin: 10px 0 0 0;">
-        <a href="${siteUrl}" style="color: #9333ea; text-decoration: none;">Visit AgentBio</a> •
-        <a href="${siteUrl}/tools/instagram-bio-analyzer" style="color: #9333ea; text-decoration: none;">Bio Analyzer</a> •
-        <a href="${siteUrl}/blog" style="color: #9333ea; text-decoration: none;">Blog</a>
+        <a href="${siteUrl}">Visit AgentBio</a> •
+        <a href="${siteUrl}/tools/instagram-bio-analyzer">Bio Analyzer</a> •
+        <a href="${siteUrl}/blog">Blog</a>
       </p>
-      <p style="margin: 15px 0 0 0; font-size: 12px;">
-        You received this email because you used our Instagram Bio Analyzer tool.
-      </p>
+      ${unsubscribeFooterHtml(unsubscribe, UNSUBSCRIBE_REASON)}
     </div>
   </div>
 </body>

@@ -43,6 +43,13 @@ vi.mock('@/hooks/useSubscriptionLimits', () => ({
 vi.mock('@/hooks/usePlanUsage', () => ({ usePlanUsage: () => ({ hasFeature: () => true }) }));
 vi.mock('@/components/UpgradeModal', () => ({ UpgradeModal: () => null }));
 vi.mock('@/components/theme/SavedThemesManager', () => ({ SavedThemesManager: () => null }));
+vi.mock('@/components/theme/CustomCssEditor', () => ({
+  CustomCssEditor: ({ onPreviewCssChange }: { onPreviewCssChange?: (css: string) => void }) => (
+    <button type="button" onClick={() => onPreviewCssChange?.('.ab-custom-css h1 { color: red; }')}>
+      Type custom CSS
+    </button>
+  ),
+}));
 vi.mock('@/components/dashboard/ThemeCard', () => ({ ThemeCard: () => null }));
 vi.mock('@/lib/themes', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/themes')>();
@@ -110,5 +117,17 @@ describe('Theme', () => {
     });
 
     await waitFor(() => expect(h.themeReads).toBe(2));
+  });
+
+  it('shows the custom CSS draft in the Live Preview before it is saved (US-533)', async () => {
+    render(<Theme />);
+    await waitFor(() => expect(h.themeReads).toBe(1));
+    const preview = screen.getByTestId('theme-live-preview');
+    expect(preview.querySelector('style')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Type custom CSS' }));
+
+    expect(preview.querySelector('style')?.textContent).toBe('.ab-custom-css h1 { color: red; }');
+    expect(screen.getByTestId('theme-preview-info')).toHaveTextContent('with your custom CSS');
   });
 });

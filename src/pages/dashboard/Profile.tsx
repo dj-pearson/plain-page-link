@@ -1,13 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Save, Plus, X } from 'lucide-react';
+import { Camera, Save, Plus, X, ImagePlus } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { useAvatarUpload } from '@/hooks/useAvatarUpload';
+import { useBrokerageLogoUpload } from '@/hooks/useBrokerageLogoUpload';
 import { useToast } from '@/hooks/use-toast';
 import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SkeletonProfile } from '@/components/ui/skeleton';
 import { planLimitKeyFromError, UPGRADE_PATH } from '@/lib/planLimits';
+import { urlSchemeErrorFrom } from '@/lib/urlSchemeErrors';
+import { profileTabFromSearch } from '@/lib/profileCompletion';
+import { AvatarImage } from '@/components/profile/AvatarImage';
+import {
+  normalizeProfileUrls,
+  PROFILE_URL_FIELDS,
+  PROFILE_URL_FIELD_NAMES,
+  type ProfileUrlErrors,
+  type ProfileUrlField,
+} from '@/lib/profileUrls';
 
 function emptyForm() {
   return {
@@ -117,6 +128,12 @@ function describeSaveError(error: unknown): SaveError {
     // The trigger's message is written for the agent (20260923000002).
     return { message: message || 'Your plan does not include this change.', planLimit: true };
   }
+  // US-456: the database refuses a social/website/Calendly value that is not
+  // an https:// address; say which field, not the constraint name.
+  const urlError = urlSchemeErrorFrom(error);
+  if (urlError) {
+    return { message: `Your profile was not saved: ${urlError.message}`, planLimit: false };
+  }
   return {
     message: message
       ? `Your profile was not saved: ${message}`
@@ -125,15 +142,70 @@ function describeSaveError(error: unknown): SaveError {
   };
 }
 
+const INPUT_CLASS =
+  'w-full px-4 py-2 bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary';
+
+interface UrlInputProps {
+  field: ProfileUrlField;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder: string;
+  error?: string;
+}
+
+/**
+ * A profile link field (US-290). type="text" with inputMode="url" rather than
+ * type="url": the browser's URL check refuses "zillow.com/me", which the save
+ * now fixes by adding https://, and it accepts "javascript:x", which the save
+ * refuses — so the check runs in handleSubmit and the error is shown here.
+ */
+function UrlInput({ field, value, onChange, placeholder, error }: UrlInputProps) {
+  const errorId = `profile-${field}-error`;
+  return (
+    <>
+      <input
+        id={`profile-${field}`}
+        // The visible <label htmlFor> lives in the caller; naming it here too
+        // keeps the static field-name check (US-261) able to see it.
+        aria-labelledby={`profile-${field}-label`}
+        type="text"
+        inputMode="url"
+        autoComplete="url"
+        autoCapitalize="none"
+        spellCheck={false}
+        name={field}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        className={`${INPUT_CLASS} ${error ? 'border-destructive' : 'border-input'}`}
+      />
+      {error && (
+        <p id={errorId} className="mt-1 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function Profile() {
   const { profile, isLoading, updateProfile } = useProfile();
   const { uploadAvatar, uploading } = useAvatarUpload();
   const { toast } = useToast();
+  const { uploadLogo, uploading: uploadingLogo } = useBrokerageLogoUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<ProfileForm>(emptyForm);
   // What the server holds, as the form spells it — the baseline for "unsaved".
   const [savedForm, setSavedForm] = useState<ProfileForm>(emptyForm);
   const [saveError, setSaveError] = useState<SaveError | null>(null);
+  const [urlErrors, setUrlErrors] = useState<ProfileUrlErrors>({});
+  // The completion checklist links straight to a tab with ?tab= (US-487).
+  const [tab, setTab] = useState<string>(() =>
+    profileTabFromSearch(typeof window === 'undefined' ? '' : window.location.search)
+  );
   const hydrated = useRef(false);
 
   // States for managing array inputs
@@ -164,6 +236,13 @@ export default function Profile() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
+    if (name in urlErrors) {
+      setUrlErrors((prev) => {
+        const next = { ...prev };
+        delete next[name as ProfileUrlField];
+        return next;
+      });
+    }
     setFormData({
       ...formData,
       [name]: type === 'number' ? Number(value) : value,
@@ -258,10 +337,47 @@ export default function Profile() {
     }
   };
 
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Clear the input so picking the same file again still fires onChange.
+    e.target.value = '';
+    if (!file) return;
+
+    const url = await uploadLogo(file);
+    if (url) {
+      // Saved by the upload, like the avatar: not an unsaved change.
+      setFormData((prev) => ({ ...prev, brokerage_logo: url }));
+      setSavedForm((prev) => ({ ...prev, brokerage_logo: url }));
+    }
+  };
+
+  // Removing is an ordinary edit, persisted by Save like any other field.
+  const removeLogo = () => setFormData((prev) => ({ ...prev, brokerage_logo: '' }));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveError(null);
-    const submitted = formData;
+    // US-290: check the link fields before anything is sent. A bare host
+    // gains https://; a value that is not a web address is refused next to
+    // its field, and the tab holding the first one is brought forward,
+    // because the other tabs are not mounted.
+    const { values: urls, errors } = normalizeProfileUrls(formData);
+    const refused = PROFILE_URL_FIELD_NAMES.filter((field) => errors[field]);
+    setUrlErrors(errors);
+    if (refused.length > 0) {
+      setTab(PROFILE_URL_FIELDS[refused[0]]);
+      setSaveError({
+        message:
+          refused.length === 1
+            ? `Your profile was not saved: ${errors[refused[0]]}`
+            : 'Your profile was not saved: some links are not web addresses. Fix the fields marked below.',
+        planLimit: false,
+      });
+      return;
+    }
+    const submitted = { ...formData, ...urls };
+    // Show what will be stored ("https://zillow.com/me", not "zillow.com/me").
+    setFormData(submitted);
     try {
       // The username is not editable here any more, so it must not be sent:
       // this form used to submit whatever was in the field, raw and
@@ -351,8 +467,8 @@ export default function Profile() {
         <div className="flex items-center gap-6">
           <div className="relative">
             {formData.avatar_url ? (
-              <img
-                src={formData.avatar_url}
+              <AvatarImage
+                url={formData.avatar_url}
                 alt="Profile"
                 className="w-24 h-24 rounded-full object-cover"
               />
@@ -398,7 +514,7 @@ export default function Profile() {
       </div>
 
       {/* Tabbed Content */}
-      <Tabs defaultValue="basic" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="basic">Basic Info</TabsTrigger>
           <TabsTrigger value="professional">Professional</TabsTrigger>
@@ -578,21 +694,69 @@ export default function Profile() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label
+                <span
                   className="block text-sm font-medium text-foreground mb-2"
-                  htmlFor="profile-brokerage_logo"
+                  id="brokerage-logo-label"
                 >
-                  Brokerage Logo URL
-                </label>
-                <input
-                  id="profile-brokerage_logo"
-                  type="url"
-                  name="brokerage_logo"
-                  value={formData.brokerage_logo}
-                  onChange={handleChange}
-                  placeholder="https://example.com/logo.png"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                  Brokerage Logo
+                </span>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-border bg-background p-2">
+                    {formData.brokerage_logo ? (
+                      <img
+                        src={formData.brokerage_logo}
+                        alt={
+                          formData.brokerage_name
+                            ? `${formData.brokerage_name} logo`
+                            : 'Brokerage logo'
+                        }
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <ImagePlus className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={uploadingLogo}
+                        aria-describedby="brokerage-logo-help"
+                        className="min-h-[44px] px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium disabled:opacity-50"
+                      >
+                        {uploadingLogo
+                          ? 'Uploading...'
+                          : formData.brokerage_logo
+                            ? 'Replace Logo'
+                            : 'Upload Logo'}
+                      </button>
+                      {formData.brokerage_logo && (
+                        <button
+                          type="button"
+                          onClick={removeLogo}
+                          disabled={uploadingLogo}
+                          className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <p id="brokerage-logo-help" className="text-sm text-muted-foreground">
+                      JPG, PNG or WEBP. Max size 2MB. Shown under your name on your page, in place
+                      of the brokerage name.
+                    </p>
+                  </div>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleLogoChange}
+                    aria-labelledby="brokerage-logo-label"
+                    data-testid="brokerage-logo-input"
+                    className="hidden"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -737,37 +901,35 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-website_url"
+                  id="profile-website_url-label"
                 >
                   Website URL
                 </label>
-                <input
-                  id="profile-website_url"
-                  type="url"
-                  name="website_url"
+                <UrlInput
+                  field="website_url"
                   value={formData.website_url}
                   onChange={handleChange}
                   placeholder="https://yourwebsite.com"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.website_url}
                 />
               </div>
               <div className="md:col-span-2">
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-calendly_url"
+                  id="profile-calendly_url-label"
                 >
                   Calendly Booking URL
                 </label>
-                <input
-                  id="profile-calendly_url"
-                  type="url"
-                  name="calendly_url"
+                <UrlInput
+                  field="calendly_url"
                   value={formData.calendly_url}
                   onChange={handleChange}
                   placeholder="https://calendly.com/yourname/30min"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.calendly_url}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add your Calendly link to enable "Book a Showing" on your listings
+                  Add your Calendly link to enable &ldquo;Book a Showing&rdquo; on your listings
                 </p>
               </div>
             </div>
@@ -872,119 +1034,112 @@ export default function Profile() {
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-facebook_url"
+                  id="profile-facebook_url-label"
                 >
                   Facebook URL
                 </label>
-                <input
-                  id="profile-facebook_url"
-                  type="url"
-                  name="facebook_url"
+                <UrlInput
+                  field="facebook_url"
                   value={formData.facebook_url}
                   onChange={handleChange}
                   placeholder="https://facebook.com/yourpage"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.facebook_url}
                 />
               </div>
               <div>
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-instagram_url"
+                  id="profile-instagram_url-label"
                 >
                   Instagram URL
                 </label>
-                <input
-                  id="profile-instagram_url"
-                  type="url"
-                  name="instagram_url"
+                <UrlInput
+                  field="instagram_url"
                   value={formData.instagram_url}
                   onChange={handleChange}
                   placeholder="https://instagram.com/yourusername"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.instagram_url}
                 />
               </div>
               <div>
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-linkedin_url"
+                  id="profile-linkedin_url-label"
                 >
                   LinkedIn URL
                 </label>
-                <input
-                  id="profile-linkedin_url"
-                  type="url"
-                  name="linkedin_url"
+                <UrlInput
+                  field="linkedin_url"
                   value={formData.linkedin_url}
                   onChange={handleChange}
                   placeholder="https://linkedin.com/in/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.linkedin_url}
                 />
               </div>
               <div>
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-tiktok_url"
+                  id="profile-tiktok_url-label"
                 >
                   TikTok URL
                 </label>
-                <input
-                  id="profile-tiktok_url"
-                  type="url"
-                  name="tiktok_url"
+                <UrlInput
+                  field="tiktok_url"
                   value={formData.tiktok_url}
                   onChange={handleChange}
                   placeholder="https://tiktok.com/@yourusername"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.tiktok_url}
                 />
               </div>
               <div>
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-youtube_url"
+                  id="profile-youtube_url-label"
                 >
                   YouTube URL
                 </label>
-                <input
-                  id="profile-youtube_url"
-                  type="url"
-                  name="youtube_url"
+                <UrlInput
+                  field="youtube_url"
                   value={formData.youtube_url}
                   onChange={handleChange}
                   placeholder="https://youtube.com/@yourchannel"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.youtube_url}
                 />
               </div>
               <div>
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-zillow_url"
+                  id="profile-zillow_url-label"
                 >
                   Zillow Profile URL
                 </label>
-                <input
-                  id="profile-zillow_url"
-                  type="url"
-                  name="zillow_url"
+                <UrlInput
+                  field="zillow_url"
                   value={formData.zillow_url}
                   onChange={handleChange}
                   placeholder="https://zillow.com/profile/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.zillow_url}
                 />
               </div>
               <div>
                 <label
                   className="block text-sm font-medium text-foreground mb-2"
                   htmlFor="profile-realtor_com_url"
+                  id="profile-realtor_com_url-label"
                 >
                   Realtor.com Profile URL
                 </label>
-                <input
-                  id="profile-realtor_com_url"
-                  type="url"
-                  name="realtor_com_url"
+                <UrlInput
+                  field="realtor_com_url"
                   value={formData.realtor_com_url}
                   onChange={handleChange}
                   placeholder="https://realtor.com/realestateagents/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  error={urlErrors.realtor_com_url}
                 />
               </div>
             </div>

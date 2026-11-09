@@ -2,14 +2,17 @@
  * API Keys management page.
  *
  * Lets users create, list, and revoke API keys for programmatic access
- * (CRM integrations etc.). The full key is shown exactly once on creation.
+ * (CRM integrations etc.). The full key is shown exactly once on creation,
+ * so leaving it behind (Done, a link, a reload) asks first until it is copied.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Copy, Check, KeyRound, Loader2, Trash2, Plus } from 'lucide-react';
+import { AlertCircle, Copy, Check, KeyRound, Loader2, Trash2, Plus, RefreshCw } from 'lucide-react';
+import { logger } from '@/lib/logger';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useToast } from '@/hooks/use-toast';
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,15 +38,36 @@ interface ApiKeyRecord {
   created_at: string;
 }
 
+const UNCOPIED_KEY_LEAVE_MESSAGE =
+  "You haven't copied your new API key, and it can't be shown again. Leave this page anyway?";
+
 export default function ApiKeysPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newName, setNewName] = useState('');
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [revokeId, setRevokeId] = useState<string | null>(null);
+  const [copyFailed, setCopyFailed] = useState(false);
+  // `copied` flips back after 2s for the icon; this one remembers that the key
+  // left the page at least once (button or a manual Ctrl+C), so 'Done' knows
+  // whether dismissing would destroy the only copy.
+  const [keySaved, setKeySaved] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<ApiKeyRecord | null>(null);
+  const keyTextRef = useRef<HTMLElement>(null);
 
-  const { data: keys, isLoading } = useQuery({
+  // The key lives only in this component's state, so a reload, a closed tab or
+  // a sidebar link destroys it as silently as 'Done' used to (US-364). Browser
+  // back/forward is not covered: without a data router a popstate cannot be held.
+  useUnsavedChangesWarning(!!createdKey && !keySaved, UNCOPIED_KEY_LEAVE_MESSAGE);
+
+  const {
+    data: keys,
+    isLoading,
+    error: listError,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['api-keys'],
     queryFn: async (): Promise<ApiKeyRecord[]> => {
       const { data, error } = await edgeFunctions.invoke('api-keys', { body: { action: 'list' } });
@@ -62,6 +86,9 @@ export default function ApiKeysPage() {
     },
     onSuccess: (data) => {
       setCreatedKey(data.key);
+      setCopied(false);
+      setCopyFailed(false);
+      setKeySaved(false);
       setNewName('');
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
     },
@@ -90,11 +117,52 @@ export default function ApiKeysPage() {
       }),
   });
 
+  /** Select the key text so the agent can copy it by hand. */
+  const selectKeyText = () => {
+    const el = keyTextRef.current;
+    const selection = typeof window !== 'undefined' ? window.getSelection() : null;
+    if (!el || !selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
   const copyKey = async () => {
     if (!createdKey) return;
-    await navigator.clipboard.writeText(createdKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      // navigator.clipboard is undefined outside a secure context, and
+      // writeText rejects when the browser refuses (iOS without a gesture,
+      // permissions policy). Either way the key must not be lost silently:
+      // it is shown exactly once.
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(createdKey);
+      setCopyFailed(false);
+      setCopied(true);
+      setKeySaved(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      logger.warn('API key copy to clipboard failed', {
+        reason: e instanceof Error ? e.message : 'unknown',
+      });
+      setCopied(false);
+      setCopyFailed(true);
+      selectKeyText();
+    }
+  };
+
+  const dismissCreatedKey = () => {
+    setCreatedKey(null);
+    setConfirmDiscard(false);
+    setCopied(false);
+    setCopyFailed(false);
+    setKeySaved(false);
+  };
+
+  /** 'Done' destroys the one-time key; ask first if it never left the page. */
+  const handleDone = () => {
+    if (keySaved) dismissCreatedKey();
+    else setConfirmDiscard(true);
   };
 
   const activeKeys = (keys ?? []).filter((k) => !k.revoked_at);
@@ -117,22 +185,40 @@ export default function ApiKeysPage() {
         <CardContent>
           {createdKey ? (
             <div className="space-y-3">
-              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="rounded-lg border border-warning-border bg-warning p-3 text-sm text-warning-foreground">
                 Copy this key now — you won't be able to see it again.
               </div>
               <div className="flex items-center gap-2">
-                <code className="flex-1 break-all rounded bg-muted px-3 py-2 font-mono text-sm">
+                <code
+                  ref={keyTextRef}
+                  data-testid="created-api-key"
+                  onCopy={() => setKeySaved(true)}
+                  className="flex-1 select-all break-all rounded bg-muted px-3 py-2 font-mono text-sm"
+                >
                   {createdKey}
                 </code>
-                <Button variant="outline" size="icon" onClick={copyKey}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11 shrink-0"
+                  onClick={copyKey}
+                  aria-label={copied ? 'API key copied' : 'Copy API key'}
+                >
                   {copied ? (
-                    <Check className="h-4 w-4 text-green-600" />
+                    <Check className="h-4 w-4 text-green-600" aria-hidden="true" />
                   ) : (
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-4 w-4" aria-hidden="true" />
                   )}
                 </Button>
               </div>
-              <Button variant="outline" onClick={() => setCreatedKey(null)}>
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                {copied
+                  ? 'Copied to your clipboard.'
+                  : copyFailed
+                    ? 'Your browser blocked automatic copying. The key is selected — copy it with Ctrl+C (⌘C on Mac), or press and hold it on a phone.'
+                    : ''}
+              </p>
+              <Button variant="outline" onClick={handleDone}>
                 Done
               </Button>
             </div>
@@ -166,12 +252,35 @@ export default function ApiKeysPage() {
       {/* List */}
       <Card>
         <CardHeader>
-          <CardTitle>Your keys ({activeKeys.length})</CardTitle>
+          <CardTitle>
+            Your keys{!isLoading && !listError ? ` (${activeKeys.length})` : ''}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex items-center text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+            </div>
+          ) : listError ? (
+            <div role="alert" className="py-6 text-center">
+              <AlertCircle className="mx-auto h-8 w-8 text-red-600" aria-hidden="true" />
+              <p className="mt-3 font-semibold text-foreground">Couldn’t load your API keys</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Your existing keys are unaffected and still work. Check your connection and try
+                again.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4 gap-2"
+                onClick={() => refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCw
+                  className={`h-4 w-4${isFetching ? ' animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+                Try again
+              </Button>
             </div>
           ) : activeKeys.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
@@ -196,11 +305,13 @@ export default function ApiKeysPage() {
                   </div>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => setRevokeId(k.id)}
+                    size="icon"
+                    className="h-11 w-11 shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => setRevokeTarget(k)}
+                    aria-label={`Revoke ${k.name}`}
+                    disabled={revokeKey.isPending && revokeKey.variables === k.id}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </li>
               ))}
@@ -209,10 +320,33 @@ export default function ApiKeysPage() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!revokeId} onOpenChange={() => setRevokeId(null)}>
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revoke this API key?</AlertDialogTitle>
+            <AlertDialogTitle>Close without copying the key?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You haven’t copied this key yet. Once you close it, it can’t be shown again — you
+              would have to revoke it and create a new one.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back and copy it</AlertDialogCancel>
+            <AlertDialogAction onClick={dismissCreatedKey}>I’ve saved it — close</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!revokeTarget}
+        onOpenChange={(open) => {
+          if (!open) setRevokeTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {revokeTarget ? `Revoke “${revokeTarget.name}”?` : 'Revoke this API key?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Any integration using this key will immediately lose access. This cannot be undone.
             </AlertDialogDescription>
@@ -222,8 +356,8 @@ export default function ApiKeysPage() {
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               onClick={() => {
-                if (revokeId) revokeKey.mutate(revokeId);
-                setRevokeId(null);
+                if (revokeTarget) revokeKey.mutate(revokeTarget.id);
+                setRevokeTarget(null);
               }}
             >
               Revoke

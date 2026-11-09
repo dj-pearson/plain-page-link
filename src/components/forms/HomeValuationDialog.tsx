@@ -23,7 +23,7 @@ export function HomeValuationDialog({
 }: HomeValuationDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl overflow-y-auto">
         {/* Hidden: HomeValuationForm renders its own visible heading, but a
             dialog without a title is announced unnamed (US-112). */}
         <DialogTitle className="sr-only">Home valuation request</DialogTitle>

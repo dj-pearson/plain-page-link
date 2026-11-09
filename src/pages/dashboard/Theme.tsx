@@ -24,6 +24,8 @@ import { logger } from '@/lib/logger';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { CustomCssEditor } from '@/components/theme/CustomCssEditor';
+import { ThemeLivePreview } from '@/components/theme/ThemeLivePreview';
 
 const AVAILABLE_FONTS = [
   'Inter',
@@ -49,6 +51,8 @@ export default function Theme() {
   const [isSaving, setIsSaving] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  // The custom CSS editor's draft, sanitised (US-533): the preview shows it before it is saved.
+  const [previewCss, setPreviewCss] = useState('');
   const { subscription } = useSubscriptionLimits();
   const { hasFeature } = usePlanUsage();
 
@@ -518,7 +522,7 @@ export default function Theme() {
                 <div>
                   <CardTitle className="text-base sm:text-lg">Live Preview</CardTitle>
                   <CardDescription className="text-xs sm:text-sm">
-                    See how your theme will look on different devices
+                    See how your theme and custom CSS will look on different devices
                   </CardDescription>
                 </div>
                 <div className="flex gap-1 bg-muted p-1 rounded-lg">
@@ -544,124 +548,27 @@ export default function Theme() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Preview Container */}
-              <div className="flex justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-lg p-4 sm:p-8">
-                <div
-                  className={`rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4 transition-all duration-300 ${
-                    previewMode === 'mobile' ? 'w-full max-w-[375px]' : 'w-full'
-                  }`}
-                  style={{
-                    backgroundColor: customColors.background,
-                    boxShadow:
-                      previewMode === 'mobile'
-                        ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                        : 'none',
-                  }}
-                >
-                  <div
-                    className={`flex items-start ${previewMode === 'mobile' ? 'flex-col items-center text-center' : 'gap-4'}`}
-                  >
-                    <div
-                      className={`rounded-full ${previewMode === 'mobile' ? 'w-16 h-16 mb-3' : 'w-20 h-20'}`}
-                      style={{
-                        backgroundColor: customColors.primary,
-                      }}
-                    />
-                    <div className="flex-1 space-y-2">
-                      <h3
-                        className={`font-bold ${previewMode === 'mobile' ? 'text-xl' : 'text-2xl'}`}
-                        style={{
-                          fontFamily: customFonts.heading,
-                          color: customColors.foreground,
-                        }}
-                      >
-                        Agent Name
-                      </h3>
-                      <p
-                        className="text-sm"
-                        style={{
-                          fontFamily: customFonts.body,
-                          color: customColors.muted,
-                        }}
-                      >
-                        Realtor® | Luxury Home Specialist
-                      </p>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`flex ${previewMode === 'mobile' ? 'flex-col w-full' : 'flex-wrap'} gap-2`}
-                  >
-                    <button
-                      className={`py-2 rounded-lg text-white text-xs sm:text-sm font-medium min-h-[44px] ${previewMode === 'mobile' ? 'w-full px-4' : 'px-3 sm:px-4'}`}
-                      style={{
-                        backgroundColor: customColors.primary,
-                      }}
-                    >
-                      Primary Button
-                    </button>
-                    <button
-                      className={`py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px] ${previewMode === 'mobile' ? 'w-full px-4' : 'px-3 sm:px-4'}`}
-                      style={{
-                        backgroundColor: customColors.secondary,
-                        color: 'white',
-                      }}
-                    >
-                      Secondary Button
-                    </button>
-                    {previewMode === 'desktop' && (
-                      <button
-                        className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px]"
-                        style={{
-                          backgroundColor: customColors.accent,
-                          color: 'white',
-                        }}
-                      >
-                        Accent Button
-                      </button>
-                    )}
-                  </div>
-
-                  <div
-                    className="p-4 rounded-lg"
-                    style={{
-                      backgroundColor: customColors.background,
-                    }}
-                  >
-                    <h4
-                      className="font-semibold mb-2 text-sm"
-                      style={{
-                        fontFamily: customFonts.heading,
-                        color: customColors.foreground,
-                      }}
-                    >
-                      Property Card
-                    </h4>
-                    <p
-                      className="text-xs"
-                      style={{
-                        fontFamily: customFonts.body,
-                        color: customColors.muted,
-                      }}
-                    >
-                      {previewMode === 'mobile'
-                        ? 'Mobile view'
-                        : 'This is how property cards will appear with your selected theme.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <ThemeLivePreview
+                colors={customColors}
+                fonts={customFonts}
+                mode={previewMode}
+                customCss={previewCss}
+              />
 
               {/* Preview Info */}
               <div className="mt-4 text-center">
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground" data-testid="theme-preview-info">
                   {previewMode === 'mobile'
-                    ? '📱 Viewing mobile preview (375px wide)'
-                    : '🖥️ Viewing desktop preview (full width)'}
+                    ? 'Viewing mobile preview (375px wide)'
+                    : 'Viewing desktop preview (full width)'}
+                  {previewCss ? ', with your custom CSS as visitors will get it' : ''}
                 </p>
               </div>
             </CardContent>
           </Card>
+
+          {/* Custom CSS (US-514): saved on its own, not with the theme. */}
+          <CustomCssEditor onPreviewCssChange={setPreviewCss} />
         </TabsContent>
       </Tabs>
 

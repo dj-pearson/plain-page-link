@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import type { Json } from '@/integrations/supabase/types';
+import type { ActivityType, AgentAuthoredActivityType } from '@/lib/leadActivityTypes';
 
 export interface LeadActivity {
   id: string;
@@ -45,15 +46,7 @@ export interface CreateTaskParams {
   notes?: string;
 }
 
-export type ActivityType =
-  | 'note'
-  | 'email'
-  | 'call'
-  | 'meeting'
-  | 'status_change'
-  | 'task'
-  | 'sms'
-  | 'form_submission';
+export type { ActivityType, AgentAuthoredActivityType } from '@/lib/leadActivityTypes';
 
 /**
  * 'initiated' covers the case the UI can actually observe: the agent tapped a
@@ -83,7 +76,11 @@ export interface LeadActivitySummary {
 
 interface LogActivityParams {
   leadId: string;
-  activityType: ActivityType;
+  /**
+   * log_lead_activity refuses status_change and form_submission (US-349):
+   * those rows are written only by the lead triggers.
+   */
+  activityType: AgentAuthoredActivityType;
   content?: string;
   title?: string;
   metadata?: Record<string, unknown>;
@@ -111,8 +108,28 @@ interface LogMeetingParams {
   notes?: string;
 }
 
+/** Activity types that log_lead_activity treats as contact (sets leads.contacted_at). */
+const CONTACT_ACTIVITY_TYPES = new Set<string>(['call', 'email', 'sms', 'meeting']);
+
 export function useLeadActivities(leadId?: string) {
   const queryClient = useQueryClient();
+
+  /**
+   * Refreshes the timeline of the lead a write was FOR, which is not always
+   * the lead this hook instance was opened with (US-392).
+   *
+   * useLeadContactAction calls useLeadActivities(undefined), because it serves
+   * both the Leads list and the detail modal. Its call/email/text logs used to
+   * invalidate ['lead-activities', undefined], so tapping Call or sending a
+   * quick response from an open lead never showed up on that lead's timeline,
+   * and the list card's last-activity line went stale too.
+   */
+  const invalidateTimeline = (targetLeadId: string | undefined) => {
+    const id = targetLeadId ?? leadId;
+    queryClient.invalidateQueries({ queryKey: ['lead-activities', id] });
+    queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', id] });
+    queryClient.invalidateQueries({ queryKey: ['lead-activity-summaries'] });
+  };
 
   // Fetch activities for a specific lead
   const activitiesQuery = useQuery({
@@ -165,9 +182,12 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
+      // sms (and call/email/meeting) set contacted_at server-side.
+      if (CONTACT_ACTIVITY_TYPES.has(params.activityType)) {
+        queryClient.invalidateQueries({ queryKey: ['leads'] });
+      }
     },
     onError: (error) => {
       logger.error('Failed to log activity', error as Error);
@@ -189,9 +209,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       toast.success('Note added');
     },
     onError: (error) => {
@@ -213,9 +232,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update last_contacted_at
       toast.success('Email logged');
     },
@@ -238,9 +256,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update last_contacted_at
       toast.success('Call logged');
     },
@@ -250,35 +267,25 @@ export function useLeadActivities(leadId?: string) {
     },
   });
 
-  // Log a meeting
+  // Log a meeting. Through log_lead_meeting, like calls and emails, so a
+  // meeting sets leads.contacted_at (first contact) once (US-373). The direct
+  // insert this replaced wrote the row and left the lead "never contacted".
   const logMeetingMutation = useMutation({
     mutationFn: async (params: LogMeetingParams) => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user?.id) throw new Error('User not authenticated');
-
-      const { data, error } = await supabase
-        .from('lead_activities')
-        .insert({
-          lead_id: params.leadId,
-          user_id: userData.user.id,
-          activity_type: 'meeting',
-          title: `${params.meetingType === 'in_person' ? 'In-person' : params.meetingType === 'video' ? 'Video' : 'Phone'} meeting`,
-          content: params.notes,
-          meeting_type: params.meetingType,
-          meeting_location: params.location,
-          meeting_scheduled_at: params.scheduledAt?.toISOString(),
-          is_internal: false,
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('log_lead_meeting', {
+        _lead_id: params.leadId,
+        _meeting_type: params.meetingType,
+        _location: params.location ?? undefined,
+        _scheduled_at: params.scheduledAt?.toISOString(),
+        _notes: params.notes ?? undefined,
+      });
 
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
+      queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update contacted_at
       toast.success('Meeting logged');
     },
     onError: (error) => {
@@ -318,9 +325,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       queryClient.invalidateQueries({ queryKey: ['lead-tasks'] });
       toast.success('Follow-up added');
     },
@@ -341,7 +347,7 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      invalidateTimeline(leadId);
       queryClient.invalidateQueries({ queryKey: ['lead-tasks'] });
       toast.success('Follow-up completed');
     },
@@ -359,8 +365,7 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+      invalidateTimeline(leadId);
       toast.success('Activity deleted');
     },
     onError: (error) => {
@@ -394,6 +399,8 @@ export function useLeadActivities(leadId?: string) {
     isLoggingMeeting: logMeetingMutation.isPending,
     isCreatingTask: createTaskMutation.isPending,
     isCompletingTask: completeTaskMutation.isPending,
+    // Which task is being completed, so a list can disable just that row.
+    completingTaskId: completeTaskMutation.isPending ? completeTaskMutation.variables : undefined,
     isDeletingActivity: deleteActivityMutation.isPending,
 
     // Refetch

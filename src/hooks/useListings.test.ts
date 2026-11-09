@@ -10,9 +10,19 @@ import { mockAuthenticatedUser } from '@/test/mocks/auth';
 let queryResult: MockQueryResult;
 let authUser: { id: string } | null;
 const fromMock = vi.fn((_table: string) => createQueryBuilder(queryResult));
+const removeMock = vi.fn(
+  async (_paths: string[]): Promise<{ data: unknown; error: { message: string } | null }> => ({
+    data: [],
+    error: null,
+  })
+);
+const storageFromMock = vi.fn((_bucket: string) => ({ remove: removeMock }));
 
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (table: string) => fromMock(table) },
+  supabase: {
+    from: (table: string) => fromMock(table),
+    storage: { from: (bucket: string) => storageFromMock(bucket) },
+  },
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
@@ -23,6 +33,7 @@ vi.mock('@/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { useListings, type ListingUpdate, type NewListing } from './useListings';
 import { logAuditEvent } from '@/lib/audit';
+import { OWNER_LISTING_COLUMNS } from '@/lib/listingColumns';
 
 const listingRow = {
   id: 'l1',
@@ -57,6 +68,13 @@ describe('useListings', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.listings).toHaveLength(1);
     expect(fromMock).toHaveBeenCalledWith('listings');
+  });
+
+  it('reads named columns, not select("*") (US-342)', async () => {
+    const { result } = renderHook(() => useListings(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const builder = fromMock.mock.results[0].value as { select: ReturnType<typeof vi.fn> };
+    expect(builder.select).toHaveBeenCalledWith(OWNER_LISTING_COLUMNS);
   });
 
   it('returns an empty list when unauthenticated', async () => {
@@ -257,6 +275,313 @@ describe('useListings', () => {
       expect(caught).toBeTruthy();
       expect(cachedIds()).toEqual(['a', 'b', 'c']);
       expect(logAuditEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * US-597: the CSV import went through addListing per row, so a 100-row file
+   * meant 100 inserts, 100 refetches and 100 audit calls.
+   */
+  describe('importListings', () => {
+    let client: QueryClient;
+    const clientWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const csvRow = (row: number) => ({
+      row,
+      address: `${row} Oak St`,
+      city: 'Springfield',
+      state: 'IL',
+      zip_code: '',
+      price: 425000,
+      bedrooms: 3,
+      bathrooms: 2,
+      square_feet: null,
+      property_type: 'single_family',
+      status: 'active',
+      description: null,
+      mls_number: null,
+      lot_size_acres: null,
+      is_featured: false,
+      virtual_tour_url: null,
+      year_built: null,
+    });
+
+    beforeEach(() => {
+      client = createTestQueryClient();
+      queryResult = { data: [listingRow], error: null };
+      fromMock.mockImplementation(() => createQueryBuilder(queryResult));
+      vi.mocked(logAuditEvent).mockClear();
+    });
+
+    it('inserts 30 rows in two requests, as the owner, and refetches once', async () => {
+      const { result } = renderHook(() => useListings(), { wrapper: clientWrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const builder = createQueryBuilder({ data: [{ id: 'n1' }], error: null });
+      fromMock.mockImplementation(() => builder);
+      const invalidate = vi.spyOn(client, 'invalidateQueries');
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.importListings.mutateAsync({
+          rows: Array.from({ length: 30 }, (_, i) => csvRow(i + 2)),
+          describeError: () => 'x',
+          today: '2026-11-08',
+        });
+      });
+
+      const inserts = (builder.insert as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c) => c[0] as { user_id: string }[]
+      );
+      expect(inserts.map((batch) => batch.length)).toEqual([25, 5]);
+      expect(inserts.flat().every((r) => r.user_id === mockAuthenticatedUser.id)).toBe(true);
+      expect(builder.select).toHaveBeenCalledWith('id');
+      expect(invalidate).toHaveBeenCalledTimes(1);
+      expect(logAuditEvent).toHaveBeenCalledTimes(2);
+      expect(logAuditEvent).toHaveBeenCalledWith('listing_import', expect.anything());
+      expect(outcome).toEqual({ imported: 30, failures: [] });
+    });
+
+    it('still refetches once when every row is refused', async () => {
+      const { result } = renderHook(() => useListings(), { wrapper: clientWrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      fromMock.mockImplementation(() =>
+        createQueryBuilder({ data: null, error: { code: '23514', message: 'limit' } })
+      );
+      const invalidate = vi.spyOn(client, 'invalidateQueries');
+
+      let outcome: { imported: number; failures: unknown[] } | undefined;
+      await act(async () => {
+        outcome = await result.current.importListings.mutateAsync({
+          rows: [csvRow(2), csvRow(3)],
+          describeError: () => 'Your plan allows 3 active listings.',
+          today: '2026-11-08',
+        });
+      });
+
+      expect(outcome?.imported).toBe(0);
+      expect(outcome?.failures).toHaveLength(2);
+      expect(invalidate).toHaveBeenCalledTimes(1);
+      expect(logAuditEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * US-451: deleting a listing, or dropping a photo from one, only changed the
+   * row, so the originals and their WebP variants stayed public in the bucket.
+   */
+  describe('photo cleanup', () => {
+    const BASE = 'https://db.example.com/storage/v1/object/public/listing-photos';
+    const uid = mockAuthenticatedUser.id;
+    const photo = (name: string) => `${BASE}/${uid}/l1/${name}`;
+    const rows = [
+      {
+        ...listingRow,
+        id: 'l1',
+        photos: [photo('a.jpg'), photo('b.jpg'), photo('shared.jpg')],
+        image: photo('a.jpg'),
+      },
+      { ...listingRow, id: 'l2', photos: [photo('shared.jpg')], image: null },
+    ];
+    let client: QueryClient;
+    const clientWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const variants = (name: string) => {
+      const stem = `${uid}/l1/${name.replace(/\.jpg$/, '')}`;
+      return [`${uid}/l1/${name}`, `${stem}-200.webp`, `${stem}-400.webp`, `${stem}-800.webp`];
+    };
+
+    beforeEach(() => {
+      client = createTestQueryClient();
+      client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity, staleTime: 0 } });
+      queryResult = { data: rows, error: null };
+      fromMock.mockImplementation(() => createQueryBuilder(queryResult));
+      removeMock.mockClear();
+      storageFromMock.mockClear();
+    });
+
+    const loaded = async () => {
+      const hook = renderHook(() => useListings(), { wrapper: clientWrapper });
+      await waitFor(() => expect(hook.result.current.listings).toHaveLength(2));
+      return hook;
+    };
+
+    it('removes a deleted listing photos and variants, keeping ones another listing uses', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: [{ id: 'l1' }], error: null }));
+
+      await act(async () => {
+        await result.current.deleteListing.mutateAsync('l1');
+      });
+
+      await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+      expect(storageFromMock).toHaveBeenCalledWith('listing-photos');
+      const removed = removeMock.mock.calls[0][0];
+      expect(removed).toEqual([...variants('a.jpg'), ...variants('b.jpg')]);
+      expect(removed).not.toContain(`${uid}/l1/shared.jpg`);
+    });
+
+    it('leaves storage alone when the delete removed no row', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: [], error: null }));
+
+      await act(async () => {
+        await result.current.deleteListing.mutateAsync('l1');
+      });
+      expect(removeMock).not.toHaveBeenCalled();
+    });
+
+    it('leaves storage alone when the delete fails', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() =>
+        createQueryBuilder({ data: null, error: { message: 'permission denied' } })
+      );
+
+      await act(async () => {
+        await result.current.deleteListing.mutateAsync('l1').catch(() => undefined);
+      });
+      expect(removeMock).not.toHaveBeenCalled();
+    });
+
+    it('removes only the photos an edit drops', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: rows[0], error: null }));
+
+      await act(async () => {
+        await result.current.updateListing.mutateAsync({
+          id: 'l1',
+          photos: [photo('b.jpg'), photo('shared.jpg')],
+          image: photo('b.jpg'),
+        });
+      });
+
+      await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+      expect(removeMock.mock.calls[0][0]).toEqual(variants('a.jpg'));
+    });
+
+    it('does not touch storage for an edit that leaves photos alone', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: rows[0], error: null }));
+
+      await act(async () => {
+        await result.current.updateListing.mutateAsync({ id: 'l1', price: '1' });
+      });
+      expect(removeMock).not.toHaveBeenCalled();
+    });
+
+    it('still resolves the delete when storage refuses the cleanup', async () => {
+      const { result } = await loaded();
+      fromMock.mockImplementation(() => createQueryBuilder({ data: [{ id: 'l1' }], error: null }));
+      removeMock.mockResolvedValueOnce({ data: null, error: { message: 'storage down' } });
+
+      let caught: unknown;
+      await act(async () => {
+        await result.current.deleteListing.mutateAsync('l1').catch((e: unknown) => (caught = e));
+      });
+      await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+      expect(caught).toBeUndefined();
+    });
+
+    describe('discardUnsavedPhotos (US-461)', () => {
+      it('removes unsaved uploads and their variants', async () => {
+        const { result } = await loaded();
+
+        await act(async () => {
+          await result.current.discardUnsavedPhotos([photo('new.jpg')]);
+        });
+
+        expect(removeMock).toHaveBeenCalledTimes(1);
+        expect(removeMock.mock.calls[0][0]).toEqual(variants('new.jpg'));
+      });
+
+      it('re-reads the listings and keeps anything a stored row refers to', async () => {
+        const { result } = await loaded();
+        // The cache does not know new.jpg was saved; the database does.
+        fromMock.mockImplementation(() =>
+          createQueryBuilder({
+            data: [{ photos: [photo('new.jpg')], image: null }],
+            error: null,
+          })
+        );
+
+        await act(async () => {
+          await result.current.discardUnsavedPhotos([photo('new.jpg'), photo('gone.jpg')]);
+        });
+
+        expect(fromMock).toHaveBeenLastCalledWith('listings');
+        expect(removeMock.mock.calls[0][0]).toEqual(variants('gone.jpg'));
+      });
+
+      it('removes nothing when the listings cannot be read', async () => {
+        const { result } = await loaded();
+        fromMock.mockImplementation(() =>
+          createQueryBuilder({ data: null, error: { message: 'network down' } })
+        );
+
+        await act(async () => {
+          await expect(
+            result.current.discardUnsavedPhotos([photo('new.jpg')])
+          ).resolves.toBeUndefined();
+        });
+        expect(removeMock).not.toHaveBeenCalled();
+      });
+
+      it('removes the photos of an add whose insert fails, and still rejects', async () => {
+        const { result } = await loaded();
+        // The insert fails; the follow-up read of stored listings finds none
+        // referring to the new photos.
+        fromMock.mockImplementationOnce(() =>
+          createQueryBuilder({ data: null, error: { message: 'plan_limit:active_listings' } })
+        );
+        fromMock.mockImplementationOnce(() => createQueryBuilder({ data: [], error: null }));
+
+        let caught: unknown;
+        await act(async () => {
+          await result.current.addListing
+            .mutateAsync({
+              address: '2 Second St',
+              city: 'Town',
+              price: '1',
+              photos: [photo('new.jpg')],
+              image: photo('new.jpg'),
+            })
+            .catch((e: unknown) => (caught = e));
+        });
+
+        expect(caught).toBeTruthy();
+        await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+        expect(removeMock.mock.calls[0][0]).toEqual(variants('new.jpg'));
+      });
+
+      it('leaves storage alone when the add succeeds', async () => {
+        const { result } = await loaded();
+        fromMock.mockImplementation(() => createQueryBuilder({ data: { id: 'l3' }, error: null }));
+
+        await act(async () => {
+          await result.current.addListing.mutateAsync({
+            address: '2 Second St',
+            city: 'Town',
+            price: '1',
+            photos: [photo('new.jpg')],
+            image: photo('new.jpg'),
+          });
+        });
+        expect(removeMock).not.toHaveBeenCalled();
+      });
+
+      it('never removes another folder or a hot-linked URL, and skips an empty list', async () => {
+        const { result } = await loaded();
+
+        await act(async () => {
+          await result.current.discardUnsavedPhotos([]);
+          await result.current.discardUnsavedPhotos([
+            `${BASE}/someone-else/l1/x.jpg`,
+            'https://images.example.com/house.jpg',
+          ]);
+        });
+        expect(removeMock).not.toHaveBeenCalled();
+      });
     });
   });
 

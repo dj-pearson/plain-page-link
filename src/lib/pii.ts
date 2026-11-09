@@ -19,7 +19,7 @@
  * still decrypt.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { callEdgeFunction } from '@/lib/edgeFunctions';
 
 const PII_PREFIX = 'enc:v1:';
 
@@ -27,6 +27,29 @@ type Nullable<T> = T | null | undefined;
 
 function isEmpty(value: Nullable<string>): value is null | undefined | '' {
   return value === null || value === undefined || value === '';
+}
+
+/**
+ * One call to pii-crypto on functions.agentbio.net, in the { data, error }
+ * shape the helpers below were written against.
+ *
+ * US-622: these calls used supabase.functions.invoke, which posts to
+ * ${VITE_SUPABASE_URL}/functions/v1. Nothing public routes there (US-611 found
+ * every review submission failing the same way), so in production lead and
+ * contact details never decrypted and a phone number could not be encrypted
+ * for saving. callEdgeFunction goes to VITE_FUNCTIONS_URL, the router that
+ * serves every function, with the caller's JWT.
+ */
+async function invokePiiCrypto<T>(
+  body: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<{ data: T | null; error: Error | null }> {
+  try {
+    const data = await callEdgeFunction<T>('pii-crypto', { body, auth: true, signal });
+    return { data, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
+  }
 }
 
 /** True if a string looks like an encryptPII() output. */
@@ -39,10 +62,7 @@ export function isEncryptedPII(value: Nullable<string>): boolean {
  * values needing no work — see the batch helpers below.
  */
 async function callPiiCrypto(op: 'encrypt', values: (string | null)[]) {
-  const { data, error } = await supabase.functions.invoke<{ values: (string | null)[] }>(
-    'pii-crypto',
-    { body: { op, values } }
-  );
+  const { data, error } = await invokePiiCrypto<{ values: (string | null)[] }>({ op, values });
 
   if (error || !data?.values || data.values.length !== values.length) {
     // Fail closed on encrypt (the caller must not silently write plaintext into
@@ -113,10 +133,10 @@ export async function decryptLeadContacts(
   if (ids.length === 0) return out;
 
   try {
-    const { data, error } = await supabase.functions.invoke<{ leads: DecryptedLeadContact[] }>(
-      'pii-crypto',
-      { body: { op: 'decrypt_leads', leadIds: ids } }
-    );
+    const { data, error } = await invokePiiCrypto<{ leads: DecryptedLeadContact[] }>({
+      op: 'decrypt_leads',
+      leadIds: ids,
+    });
     if (error || !data?.leads) return out;
     for (const lead of data.leads) out.set(lead.id, lead);
   } catch {
@@ -143,9 +163,10 @@ export async function decryptContactDetails(
   // pii-crypto takes at most 100 ids a call.
   for (let i = 0; i < ids.length; i += 100) {
     try {
-      const { data, error } = await supabase.functions.invoke<{
-        contacts: DecryptedContactDetails[];
-      }>('pii-crypto', { body: { op: 'decrypt_contacts', contactIds: ids.slice(i, i + 100) } });
+      const { data, error } = await invokePiiCrypto<{ contacts: DecryptedContactDetails[] }>({
+        op: 'decrypt_contacts',
+        contactIds: ids.slice(i, i + 100),
+      });
       if (error || !data?.contacts) continue;
       for (const contact of data.contacts) out.set(contact.id, contact);
     } catch {
@@ -170,8 +191,8 @@ export async function decryptContactDetails(
  * those untouched) is the same failure.
  */
 export async function decryptOwnProfilePhone(): Promise<string | null> {
-  const { data, error } = await supabase.functions.invoke<{ phone: string | null }>('pii-crypto', {
-    body: { op: 'decrypt_profile' },
+  const { data, error } = await invokePiiCrypto<{ phone: string | null }>({
+    op: 'decrypt_profile',
   });
   if (error) throw error;
   if (!data) throw new Error('pii-crypto returned an unexpected response');
@@ -191,4 +212,121 @@ export async function encryptPII<T extends Nullable<string>>(plaintext: T): Prom
   if (isEmpty(plaintext)) return plaintext;
   const [result] = await encryptPIIBatch([plaintext]);
   return result as string;
+}
+
+/** One of the caller's contacts that a lead already is (US-629). */
+export interface ContactMatchForLead {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  /** The lead this contact is already linked to, if any. */
+  lead_id: string | null;
+  matched_on: 'email' | 'phone' | 'email_and_phone';
+}
+
+/** pii-crypto hashes a batch of contacts per call; this caps the round trips. */
+const MAX_MATCH_ROUNDS = 8;
+
+/**
+ * The caller's contacts with the same email or phone as this lead, strongest
+ * match first. pii-crypto compares keyed fingerprints, so nothing is
+ * decrypted into the browser; a locked lead never matches.
+ *
+ * Contacts are fingerprinted lazily, a batch per call, so this asks again
+ * while pii-crypto reports `complete: false` (a large sphere's first
+ * conversion), up to a fixed number of rounds.
+ *
+ * Throws when pii-crypto cannot answer; the caller decides whether to go
+ * ahead without the check.
+ */
+export async function findContactsMatchingLead(leadId: string): Promise<ContactMatchForLead[]> {
+  let matches: ContactMatchForLead[] = [];
+  for (let round = 0; round < MAX_MATCH_ROUNDS; round++) {
+    const { data, error } = await invokePiiCrypto<{
+      matches: ContactMatchForLead[];
+      complete: boolean;
+    }>({ op: 'match_contacts_for_lead', leadId });
+    if (error) throw error;
+    if (!data || !Array.isArray(data.matches)) {
+      throw new Error('pii-crypto returned an unexpected response');
+    }
+    matches = data.matches;
+    if (data.complete !== false) break;
+  }
+  return matches;
+}
+
+/** One of the caller's contacts that already has a typed email or phone (US-670). */
+export type ContactMatchForDetails = ContactMatchForLead;
+
+/**
+ * The client form waits on this before saving, so it is held to fewer rounds
+ * and a time budget; past either, the caller saves without the check.
+ */
+const MAX_DETAILS_ROUNDS = 3;
+const DETAILS_BUDGET_MS = 8000;
+
+/**
+ * The caller's contacts that already have this email or phone, strongest
+ * match first, excluding `excludeContactId` (the contact being edited).
+ * pii-crypto compares keyed fingerprints; nothing is decrypted into the
+ * browser.
+ *
+ * Throws when pii-crypto cannot answer within the budget; the form then saves
+ * without the check rather than refuse to save.
+ */
+export async function findContactsMatchingDetails(details: {
+  email?: string | null;
+  phone?: string | null;
+  excludeContactId?: string | null;
+}): Promise<ContactMatchForDetails[]> {
+  const email = details.email?.trim() || null;
+  const phone = details.phone?.trim() || null;
+  if (!email && !phone) return [];
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DETAILS_BUDGET_MS);
+  try {
+    let matches: ContactMatchForDetails[] = [];
+    for (let round = 0; round < MAX_DETAILS_ROUNDS; round++) {
+      const { data, error } = await invokePiiCrypto<{
+        matches: ContactMatchForDetails[];
+        complete: boolean;
+      }>(
+        {
+          op: 'match_contacts_for_details',
+          email,
+          phone,
+          excludeContactId: details.excludeContactId ?? null,
+        },
+        controller.signal
+      );
+      if (error) throw error;
+      if (!data || !Array.isArray(data.matches)) {
+        throw new Error('pii-crypto returned an unexpected response');
+      }
+      matches = data.matches;
+      // A match found in an incomplete pass is already worth showing.
+      if (data.complete !== false || matches.length > 0) break;
+    }
+    return matches;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Asks pii-crypto to fingerprint the caller's contacts that have none yet
+ * (US-640), newest edits first, so a contact just created or edited is
+ * hashed within this one request and the next lead conversion can find it.
+ *
+ * Fire-and-forget: never throws, and resolves to whether pii-crypto answered.
+ * A miss is harmless: scheduled-maintenance hashes whatever is left, and the
+ * duplicate check still hashes a batch itself before matching.
+ */
+export async function indexOwnContacts(): Promise<boolean> {
+  const { data, error } = await invokePiiCrypto<{ hashed: number; complete: boolean }>({
+    op: 'index_contacts',
+  });
+  return !error && !!data;
 }

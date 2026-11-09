@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { encryptPIIBatch, decryptLeadContacts } from '@/lib/pii';
 import { LEAD_COLUMNS } from '@/lib/leadColumns';
+import { normalizeStatusFilter, statusFilterValues } from '@/lib/leadStatus';
+import { normalizeAssigneeFilter, type AssigneeFilter } from '@/lib/leadAssignee';
 import type { Lead, LeadReadRow } from '@/types/lead';
 
 /**
@@ -42,6 +44,11 @@ export interface LeadFilters {
   search?: string;
   /** Only leads a teammate's routing assigned to me (US-226). */
   assignedToMe?: boolean;
+  /**
+   * Who holds the lead (US-515): 'unassigned' or one teammate's user id, the
+   * owner's view of how their team's leads are split. Anything else is ignored.
+   */
+  assignee?: string | null;
 }
 
 /**
@@ -53,7 +60,13 @@ export interface LeadFilters {
 /** The list's filters as a query; shared by the paged list and the export. */
 function leadsQuery(
   userId: string,
-  filters: { status?: string; leadType?: string; search?: string; assignedToMe?: boolean }
+  filters: {
+    statuses?: readonly string[];
+    leadType?: string;
+    search?: string;
+    assignedToMe?: boolean;
+    assignee?: AssigneeFilter | null;
+  }
 ) {
   // US-226: my leads AND the ones assigned to me. RLS always allowed the
   // assignee to read them; this query filtered on user_id alone, so a lead the
@@ -64,7 +77,12 @@ function leadsQuery(
     .select(LEAD_COLUMNS)
     .or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
   if (filters.assignedToMe) query = query.eq('assigned_to', userId);
-  if (filters.status) query = query.eq('status', filters.status);
+  if (filters.assignee === 'unassigned') query = query.is('assigned_to', null);
+  else if (filters.assignee) query = query.eq('assigned_to', filters.assignee);
+  // One status or a group of them (US-439: "In progress", "Won").
+  const statuses = filters.statuses;
+  if (statuses?.length === 1) query = query.eq('status', statuses[0]);
+  else if (statuses?.length) query = query.in('status', [...statuses]);
   if (filters.leadType) query = query.eq('lead_type', filters.leadType);
   // Name only: email and phone are ciphertext since US-086, so an ilike
   // against them would match nothing.
@@ -89,10 +107,11 @@ export async function fetchAllLeads(
   filters: LeadFilters = {}
 ): Promise<{ leads: Lead[]; truncated: boolean }> {
   const normalized = {
-    status: filters.status && filters.status !== 'all' ? filters.status : undefined,
+    statuses: statusFilterValues(filters.status),
     leadType: filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined,
     search: filters.search?.trim() || undefined,
     assignedToMe: filters.assignedToMe,
+    assignee: normalizeAssigneeFilter(filters.assignee),
   };
   const out: Lead[] = [];
   for (let from = 0; from < EXPORT_MAX_LEADS; from += EXPORT_BATCH) {
@@ -114,10 +133,12 @@ export function useLeads(filters: LeadFilters = {}) {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
-  const status = filters.status && filters.status !== 'all' ? filters.status : undefined;
+  const status = normalizeStatusFilter(filters.status);
+  const statuses = statusFilterValues(status);
   const leadType = filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined;
   const search = filters.search?.trim() || undefined;
   const assignedToMe = filters.assignedToMe || undefined;
+  const assignee = normalizeAssigneeFilter(filters.assignee) ?? undefined;
 
   const {
     data,
@@ -129,7 +150,7 @@ export function useLeads(filters: LeadFilters = {}) {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['leads', user?.id, { status, leadType, search, assignedToMe }],
+    queryKey: ['leads', user?.id, { status, leadType, search, assignedToMe, assignee }],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       if (!user?.id) return [];
@@ -140,10 +161,11 @@ export function useLeads(filters: LeadFilters = {}) {
       // visit (US-104).
       const from = (pageParam as number) * LEADS_PAGE_SIZE;
       const { data, error } = await leadsQuery(user.id, {
-        status,
+        statuses,
         leadType,
         search,
         assignedToMe,
+        assignee,
       }).range(from, from + LEADS_PAGE_SIZE - 1);
 
       if (error) throw error;
@@ -266,25 +288,72 @@ export function useLeads(filters: LeadFilters = {}) {
    * was looking at (US-104).
    */
   const bulkUpdateStatus = useMutation({
-    mutationFn: async ({ ids, patch }: { ids: string[]; patch: Record<string, unknown> }) => {
+    mutationFn: async ({
+      ids,
+      patch,
+    }: {
+      ids: string[];
+      patch: Record<string, unknown>;
+    }): Promise<string[]> => {
       if (!user?.id) throw new Error('User not authenticated');
-      // Scoped by user_id as well as id: RLS covers it, but the same
-      // defence-in-depth the single-row mutations use.
-      const { error } = await supabase
+      if (ids.length === 0) return [];
+      // US-588: the owner OR the assignee, as the leads UPDATE policy allows
+      // (and as the detail dialog's single-lead status change already does).
+      // Scoped by user_id alone, a teammate's bulk change to the leads
+      // assigned to them matched no row and was reported as done. Returns the
+      // ids the server changed, so the page reports what really happened.
+      const { data, error } = await supabase
         .from('leads')
         .update(patch)
         .in('id', ids)
-        .eq('user_id', user.id);
+        .or(`user_id.eq.${user.id},assigned_to.eq.${user.id}`)
+        .select('id');
       if (error) throw error;
+      return (data ?? []).map((row) => row.id);
     },
     onSuccess: invalidateLeadCaches,
   });
 
-  const bulkDelete = useMutation({
-    mutationFn: async (ids: string[]) => {
+  // US-573: hand the selected leads to one teammate, or to nobody. The same
+  // guard_lead_assignee trigger as the detail dialog (20261108000497) refuses
+  // anyone who is not an accepted member of the owner's team. Returns the ids
+  // the server actually changed, so the page can report the rest.
+  const bulkAssign = useMutation({
+    mutationFn: async ({
+      ids,
+      assignedTo,
+    }: {
+      ids: string[];
+      assignedTo: string | null;
+    }): Promise<string[]> => {
       if (!user?.id) throw new Error('User not authenticated');
-      const { error } = await supabase.from('leads').delete().in('id', ids).eq('user_id', user.id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from('leads')
+        .update({ assigned_to: assignedTo })
+        .in('id', ids)
+        .eq('user_id', user.id)
+        .select('id');
       if (error) throw error;
+      return (data ?? []).map((row) => row.id);
+    },
+    onSuccess: invalidateLeadCaches,
+  });
+
+  // Only the owner can delete a lead (an assignee cannot destroy the team's
+  // record of it). Returns the ids the server actually deleted (US-588).
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: string[]): Promise<string[]> => {
+      if (!user?.id) throw new Error('User not authenticated');
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from('leads')
+        .delete()
+        .in('id', ids)
+        .eq('user_id', user.id)
+        .select('id');
+      if (error) throw error;
+      return (data ?? []).map((row) => row.id);
     },
     onSuccess: invalidateLeadCaches,
   });
@@ -302,6 +371,7 @@ export function useLeads(filters: LeadFilters = {}) {
     updateLead,
     deleteLead,
     bulkUpdateStatus,
+    bulkAssign,
     bulkDelete,
   };
 }

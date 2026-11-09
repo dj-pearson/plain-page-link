@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
-import { SEO_CONFIG, getBaseUrl, getOgImageUrl } from '@/config/seo.config';
+import { SEO_CONFIG, getBaseUrl, getOgImageUrl, offerPriceValidUntil } from '@/config/seo.config';
+import { organizationId, websiteId } from '@/config/site-entities';
 import { getFeaturedLocations, type LocationData } from '@/data/locations';
+import { buildLocationFaqs } from './locationFaq';
 
 // Re-export LocationData for backward compatibility
 export type { LocationData } from '@/data/locations';
@@ -37,6 +39,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
   // Get related locations for internal linking
   const featuredLocations = getFeaturedLocations(slug, 6);
 
+  // One list for the FAQPage schema and the visible FAQ section.
+  const faqs = buildLocationFaqs(city);
+
   // Enhanced schema with more structured data
   const schema = {
     '@context': 'https://schema.org',
@@ -48,7 +53,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         url: canonicalUrl,
         name: pageTitle,
         description: pageDescription,
-        isPartOf: { '@id': `${baseUrl}/#website` },
+        isPartOf: { '@id': websiteId(baseUrl) },
         about: { '@id': `${canonicalUrl}#service` },
         breadcrumb: { '@id': `${canonicalUrl}#breadcrumb` },
         inLanguage: 'en-US',
@@ -68,7 +73,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         publisher: {
           '@type': 'Organization',
           name: SEO_CONFIG.organization.name,
-          '@id': `${baseUrl}/#organization`,
+          '@id': organizationId(baseUrl),
         },
       },
       // BreadcrumbList schema
@@ -106,7 +111,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         provider: {
           '@type': 'Organization',
           name: SEO_CONFIG.organization.name,
-          '@id': `${baseUrl}/#organization`,
+          '@id': organizationId(baseUrl),
         },
         areaServed: {
           '@type': 'City',
@@ -119,7 +124,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
           '@type': 'Offer',
           price: SEO_CONFIG.pricing.startingPrice,
           priceCurrency: SEO_CONFIG.pricing.currency,
-          priceValidUntil: SEO_CONFIG.pricing.priceValidUntil,
+          priceValidUntil: offerPriceValidUntil(),
           availability: 'https://schema.org/InStock',
         },
         // aggregateRating removed (US-157). SEO_CONFIG.ratings held the same
@@ -130,48 +135,11 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
       {
         '@type': 'FAQPage',
         '@id': `${canonicalUrl}#faq`,
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: `How do ${city} real estate agents use AgentBio?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `${city} real estate agents use AgentBio as their Instagram link in bio to showcase ${city} property listings, capture local buyer and seller leads, and book consultations. The platform is optimized for mobile traffic from Instagram and includes features specifically for real estate professionals.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            name: `Can I showcase ${city} property listings on AgentBio?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `Yes! AgentBio allows ${city} agents to display property listing cards with photos, addresses, prices, and details. You can update listings instantly when properties go pending or sell, ensuring your ${city} followers always see current inventory.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            name: `Does AgentBio work with ${city} MLS systems?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `AgentBio integrates with major MLS and IDX providers used in ${city}. You can automatically sync your active ${city} listings or manually add properties with photos and details.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            name: `How much does AgentBio cost for ${city} agents?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `AgentBio has a free plan with 3 active listings, lead capture forms and analytics. Paid plans start at $${SEO_CONFIG.pricing.startingPrice}/month and add more listings, a custom domain and a longer analytics history—perfect for growing ${city} real estate businesses.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            name: `Can I customize my AgentBio page for ${city} branding?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `Absolutely! You can customize colors, fonts, logos, and background images to match your personal brand or brokerage guidelines. Many ${city} agents maintain consistent branding across Instagram, their website, and AgentBio.`,
-            },
-          },
-        ],
+        mainEntity: faqs.map(({ question, answer }) => ({
+          '@type': 'Question',
+          name: question,
+          acceptedAnswer: { '@type': 'Answer', text: answer },
+        })),
       },
     ],
   };
@@ -297,10 +265,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
               lead capture forms for buyer/seller qualification, calendar booking for consultation
               scheduling, and testimonial showcases. {city} agents use AgentBio to consolidate their
               property portfolio, contact information, and lead generation tools into one
-              mobile-optimized link that turns Instagram traffic into actual clients. The platform
-              integrates with popular CRM systems used by {city} real estate professionals and
-              provides detailed analytics to track which {city} neighborhoods and property types
-              generate the most engagement.
+              mobile-optimized link that turns Instagram traffic into actual clients. Every new lead
+              can be sent on to the agent's CRM through a Zapier webhook or, on paid plans, exported
+              as a CSV, and the dashboard shows how many people viewed each listing, clicked each
+              link and which campaign sources turned into leads.
             </p>
           </div>
         </section>
@@ -418,10 +386,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                     <TrendingUp className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold mb-2">Track {city} Market Engagement</h3>
+                    <h3 className="text-xl font-bold mb-2">See What {city} Buyers Respond To</h3>
                     <p className="text-muted-foreground">
-                      See which {city} neighborhoods, property types, and price ranges generate the
-                      most clicks and leads.
+                      See how many views each listing gets, which links are clicked and which
+                      campaign sources turn into leads.
                     </p>
                   </div>
                 </div>
@@ -518,9 +486,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
 
               <div className="glass-panel p-6">
                 <CheckCircle className="h-10 w-10 text-primary mb-4" />
-                <h3 className="text-xl font-bold mb-2">CRM Integration</h3>
+                <h3 className="text-xl font-bold mb-2">Zapier Hand-off</h3>
                 <p className="text-muted-foreground text-sm">
-                  Auto-sync leads to your existing system
+                  Send each new lead on to your CRM through Zapier
                 </p>
               </div>
             </div>
@@ -546,62 +514,15 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
               Frequently Asked Questions
             </h2>
 
+            {/* Rendered from the same list as the FAQPage schema, so the
+                answer Google is shown is the answer on the page (US-311). */}
             <div className="space-y-6">
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  How do {city} real estate agents use AgentBio?
-                </h3>
-                <p className="text-muted-foreground">
-                  {city} real estate agents use AgentBio as their Instagram link in bio to showcase{' '}
-                  {city} property listings, capture local buyer and seller leads, and book
-                  consultations. The platform is optimized for mobile traffic from Instagram and
-                  includes features specifically for real estate professionals.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Can I showcase {city} property listings on AgentBio?
-                </h3>
-                <p className="text-muted-foreground">
-                  Yes! AgentBio allows {city} agents to display property listing cards with photos,
-                  addresses, prices, and details. You can update listings instantly when properties
-                  go pending or sell, ensuring your {city} followers always see current inventory.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Does AgentBio work with {city} MLS systems?
-                </h3>
-                <p className="text-muted-foreground">
-                  AgentBio integrates with major MLS and IDX providers used in {city}. You can
-                  automatically sync your active {city} listings or manually add properties with
-                  photos and details.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  How much does AgentBio cost for {city} agents?
-                </h3>
-                <p className="text-muted-foreground">
-                  AgentBio pricing starts at ${SEO_CONFIG.pricing.startingPrice}/month with a free
-                  trial. All plans include unlimited property listings, lead capture forms, calendar
-                  booking, and analytics—perfect for growing {city} real estate businesses.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Can I customize my AgentBio page for {city} branding?
-                </h3>
-                <p className="text-muted-foreground">
-                  Absolutely! You can customize colors, fonts, logos, and background images to match
-                  your personal brand or brokerage guidelines. Many {city} agents maintain
-                  consistent branding across Instagram, their website, and AgentBio.
-                </p>
-              </div>
+              {faqs.map(({ question, answer }) => (
+                <div key={question} className="glass-panel p-6">
+                  <h3 className="font-bold text-lg mb-2">{question}</h3>
+                  <p className="text-muted-foreground">{answer}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>

@@ -1,6 +1,8 @@
 import { Helmet } from 'react-helmet-async';
 import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { getBaseUrl } from '@/config/seo.config';
+import { organizationId, publisherOrganization, websiteId } from '@/config/site-entities';
+import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 
 interface BlogListSEOProps {
   totalArticles: number;
@@ -27,40 +29,31 @@ export function BlogListSEO({ latestArticleDate }: BlogListSEOProps) {
     name: title,
     description: description,
     url: blogUrl,
-    publisher: {
-      '@type': 'Organization',
-      name: siteName,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${siteUrl}/Cover.png`,
-      },
-    },
+    // The site Organization by @id, with its real logo. This was an anonymous
+    // Organization giving /Cover.png (the 1536x1024 social banner) as its
+    // logo, the drift US-346 removed from the article publisher (US-502).
+    publisher: publisherOrganization(siteUrl),
+    isPartOf: { '@id': websiteId(siteUrl) },
     inLanguage: 'en-US',
     ...(latestArticleDate && { dateModified: latestArticleDate }),
   };
 
-  // Structured data for Organization
-  const organizationStructuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'Organization',
-    name: siteName,
-    url: siteUrl,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${siteUrl}/Cover.png`,
-    },
-    sameAs: [
-      // Add your social media URLs here
-    ],
-  };
+  // The one Organization node every other marketing page declares. This was a
+  // second, anonymous Organization with the banner as its logo and an empty
+  // sameAs, so /blog told a consumer about an AgentBio that matched nothing
+  // else on the site (US-502).
+  const organizationStructuredData = generateEnhancedOrganizationSchema();
 
   // Structured data for WebSite with SearchAction
   const websiteStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    '@id': siteUrl,
+    // Was '@id': siteUrl, the bare origin, so this WebSite was a different
+    // node from the websiteId() every other page declares (US-502).
+    '@id': websiteId(siteUrl),
     name: siteName,
     url: siteUrl,
+    publisher: { '@id': organizationId(siteUrl) },
     potentialAction: {
       '@type': 'SearchAction',
       target: {

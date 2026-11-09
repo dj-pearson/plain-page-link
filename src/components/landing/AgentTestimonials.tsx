@@ -26,7 +26,7 @@ export function AgentTestimonials() {
       icon: <Shield className="h-8 w-8" />,
       title: 'Professional Credibility',
       description:
-        'Display your license, brokerage, sold properties, and certifications. Build trust with verified credentials that set you apart from the competition.',
+        'Display your license, brokerage, sold properties, and certifications. Your credentials are on show to every visitor, building trust before the first call.',
       highlight: 'Trust Builder',
     },
     {
@@ -48,7 +48,7 @@ export function AgentTestimonials() {
       title: 'Lead Management',
       description:
         'Capture buyer inquiries, seller leads, and home valuation requests in one place. Follow up faster with organized lead tracking.',
-      highlight: 'CRM Built-In',
+      highlight: 'One Lead Inbox',
     },
   ];
 

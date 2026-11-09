@@ -1,6 +1,7 @@
 import { Instagram, Facebook, Linkedin, Music, Youtube, Home, Building, Globe } from 'lucide-react';
 import { trackSocialClick } from '@/lib/analyticsEvents';
 import type { PublicProfile } from '@/types/profile';
+import { sanitizeExternalUrl } from '@/utils/sanitizeUrl';
 
 interface SocialLinksProps {
   profile: PublicProfile;
@@ -58,7 +59,11 @@ const socialPlatforms = [
 ];
 
 export default function SocialLinks({ profile }: SocialLinksProps) {
-  const activeSocials = socialPlatforms.filter((platform) => profile[platform.key]);
+  // US-268: only http(s) profile URLs become links; a javascript: or
+  // otherwise unusable value is dropped instead of rendered as an href.
+  const activeSocials = socialPlatforms
+    .map((platform) => ({ ...platform, url: sanitizeExternalUrl(profile[platform.key]) }))
+    .filter((platform) => platform.url !== '');
 
   if (activeSocials.length === 0) {
     return null;
@@ -71,12 +76,10 @@ export default function SocialLinks({ profile }: SocialLinksProps) {
       <div className="flex flex-wrap justify-center gap-3">
         {activeSocials.map((platform) => {
           const Icon = platform.icon;
-          const url = profile[platform.key];
-
           return (
             <a
               key={platform.key}
-              href={url!}
+              href={platform.url}
               target="_blank"
               rel="noopener noreferrer"
               className={`flex items-center gap-2 px-4 py-2 border-2 border-gray-200 rounded-lg text-gray-700 font-medium transition-all ${platform.color} hover:border-current hover:shadow-md`}

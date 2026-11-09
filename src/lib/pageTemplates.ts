@@ -106,7 +106,7 @@ const luxuryAgentTemplate: PageTemplate = {
           },
         ],
         submitButtonText: 'Request Consultation',
-        successMessage: "Thank you! I'll be in touch within 24 hours.",
+        successMessage: "Thank you! I'll be in touch soon.",
       },
     },
   ],
@@ -159,13 +159,16 @@ const firstTimeBuyerTemplate: PageTemplate = {
         showStatus: true,
       },
     },
+    // Was "📚 First-Time Buyer Guide (Free Download)" with url '#': a dead
+    // button promising a download no agent had uploaded (US-327). It now
+    // scrolls to the profile's contact section, which every page has.
     {
       type: 'link',
       visible: true,
       config: {
         type: 'link',
-        title: '📚 First-Time Buyer Guide (Free Download)',
-        url: '#',
+        title: 'Ask me anything about buying your first home',
+        url: '#contact',
         style: 'button',
         openInNewTab: false,
       },
@@ -272,17 +275,8 @@ const investorFocusedTemplate: PageTemplate = {
         fontSize: 'medium',
       },
     },
-    {
-      type: 'link',
-      visible: true,
-      config: {
-        type: 'link',
-        title: '📊 Market Analysis Report',
-        url: '#',
-        style: 'button',
-        openInNewTab: false,
-      },
-    },
+    // A "📊 Market Analysis Report" button with url '#' stood here; there was
+    // no report behind it (US-327). The form below is the ask.
     {
       type: 'contact',
       visible: true,
@@ -328,7 +322,7 @@ const investorFocusedTemplate: PageTemplate = {
           },
         ],
         submitButtonText: 'Get Investment Analysis',
-        successMessage: "I'll prepare a custom market analysis for you.",
+        successMessage: "Thanks! I'll be in touch to talk through your investment goals.",
       },
     },
     {
@@ -433,7 +427,7 @@ const premiumShowcaseTemplate: PageTemplate = {
         type: 'hero',
         headline: 'Turning Dreams Into Addresses',
         subheadline:
-          'Trusted real estate professional with a proven track record of finding the perfect home for every client',
+          'Real estate guidance for buyers and sellers, from first showing to closing day',
         backgroundOverlay: 'gradient',
         ctaText: 'Schedule a Consultation',
         ctaUrl: '#contact',
@@ -450,11 +444,21 @@ const premiumShowcaseTemplate: PageTemplate = {
       config: {
         type: 'stats',
         title: 'By The Numbers',
+        // Live figures only (US-305). These were "200+ Homes Sold", "98% Client
+        // Satisfaction", "15+ Years" and "$50M in Sales" — invented numbers
+        // published under the agent's name. Each item now reads the agent's
+        // real count and is hidden until it exists.
         stats: [
-          { id: 's1', value: '200', label: 'Homes Sold', icon: 'home', suffix: '+' },
-          { id: 's2', value: '98', label: 'Client Satisfaction', icon: 'star', suffix: '%' },
-          { id: 's3', value: '15', label: 'Years Experience', icon: 'award', suffix: '+' },
-          { id: 's4', value: '50', label: 'M in Sales', icon: 'dollar', prefix: '$' },
+          { id: 's1', source: 'sold_listings', value: '', label: 'Homes sold', icon: 'home' },
+          {
+            id: 's2',
+            source: 'years_experience',
+            value: '',
+            label: 'Years experience',
+            icon: 'award',
+          },
+          { id: 's3', source: 'review_count', value: '', label: 'Client reviews', icon: 'users' },
+          { id: 's4', source: 'average_rating', value: '', label: 'Average rating', icon: 'star' },
         ],
         layout: 'cards',
       },
@@ -471,7 +475,7 @@ const premiumShowcaseTemplate: PageTemplate = {
         title: 'Your Name',
         subtitle: 'Licensed Real Estate Professional',
         description:
-          "With over 15 years of experience, I specialize in helping families find their dream homes. My approach combines market expertise with genuine care for each client's unique needs.",
+          'I help families buy and sell homes with clear advice and steady communication at every step.',
         showSocialLinks: false,
         showContactButton: true,
       },
@@ -506,32 +510,10 @@ const premiumShowcaseTemplate: PageTemplate = {
       config: {
         type: 'testimonial',
         title: 'What My Clients Say',
-        testimonials: [
-          {
-            id: 't1',
-            name: 'Sarah & James M.',
-            role: 'First-Time Buyers',
-            content:
-              'An incredible agent who went above and beyond to find us our dream home. Their market knowledge and negotiation skills saved us thousands.',
-            rating: 5,
-          },
-          {
-            id: 't2',
-            name: 'Michael R.',
-            role: 'Home Seller',
-            content:
-              'Sold our home in just 5 days above asking price. The marketing strategy was top-notch and communication was excellent throughout.',
-            rating: 5,
-          },
-          {
-            id: 't3',
-            name: 'Lisa T.',
-            role: 'Investment Buyer',
-            content:
-              'A true professional who understands the investment side of real estate. Helped me build a portfolio of three rental properties.',
-            rating: 5,
-          },
-        ],
+        // The agent's published testimonials (US-305). This shipped three
+        // five-star reviews from clients who do not exist.
+        source: 'profile',
+        testimonials: [],
         layout: 'slider',
       },
       style: {
@@ -593,7 +575,7 @@ const premiumShowcaseTemplate: PageTemplate = {
           },
         ],
         submitButtonText: 'Send Message',
-        successMessage: "Thank you! I'll get back to you within 24 hours.",
+        successMessage: "Thank you! I'll get back to you soon.",
       },
     },
     {
@@ -655,10 +637,18 @@ const modernMinimalTemplate: PageTemplate = {
       visible: true,
       config: {
         type: 'stats',
+        // Live figures only (US-305); these were "100+ Properties Sold",
+        // "5 Star Rating" and "10+ Years in Market".
         stats: [
-          { id: 's1', value: '100', label: 'Properties Sold', icon: 'home', suffix: '+' },
-          { id: 's2', value: '5', label: 'Star Rating', icon: 'star' },
-          { id: 's3', value: '10', label: 'Years in Market', icon: 'clock', suffix: '+' },
+          { id: 's1', source: 'sold_listings', value: '', label: 'Homes sold', icon: 'home' },
+          { id: 's2', source: 'average_rating', value: '', label: 'Average rating', icon: 'star' },
+          {
+            id: 's3',
+            source: 'years_experience',
+            value: '',
+            label: 'Years experience',
+            icon: 'clock',
+          },
         ],
         layout: 'row',
       },

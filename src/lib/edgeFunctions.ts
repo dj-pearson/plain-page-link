@@ -17,6 +17,8 @@ interface EdgeFunctionOptions {
   body?: any;
   headers?: Record<string, string>;
   auth?: boolean; // Whether to include Supabase auth token
+  /** Aborts the request; fetch then rejects with an AbortError. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -181,7 +183,7 @@ export async function callEdgeFunction<T = any>(
   functionName: string,
   options: EdgeFunctionOptions = {}
 ): Promise<T> {
-  const { method = 'POST', body, headers = {}, auth = false } = options;
+  const { method = 'POST', body, headers = {}, auth = false, signal } = options;
 
   const url = `${EDGE_FUNCTIONS_URL}/${functionName}`;
 
@@ -206,6 +208,7 @@ export async function callEdgeFunction<T = any>(
     method,
     headers: requestHeaders,
     body: body ? JSON.stringify(body) : undefined,
+    signal,
   });
 
   // Handle errors
@@ -321,17 +324,10 @@ export const EdgeFunctions = {
       auth: true,
     }),
 
-  // Report usage to Stripe (for metered billing)
-  reportStripeUsage: (data: {
-    subscription_item_id: string;
-    quantity: number;
-    timestamp?: number;
-    action?: 'increment' | 'set';
-  }) =>
-    callEdgeFunction<{ id: string; quantity: number; timestamp: number }>('report-stripe-usage', {
-      body: data,
-      auth: true,
-    }),
+  // US-656: reportStripeUsage was removed with the report-stripe-usage
+  // function. It let a signed-in agent post usage records ('set' to 0
+  // included) against their own subscription items. Metered usage, if it is
+  // ever billed, must be reported server-side from where the work happens.
 
   // SEO Audit
   seoAudit: (url: string) =>

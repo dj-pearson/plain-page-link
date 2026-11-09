@@ -82,4 +82,75 @@ describe('useLeads', () => {
     });
     expect(returned).toEqual(updated);
   });
+
+  /** Records every query builder handed out, so a test can inspect the chain. */
+  const captureBuilders = () => {
+    const builders: Record<string, ReturnType<typeof vi.fn>>[] = [];
+    fromMock.mockImplementation((_table: string) => {
+      const b = createQueryBuilder(queryResult) as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >;
+      builders.push(b);
+      return b as never;
+    });
+    return builders;
+  };
+
+  // US-588: a teammate's bulk change to the leads assigned to them used to be
+  // scoped to user_id alone, matched nothing, and was reported as done.
+  it('bulkUpdateStatus reaches assigned leads and returns the changed ids', async () => {
+    const builders = captureBuilders();
+    const { result } = renderHook(() => useLeads(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    queryResult = { data: [{ id: 'a' }], error: null };
+    builders.length = 0;
+    let returned: string[] = [];
+    await act(async () => {
+      returned = await result.current.bulkUpdateStatus.mutateAsync({
+        ids: ['a', 'b'],
+        patch: { status: 'contacted' },
+      });
+    });
+    expect(returned).toEqual(['a']);
+    const uid = mockAuthenticatedUser.id;
+    expect(builders[0].or).toHaveBeenCalledWith(`user_id.eq.${uid},assigned_to.eq.${uid}`);
+    expect(builders[0].eq).not.toHaveBeenCalledWith('user_id', uid);
+    expect(builders[0].select).toHaveBeenCalledWith('id');
+    fromMock.mockImplementation((_table: string) => createQueryBuilder(queryResult));
+  });
+
+  it('bulkDelete stays owner-only and returns the deleted ids', async () => {
+    const builders = captureBuilders();
+    const { result } = renderHook(() => useLeads(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    queryResult = { data: [{ id: 'a' }], error: null };
+    builders.length = 0;
+    let returned: string[] = [];
+    await act(async () => {
+      returned = await result.current.bulkDelete.mutateAsync(['a', 'b']);
+    });
+    expect(returned).toEqual(['a']);
+    expect(builders[0].eq).toHaveBeenCalledWith('user_id', mockAuthenticatedUser.id);
+    expect(builders[0].or).not.toHaveBeenCalled();
+    fromMock.mockImplementation((_table: string) => createQueryBuilder(queryResult));
+  });
+
+  it('bulk actions send nothing for an empty selection', async () => {
+    const builders = captureBuilders();
+    const { result } = renderHook(() => useLeads(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      expect(await result.current.bulkDelete.mutateAsync([])).toEqual([]);
+      expect(
+        await result.current.bulkUpdateStatus.mutateAsync({ ids: [], patch: { status: 'lost' } })
+      ).toEqual([]);
+    });
+    // The success handler refetches the list; no write was ever built.
+    for (const b of builders) {
+      expect(b.update).not.toHaveBeenCalled();
+      expect(b.delete).not.toHaveBeenCalled();
+    }
+    fromMock.mockImplementation((_table: string) => createQueryBuilder(queryResult));
+  });
 });

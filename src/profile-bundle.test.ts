@@ -14,21 +14,45 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  VENDOR_CHUNKS,
+  chunkForPackage as chunkOf,
+  packageOf,
+  vendorChunkFor,
+} from '@/config/vendor-chunks';
 
 /**
- * VENDOR_CHUNKS as written in vite.config.ts, evaluated. Read from source
- * rather than imported: importing the config loads esbuild, which refuses to
- * start under jsdom (its TextEncoder returns another realm's Uint8Array).
+ * The rule itself is imported (src/config/vendor-chunks.ts). vite.config.ts is
+ * only read as text: importing it loads esbuild, which refuses to start under
+ * jsdom (its TextEncoder returns another realm's Uint8Array).
  */
 const viteSource = readFileSync(join(process.cwd(), 'vite.config.ts'), 'utf8');
-const tableSource = viteSource.match(/const VENDOR_CHUNKS[^=]*=\s*(\[[\s\S]*?\n\]);/)?.[1];
-const VENDOR_CHUNKS = new Function(`return ${tableSource}`)() as [string, string[]][];
-const chunkOf = (pkg: string) => VENDOR_CHUNKS.find(([, pkgs]) => pkgs.includes(pkg))?.[0];
 
 describe('manualChunks (US-244)', () => {
   it('found the table', () => {
     expect(VENDOR_CHUNKS.length).toBeGreaterThan(5);
     expect(chunkOf('react')).toBe('react-vendor');
+  });
+
+  it('is the rule vite.config.ts actually uses', () => {
+    expect(viteSource).toContain("from './src/config/vendor-chunks'");
+    expect(viteSource).toContain('return vendorChunkFor(id);');
+  });
+
+  it('attributes a module id to its innermost package', () => {
+    expect(packageOf('/app/src/components/ui/button.tsx')).toBeUndefined();
+    expect(packageOf('/app/node_modules/react-dom/client.js')).toBe('react-dom');
+    expect(packageOf('/app/node_modules/@radix-ui/react-dialog/dist/index.mjs')).toBe(
+      '@radix-ui/react-dialog'
+    );
+    expect(packageOf('/app/node_modules/recharts/node_modules/d3-scale/src/index.js')).toBe(
+      'd3-scale'
+    );
+    // Transitive dependencies are not welded into their parent's chunk.
+    expect(vendorChunkFor('/app/node_modules/recharts/node_modules/d3-scale/src/index.js')).toBe(
+      undefined
+    );
+    expect(vendorChunkFor('/app/src/pages/Landing.tsx')).toBeUndefined();
   });
 
   it('puts framer-motion and GSAP in separate chunks', () => {
@@ -43,6 +67,47 @@ describe('manualChunks (US-244)', () => {
     expect(chunkOf('@radix-ui/react-slot')).toBe('react-vendor');
     expect(chunkOf('@radix-ui/react-compose-refs')).toBe('react-vendor');
     expect(chunkOf('@radix-ui/react-dialog')).toBe('ui-vendor');
+  });
+
+  it('routes every other Radix package to ui-vendor by prefix (US-288)', () => {
+    // The internal primitives the named components are built on, which the
+    // old by-name list never mentioned.
+    for (const pkg of [
+      '@radix-ui/react-dismissable-layer',
+      '@radix-ui/react-focus-scope',
+      '@radix-ui/react-popper',
+      '@radix-ui/react-presence',
+      '@radix-ui/react-primitive',
+      '@radix-ui/react-portal',
+      '@radix-ui/number',
+      // and one this project does not use yet
+      '@radix-ui/react-tooltip',
+    ]) {
+      expect(chunkOf(pkg), pkg).toBe('ui-vendor');
+    }
+    expect(vendorChunkFor('/app/node_modules/@radix-ui/react-slot/dist/index.mjs')).toBe(
+      'react-vendor'
+    );
+    // A prefix is a scope, not a substring.
+    expect(chunkOf('@radix-uix/anything')).toBeUndefined();
+    expect(chunkOf('radix-ui')).toBeUndefined();
+  });
+
+  it('never files one package into two chunks', () => {
+    // First match wins, so an overlap is silent. The only intended one is the
+    // two Radix packages react-vendor names ahead of the '@radix-ui/' prefix.
+    const seen = new Map<string, string>();
+    for (const [chunk, entries] of VENDOR_CHUNKS) {
+      for (const entry of entries) {
+        expect(seen.get(entry), `${entry} in ${chunk}`).toBeUndefined();
+        seen.set(entry, chunk);
+      }
+    }
+    const prefixes = [...seen.keys()].filter((e) => e.endsWith('/'));
+    const shadowed = [...seen.keys()].filter((e) =>
+      prefixes.some((p) => p !== e && e.startsWith(p))
+    );
+    expect(shadowed.sort()).toEqual(['@radix-ui/react-compose-refs', '@radix-ui/react-slot']);
   });
 
   it('still gives the preload helper a home in react-vendor (US-163)', () => {
@@ -60,7 +125,7 @@ describe('profile modals are lazy (US-244)', () => {
   it('FullProfilePage imports none of them statically', () => {
     const page = source('src/pages/public/FullProfilePage.tsx');
     for (const module of [
-      'ListingDetailModal',
+      'ListingDetails',
       'LeadFormModal',
       'CalendlyModal',
       'HomeValuationForm',
@@ -68,6 +133,14 @@ describe('profile modals are lazy (US-244)', () => {
       'CustomBlocksSection',
       'ui/dialog',
     ]) {
+      expect(staticImportOf(page, module), module).toBe(false);
+    }
+    expect(page).toMatch(/lazy\(\(\) =>\s*import\('@\/components\/profile\/LeadFormModal'\)/);
+  });
+
+  it('ListingPage loads its modals lazily too (US-275)', () => {
+    const page = source('src/pages/public/ListingPage.tsx');
+    for (const module of ['LeadFormModal', 'CalendlyModal', 'ui/dialog']) {
       expect(staticImportOf(page, module), module).toBe(false);
     }
     expect(page).toMatch(/lazy\(\(\) =>\s*import\('@\/components\/profile\/LeadFormModal'\)/);

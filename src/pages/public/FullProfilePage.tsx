@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
@@ -12,37 +12,50 @@ import { ReviewInvite } from '@/components/profile/ReviewInvite';
 import { SocialProofBanner } from '@/components/profile/SocialProofBanner';
 import { FeaturedListingsCarousel } from '@/components/profile/FeaturedListingsCarousel';
 import { StickyActionBar } from '@/components/profile/StickyActionBar';
+import { STICKY_BAR_CONTENT_CLEARANCE } from '@/components/profile/stickyActionBarLayout';
 import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
 import { UpcomingOpenHouses } from '@/components/profile/UpcomingOpenHouses';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
-import { trackContactTap, trackListingView } from '@/lib/analyticsEvents';
-import { poweredByUrl } from '@/lib/signupIntent';
+import { trackContactTap } from '@/lib/analyticsEvents';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
+import { useProfileCustomCss } from '@/hooks/useProfileCustomCss';
 import { SEOHead } from '@/components/SEOHead';
-import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
-import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
+import { PROFILE_MAIN_STYLE, useProfileTheme } from '@/hooks/useProfileTheme';
+import {
+  selectAvailableListings,
+  reachableListingHref,
+  selectSoldListings,
+  selectVisibleProfileListings,
+} from '@/lib/publicListingVisibility';
+import { agentListingOffers } from '@/lib/listingJsonLd';
+import type { ListingsBlockHref } from '@/components/pageBuilder/blocks/ListingsBlock';
 import { formatResponseTime } from '@/lib/responseTime';
 import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { parsePrice } from '@/lib/format';
-import { LISTING_PARAM } from '@/lib/listingShare';
+import { legacyListingRedirect, listingPagePath } from '@/lib/listingShare';
 import {
   addImagePreload,
   FEATURED_LISTING_IMAGE_SIZES,
   PLACEHOLDER_PROPERTY_IMAGE,
   responsiveImage,
 } from '@/lib/images';
-import { logger } from '@/lib/logger';
 import type { PublicProfileListing } from '@/types';
-import NotFound from './NotFound';
+import { ProfileUnavailable } from '@/components/profile/ProfileUnavailable';
+import { UnpublishedPreviewBanner } from '@/components/profile/UnpublishedPreviewBanner';
+import { isUnpublishedPreview } from '@/lib/profilePublishing';
 import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
-import { getSafeOrigin } from '@/lib/utils';
+import { areaServedSchema, cleanServiceCities } from '@/lib/serviceAreas';
+import { getBaseUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { needsCanonicalRedirect, normalizeUsername } from '@/lib/username';
 import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
 import { LazyModal } from '@/components/profile/LazyModal';
+import { ProfileComplianceFooter } from '@/components/profile/ProfileComplianceFooter';
+import { ProfileCustomCssScope } from '@/components/profile/ProfileCustomCssScope';
 
 // Loaded on demand (US-244). These were static imports, so every visitor to
 // /:username downloaded react-hook-form, zod, DOMPurify, Radix Dialog and the
@@ -50,7 +63,6 @@ import { LazyModal } from '@/components/profile/LazyModal';
 // never open. Each modal is now mounted, and its chunk fetched, only while it
 // is open; the page-builder blocks only when the agent has built a page.
 // (LeadCaptureCTA lazy-loads its own copy of LeadFormModal the same way.)
-const ListingDetailModal = lazy(() => import('@/components/profile/ListingDetailModal'));
 const LeadFormModal = lazy(() =>
   import('@/components/profile/LeadFormModal').then((m) => ({ default: m.LeadFormModal }))
 );
@@ -70,113 +82,55 @@ const CustomBlocksSection = lazy(() =>
 
 export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
+  const [searchParams] = useSearchParams();
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
-  // The property a showing was requested for, if any. Kept separate from
-  // selectedListing so closing the detail modal does not drop the context the
-  // lead form and the Calendly header need (US-096).
-  const [showingListing, setShowingListing] = useState<PublicProfileListing | null>(null);
   const [isHomeValuationModalOpen, setIsHomeValuationModalOpen] = useState(false);
 
   // Fetch profile and related data
   const { data, isLoading, error, refetch } = usePublicProfile(slug || '');
 
-  /**
-   * Which listing's detail modal is open, derived from ?listing=<id> rather
-   * than held in state (US-114).
-   *
-   * The modal used to be pure component state, so it had no URL: every share
-   * button sent the recipient to the top of the profile, and the JSON-LD the
-   * modal injects could never be indexed because there was nothing to index it
-   * against. Deriving it from the query parameter gives the modal an address,
-   * makes Back close it, and makes a pasted link open the right property.
-   *
-   * An id that matches nothing — a deleted listing, a mangled paste — resolves
-   * to null, which renders the profile rather than an error.
-   */
-  const selectedListingId = searchParams.get(LISTING_PARAM);
-  const selectedListing =
-    (selectedListingId && data?.listings?.find((l) => l.id === selectedListingId)) || null;
-
-  // US-227: a listing opened — by click or by a pasted ?listing= link — is a
-  // funnel stage the agent never saw.
-  const profileId = data?.profile?.id;
-  useEffect(() => {
-    if (profileId && selectedListing) {
-      void trackListingView(profileId, selectedListing.id, selectedListing.address);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, selectedListing?.id]);
+  // US-265: the owner previewing their unpublished page is not a visitor —
+  // count no view, no listing view, nothing that would show up in Analytics.
+  const isPreview = isUnpublishedPreview(data?.profile);
+  const profileId = isPreview ? undefined : data?.profile?.id;
 
   /**
-   * Open or close the detail modal by rewriting the query parameter.
+   * A listing opens its own page (US-275). It used to open a modal addressed by
+   * ?listing=<id> (US-114); the page has the gallery, the open houses and a URL
+   * a crawler can index, and the listing_view is counted there.
    *
-   * `replace` on close and push on open: a visitor who opened a property and
-   * pressed Back expects the profile, not the page before it.
+   * Cards link to it with a real href (US-408) rather than navigating in a
+   * click handler, so the listing pages are discoverable from the profile and
+   * a visitor can open one in a new tab.
    */
-  const setSelectedListing = useCallback(
-    (listing: PublicProfileListing | null) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          if (listing) {
-            next.set(LISTING_PARAM, listing.id);
-          } else {
-            next.delete(LISTING_PARAM);
-          }
-          return next;
-        },
-        { replace: !listing }
-      );
-    },
-    [setSearchParams]
+  const listingHref = useCallback(
+    (listing: PublicProfileListing) =>
+      listingPagePath(data?.profile?.username ?? normalizeUsername(slug), listing.id),
+    [data?.profile?.username, slug]
+  );
+
+  /**
+   * The same page for a card in a page-builder listings block, but only when
+   * that page would show the listing: a sold home while the agent hides sold
+   * properties is not linked, so a visitor never taps through to "not found".
+   */
+  const blockListingHref = useMemo<ListingsBlockHref>(
+    () => reachableListingHref(data?.profile?.username ?? normalizeUsername(slug), data?.settings),
+    [data?.profile?.username, data?.settings, slug]
   );
 
   // One page, one view (US-115). This used to run alongside a redirect to
   // /p/<slug>, so an agent with a page-builder page had the view counted here
   // and the page their visitors actually saw tracked nothing at all. There is
   // no redirect any more (US-116): the blocks render below, on this page.
-  useProfileTracking(data?.profile?.id, slug || '');
+  useProfileTracking(profileId, slug || '');
   // Plans with removeBranding hide "Powered by AgentBio" (20260923000002).
   const showBranding = useProfileShowsBranding(data?.profile?.id);
+  // The agent's custom CSS, sanitised and scoped (US-514); '' for none.
+  const customCss = useProfileCustomCss(data?.profile?.id);
 
-  // Apply theme when profile loads - IMPORTANT: All hooks must be before conditional returns
-  useEffect(() => {
-    if (data?.profile?.theme) {
-      try {
-        // Check if theme is a valid JSON string or just a theme name like "default"
-        if (typeof data.profile.theme === 'string') {
-          // Only try to parse if it looks like JSON (starts with { or [)
-          if (
-            data.profile.theme.trim().startsWith('{') ||
-            data.profile.theme.trim().startsWith('[')
-          ) {
-            const parsedTheme = JSON.parse(data.profile.theme);
-            setActiveTheme(parsedTheme);
-            applyTheme(data.profile.theme);
-          } else {
-            // A preset NAME, which is what the onboarding wizard stores. This
-            // used to log "skip applying" and do nothing, so the wizard's
-            // mandatory template step changed nothing on the public page
-            // whichever card the agent chose (US-108). getCurrentTheme falls
-            // back to 'modern' for an unknown name rather than leaving the
-            // page unstyled.
-            const preset = getCurrentTheme(data.profile.theme);
-            setActiveTheme(preset);
-            applyTheme(JSON.stringify(preset));
-          }
-        } else {
-          // It's already an object, stringify it
-          setActiveTheme(data.profile.theme as ThemeConfig);
-          applyTheme(JSON.stringify(data.profile.theme));
-        }
-      } catch (e) {
-        logger.error('Failed to apply profile theme', e as Error);
-      }
-    }
-  }, [data]);
+  const activeTheme = useProfileTheme(data?.profile?.theme);
 
   // Preload the one image that is the page's LCP candidate: the carousel's
   // first slide.
@@ -200,30 +154,8 @@ export default function FullProfilePage() {
     return addImagePreload(image, FEATURED_LISTING_IMAGE_SIZES);
   }, [data]);
 
-  const closeLeadModal = () => {
-    setIsLeadModalOpen(false);
-    setShowingListing(null);
-  };
-  const closeCalendlyModal = () => {
-    setIsCalendlyModalOpen(false);
-    setShowingListing(null);
-  };
-
-  /**
-   * A showing request on a specific property. Routes to the agent's Calendly
-   * when they have one and to the lead form otherwise, carrying the listing
-   * either way — so the Calendly header names the property and the lead lands
-   * in the CRM with listing_id and property_address set (US-096).
-   */
-  const handleRequestShowing = (listing: PublicProfileListing) => {
-    setShowingListing(listing);
-    setSelectedListing(null);
-    if (data?.profile?.calendly_url) {
-      setIsCalendlyModalOpen(true);
-    } else {
-      setIsLeadModalOpen(true);
-    }
-  };
+  const closeLeadModal = () => setIsLeadModalOpen(false);
+  const closeCalendlyModal = () => setIsCalendlyModalOpen(false);
 
   // One profile, one URL. The lookup below is case-insensitive, so
   // /JaneDoe would otherwise render the same page as /janedoe at a second
@@ -238,6 +170,13 @@ export default function FullProfilePage() {
       typeof window === 'undefined' ? '' : window.location.hash
     }`;
     return <Navigate to={target} replace />;
+  }
+
+  // An old /:username?listing=<id> link — shared before US-275, printed on a
+  // flyer — goes to the listing's page, keeping its campaign parameters.
+  const legacyListingTarget = legacyListingRedirect(normalizeUsername(slug), searchParams);
+  if (legacyListingTarget) {
+    return <Navigate to={legacyListingTarget} replace />;
   }
 
   if (isLoading) {
@@ -258,11 +197,13 @@ export default function FullProfilePage() {
     if (!isMissing) {
       return <ProfileLoadError onRetry={() => refetch()} />;
     }
-    return <NotFound />;
+    // One neutral page for "no such username" and "not published" (US-265),
+    // so the response says nothing about whether an account exists.
+    return <ProfileUnavailable />;
   }
 
   if (!data) {
-    return <NotFound />;
+    return <ProfileUnavailable />;
   }
 
   const { profile, listings, testimonials, links, settings, customPage } = data;
@@ -284,8 +225,12 @@ export default function FullProfilePage() {
       ? testimonials.reduce((sum: number, t) => sum + (t.rating || 0), 0) / testimonials.length
       : 0;
 
-  // Generate SEO data with safe origin detection for SSR/crawlers
-  const origin = getSafeOrigin();
+  // The configured origin, not the visitor's host (US-595). On the *.pages.dev
+  // alias the host made this page self-canonicalise as a duplicate of the
+  // agent's agentbio.net page; nothing serves a profile from a custom domain,
+  // so the configured origin is the only canonical address it has. The
+  // crawler HTML (functions/_lib/site-origin.ts) applies the same rule.
+  const origin = getBaseUrl();
   const seoTitle =
     profile.seo_title || `${profile.full_name || profile.username} - Real Estate Agent`;
   const seoDescription =
@@ -293,6 +238,20 @@ export default function FullProfilePage() {
     profile.bio ||
     `Browse properties and connect with ${profile.full_name || profile.username}, a trusted real estate professional.`;
   const currentUrl = `${origin}/${slug}`;
+
+  // Every service city, cleaned once, for the address, areaServed and keywords (US-281).
+  const serviceCities = cleanServiceCities(profile.service_cities);
+  const areaServed = areaServedSchema(serviceCities);
+
+  // The homes this page shows, as offers the agent makes (US-586): the same
+  // builder, set and order as the crawler HTML (functions/_lib/social-meta.ts),
+  // so both renderings of /:username carry one graph. Each offer points at the
+  // `#listing` node its listing page declares.
+  const offers = agentListingOffers(
+    selectVisibleProfileListings(listings as PublicProfileListing[], settings),
+    profile.username,
+    origin
+  );
 
   // Generate comprehensive structured data for SEO (dual schema for better coverage)
   const personSchema = {
@@ -309,12 +268,10 @@ export default function FullProfilePage() {
         image: profile.avatar_url,
         url: currentUrl,
         address:
-          Array.isArray(profile.service_cities) &&
-          profile.service_cities[0] &&
-          profile.license_state
+          serviceCities[0] && profile.license_state
             ? {
                 '@type': 'PostalAddress',
-                addressLocality: profile.service_cities[0] as string,
+                addressLocality: serviceCities[0],
                 addressRegion: profile.license_state,
                 addressCountry: 'US',
               }
@@ -331,13 +288,8 @@ export default function FullProfilePage() {
           profile.specialties.length > 0 && {
             knowsAbout: profile.specialties,
           }),
-        ...(Array.isArray(profile.service_cities) &&
-          profile.service_cities.length > 0 && {
-            areaServed: (profile.service_cities as string[]).map((city: string) => ({
-              '@type': 'City',
-              name: city,
-            })),
-          }),
+        ...(areaServed && { areaServed }),
+        ...(offers.length > 0 && { makesOffer: offers }),
         ...(profile.brokerage_name && {
           memberOf: {
             '@type': 'Organization',
@@ -364,16 +316,16 @@ export default function FullProfilePage() {
         telephone: profile.phone,
         email: profile.email_display,
         url: currentUrl,
-        ...(Array.isArray(profile.service_cities) &&
-          profile.service_cities[0] &&
+        ...(serviceCities[0] &&
           profile.license_state && {
             address: {
               '@type': 'PostalAddress',
-              addressLocality: profile.service_cities[0] as string,
+              addressLocality: serviceCities[0],
               addressRegion: profile.license_state,
               addressCountry: 'US',
             },
           }),
+        ...(areaServed && { areaServed }),
         priceRange: '$$',
         ...(testimonials.length > 0 && {
           aggregateRating: {
@@ -397,8 +349,12 @@ export default function FullProfilePage() {
         url: currentUrl,
         name: seoTitle,
         description: seoDescription,
+        // The WebSite is agentbio.net itself, so its id comes from the
+        // configured base URL, never the host that served this page: on a
+        // preview host window.location named a WebSite node no other page
+        // declares (US-380).
         isPartOf: {
-          '@id': `${origin}/#website`,
+          '@id': websiteId(getBaseUrl()),
         },
         about: {
           '@id': `${currentUrl}#agent`,
@@ -484,294 +440,183 @@ export default function FullProfilePage() {
         description={seoDescription}
         ogImage={profile.og_image || profile.avatar_url || undefined}
         canonicalUrl={currentUrl}
+        noindex={isPreview}
         keywords={
           [
             profile.full_name || profile.username,
             'real estate agent',
             profile.license_state || '',
             ...(Array.isArray(profile.specialties) ? profile.specialties : []),
-            ...(Array.isArray(profile.service_cities) ? profile.service_cities : []),
+            ...serviceCities,
           ].filter(Boolean) as string[]
         }
         schema={personSchema}
       />
+      {isPreview && <UnpublishedPreviewBanner />}
       {render3DBackground()}
       <QuickNav hasListings={activeListings.length > 0} hasTestimonials={testimonials.length > 0} />
       <main
         id="main-content"
         tabIndex={-1}
         className="min-h-screen relative"
-        style={
-          {
-            backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
-            color: `hsl(var(--theme-text, 222 47% 11%))`,
-            // applyTheme writes only --theme-*; Tailwind's bg-primary /
-            // text-primary-foreground read --primary. Re-point them here, on
-            // the profile alone, so the profile's components can use the
-            // tokens and get the agent's colour, not the dashboard navy
-            // (US-247). Fallback is the 'modern' preset's #2563eb.
-            '--primary': 'var(--theme-primary, 221 83% 53%)',
-            '--primary-foreground': 'var(--theme-primary-foreground, 0 0% 100%)',
-          } as CSSProperties
-        }
+        style={PROFILE_MAIN_STYLE}
       >
-        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 max-w-5xl relative z-10 pb-24 sm:pb-8">
+        {/* Top padding only here: the bottom clears the mobile Contact button
+            and the home indicator at every width the button is shown (US-660). */}
+        <div
+          className={`container mx-auto px-3 sm:px-4 pt-4 sm:pt-8 max-w-5xl relative z-10 ${STICKY_BAR_CONTENT_CLEARANCE}`}
+        >
           <div className="space-y-4 sm:space-y-6">
-            {/* Profile Header */}
-            <section id="about" className="scroll-mt-16 sm:scroll-mt-20">
-              <ProfileHeader
-                profile={profile}
-                stats={{
-                  propertiesSold: soldListings.length,
-                  averageRating: averageRating,
-                  reviewCount: testimonials.length,
-                  // Computed, or absent. This was the literal string
-                  // '< 1 hour' for every agent (US-111).
-                  responseTime: formatResponseTime(data.responseHours),
-                }}
-              />
-            </section>
-            {/* Contact Buttons */}
-            {settings?.show_contact_buttons !== false && (
-              <ContactButtons
-                profile={profile}
-                // logger.info wrote this to the visitor's own console and
-                // nowhere else, so an agent never learned that thirty people
-                // tapped Call this week (US-115).
-                onContactClick={(method) => void trackContactTap(profile.id, method)}
-              />
-            )}
-
-            {/* Social Proof Banner */}
-            {settings?.show_social_proof !== false && (
-              <div className="pt-2 sm:pt-4">
-                <SocialProofBanner
+            {/* Everything the agent's custom CSS may style (US-514). The
+                compliance footer stays outside it. */}
+            <ProfileCustomCssScope css={customCss} className="space-y-4 sm:space-y-6">
+              {/* Profile Header */}
+              <section id="about" className="scroll-mt-16 sm:scroll-mt-20">
+                <ProfileHeader
+                  profile={profile}
                   stats={{
                     propertiesSold: soldListings.length,
-                    totalVolume: totalVolume,
                     averageRating: averageRating,
                     reviewCount: testimonials.length,
-                    yearsExperience: profile.years_experience ?? undefined,
+                    // Computed, or absent. This was the literal string
+                    // '< 1 hour' for every agent (US-111).
+                    responseTime: formatResponseTime(data.responseHours),
                   }}
                 />
-              </div>
-            )}
-
-            {/* Featured Listings Carousel */}
-            {settings?.show_listings !== false && activeListings.length > 0 && (
-              <section className="pt-4 sm:pt-6">
-                <FeaturedListingsCarousel
-                  listings={activeListings}
-                  onViewDetails={(listing) => setSelectedListing(listing)}
-                  autoRotate={true}
-                  interval={4000}
-                />
               </section>
-            )}
-
-            {/* Active Listings */}
-            {settings?.show_listings !== false && activeListings.length > 0 && (
-              <section id="listings" className="pt-4 sm:pt-6 scroll-mt-16 sm:scroll-mt-20">
-                <ListingGallery
-                  listings={activeListings}
-                  title="All Properties"
-                  onListingClick={(listing) => setSelectedListing(listing)}
+              {/* Contact Buttons */}
+              {settings?.show_contact_buttons !== false && (
+                <ContactButtons
+                  profile={profile}
+                  // logger.info wrote this to the visitor's own console and
+                  // nowhere else, so an agent never learned that thirty people
+                  // tapped Call this week (US-115).
+                  onContactClick={(method) => {
+                    if (!isPreview) void trackContactTap(profile.id, method);
+                  }}
                 />
-              </section>
-            )}
+              )}
 
-            {/* Upcoming open houses. Renders nothing when there are none. */}
-            {settings?.show_listings !== false && (
-              <UpcomingOpenHouses
-                agentId={profile.id}
-                agentName={profile.full_name || profile.username}
-                profileUrl={currentUrl}
-                onViewListing={(listingId) => {
-                  const listing = activeListings.find((l) => l.id === listingId);
-                  if (listing) setSelectedListing(listing);
-                }}
-              />
-            )}
+              {/* Social Proof Banner */}
+              {settings?.show_social_proof !== false && (
+                <div className="pt-2 sm:pt-4">
+                  <SocialProofBanner
+                    stats={{
+                      propertiesSold: soldListings.length,
+                      totalVolume: totalVolume,
+                      averageRating: averageRating,
+                      reviewCount: testimonials.length,
+                      yearsExperience: profile.years_experience ?? undefined,
+                    }}
+                  />
+                </div>
+              )}
 
-            {/* Lead Capture CTAs */}
-            <section id="contact" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
-              <LeadCaptureCTA
-                agentId={profile.id}
-                agentName={profile.full_name || profile.username}
-              />
-            </section>
+              {/* Featured Listings Carousel */}
+              {settings?.show_listings !== false && activeListings.length > 0 && (
+                <section className="pt-4 sm:pt-6">
+                  <FeaturedListingsCarousel
+                    listings={activeListings}
+                    listingHref={listingHref}
+                    autoRotate={true}
+                    interval={4000}
+                  />
+                </section>
+              )}
 
-            {/* Sold Properties */}
-            {settings?.show_sold_properties !== false && (
-              <div className="pt-2 sm:pt-4">
-                <SoldProperties
-                  listings={listings}
-                  onListingClick={(listing) => setSelectedListing(listing)}
+              {/* Active Listings */}
+              {settings?.show_listings !== false && activeListings.length > 0 && (
+                <section id="listings" className="pt-4 sm:pt-6 scroll-mt-16 sm:scroll-mt-20">
+                  <ListingGallery
+                    listings={activeListings}
+                    title="All Properties"
+                    listingHref={listingHref}
+                  />
+                </section>
+              )}
+
+              {/* Upcoming open houses. Renders nothing when there are none. */}
+              {settings?.show_listings !== false && (
+                <UpcomingOpenHouses
+                  agentId={profile.id}
+                  agentName={profile.full_name || profile.username}
+                  profileUrl={currentUrl}
+                  listingHref={(listingId) => {
+                    const listing = activeListings.find((l) => l.id === listingId);
+                    return listing ? listingHref(listing) : null;
+                  }}
                 />
-              </div>
-            )}
+              )}
 
-            {/* Testimonials.
-                Not gated on testimonials.length: the review invitation belongs
-                on a profile that has no reviews yet more than on one that has
-                plenty, and TestimonialSection already renders nothing when the
-                list is empty (US-113). */}
-            {settings?.show_testimonials !== false && (
-              <section id="testimonials" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
-                <TestimonialSection testimonials={testimonials} />
-                <ReviewInvite
-                  username={profile.username}
+              {/* Lead Capture CTAs */}
+              <section id="contact" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
+                <LeadCaptureCTA
+                  agentId={profile.id}
                   agentName={profile.full_name || profile.username}
                 />
               </section>
-            )}
 
-            {/* Anything the agent built in the page builder.
-                A section of this page, not a replacement for it: building a
-                page used to redirect /:username to /p/<slug> and take the
-                listings, testimonials, contact buttons and lead capture off
-                the public web entirely (US-116). */}
-            {customPage && (
-              <LazyLoadErrorBoundary fallback={null}>
-                <Suspense fallback={<div className="min-h-[200px]" aria-hidden="true" />}>
-                  <CustomBlocksSection
-                    blocks={customPage.blocks}
-                    userId={profile.id}
-                    title={customPage.title}
+              {/* Sold Properties */}
+              {settings?.show_sold_properties !== false && (
+                <div className="pt-2 sm:pt-4">
+                  <SoldProperties listings={listings} listingHref={listingHref} />
+                </div>
+              )}
+
+              {/* Testimonials.
+                  Not gated on testimonials.length: the review invitation belongs
+                  on a profile that has no reviews yet more than on one that has
+                  plenty, and TestimonialSection already renders nothing when the
+                  list is empty (US-113). */}
+              {settings?.show_testimonials !== false && (
+                <section id="testimonials" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
+                  <TestimonialSection testimonials={testimonials} />
+                  <ReviewInvite
+                    username={profile.username}
+                    agentName={profile.full_name || profile.username}
                   />
-                </Suspense>
-              </LazyLoadErrorBoundary>
-            )}
+                </section>
+              )}
 
-            {/* Custom Links */}
-            {links.length > 0 && (
-              <CustomLinks
-                links={links}
-                onLinkClick={async (link) => {
-                  // trackLinkClick already calls increment_link_clicks;
-                  // calling it again here counted every click twice.
-                  await trackLinkClick(link.id.toString(), profile.id, link.title);
-                }}
-              />
-            )}
+              {/* Anything the agent built in the page builder.
+                  A section of this page, not a replacement for it: building a
+                  page used to redirect /:username to /p/<slug> and take the
+                  listings, testimonials, contact buttons and lead capture off
+                  the public web entirely (US-116). */}
+              {customPage && (
+                <LazyLoadErrorBoundary fallback={null}>
+                  <Suspense fallback={<div className="min-h-[200px]" aria-hidden="true" />}>
+                    <CustomBlocksSection
+                      blocks={customPage.blocks}
+                      userId={profile.id}
+                      title={customPage.title}
+                      listingHref={blockListingHref}
+                    />
+                  </Suspense>
+                </LazyLoadErrorBoundary>
+              )}
 
-            {/* Social Links */}
-            <SocialLinks profile={profile} />
+              {/* Custom Links */}
+              {links.length > 0 && (
+                <CustomLinks
+                  links={links}
+                  onLinkClick={async (link) => {
+                    // trackLinkClick already calls increment_link_clicks;
+                    // calling it again here counted every click twice.
+                    if (isPreview) return;
+                    await trackLinkClick(link.id.toString(), profile.id, link.title);
+                  }}
+                />
+              )}
+
+              {/* Social Links */}
+              <SocialLinks profile={profile} />
+            </ProfileCustomCssScope>
 
             {/* Compliance Footer with Equal Housing */}
-            <footer className="mt-8 sm:mt-12 pt-6 sm:pt-8 pb-4 sm:pb-6 border-t border-gray-200 bg-gray-50 rounded-lg">
-              <div className="text-center px-3 sm:px-4">
-                {/* Equal Housing Opportunity Logo */}
-                <div className="flex justify-center mb-2 sm:mb-3">
-                  <svg
-                    className="h-8 w-8 sm:h-10 sm:w-10 text-blue-600"
-                    viewBox="0 0 100 100"
-                    fill="currentColor"
-                    role="img"
-                    aria-label="Equal Housing Opportunity"
-                  >
-                    {/* Simple Equal Housing symbol */}
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="45"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      fill="none"
-                    />
-                    <rect
-                      x="30"
-                      y="20"
-                      width="40"
-                      height="60"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                    />
-                    <line x1="35" y1="45" x2="65" y2="45" stroke="currentColor" strokeWidth="3" />
-                    <line x1="35" y1="55" x2="65" y2="55" stroke="currentColor" strokeWidth="3" />
-                  </svg>
-                </div>
-
-                {/* Equal Housing Statement */}
-                <p className="text-xs sm:text-sm font-semibold text-gray-700 mb-1 sm:mb-2">
-                  Equal Housing Opportunity
-                </p>
-                <p className="text-xs text-gray-600 mb-3 sm:mb-4 max-w-2xl mx-auto leading-relaxed">
-                  We are pledged to the letter and spirit of U.S. policy for the achievement of
-                  equal housing opportunity throughout the Nation.
-                </p>
-
-                {/* License Information */}
-                {profile.license_number && (
-                  <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-300">
-                    <p className="text-xs sm:text-sm text-gray-700 font-medium">
-                      {profile.full_name || profile.username}
-                      {profile.title && ` | ${profile.title}`}
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {profile.brokerage_name && `${profile.brokerage_name} | `}
-                      License #{profile.license_number} ({profile.license_state})
-                    </p>
-                  </div>
-                )}
-
-                {/* Legal Links */}
-                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 text-xs text-gray-500 mb-2 sm:mb-3">
-                  <a
-                    href="/terms"
-                    className="hover:text-blue-600 active:text-blue-700 hover:underline min-h-[32px] flex items-center"
-                  >
-                    Terms of Service
-                  </a>
-                  <span>•</span>
-                  <a
-                    href="/privacy"
-                    className="hover:text-blue-600 active:text-blue-700 hover:underline min-h-[32px] flex items-center"
-                  >
-                    Privacy Policy
-                  </a>
-                </div>
-
-                {/* Copyright */}
-                <p className="text-xs text-gray-500">
-                  © {new Date().getFullYear()} {profile.full_name || profile.username}. All rights
-                  reserved.
-                </p>
-                {showBranding && (
-                  <p className="text-xs text-gray-600 mt-1 sm:mt-2">
-                    Powered by{' '}
-                    {/* US-232: attributed to this profile, so the signups it
-                        brings can be counted (profiles.referred_by). */}
-                    <a
-                      href={poweredByUrl(profile.username)}
-                      className="hover:text-blue-600 active:text-blue-700 hover:underline"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      AgentBio.net
-                    </a>
-                  </p>
-                )}
-              </div>
-            </footer>
+            <ProfileComplianceFooter profile={profile} showBranding={showBranding} />
           </div>
         </div>
-
-        {/* Listing Detail Modal */}
-        {/* Each modal is mounted only while open, so its chunk is fetched on
-            first use rather than with the page (US-244). */}
-        {selectedListing && (
-          <LazyModal onClose={() => setSelectedListing(null)}>
-            <ListingDetailModal
-              listing={selectedListing}
-              isOpen={!!selectedListing}
-              onClose={() => setSelectedListing(null)}
-              calendlyUrl={data?.profile?.calendly_url ?? undefined}
-              onRequestShowing={handleRequestShowing}
-            />
-          </LazyModal>
-        )}
 
         {/* Lead Form Modal */}
         {isLeadModalOpen && (
@@ -782,11 +627,6 @@ export default function FullProfilePage() {
               formType="contact"
               agentId={profile.id}
               agentName={profile.full_name || profile.username}
-              listing={
-                showingListing
-                  ? { id: showingListing.id, address: showingListing.address }
-                  : undefined
-              }
             />
           </LazyModal>
         )}
@@ -801,8 +641,6 @@ export default function FullProfilePage() {
               agentId={profile.id}
               title="Schedule a Showing"
               subtitle="Choose a time that works best for you"
-              listingAddress={showingListing?.address}
-              listingId={showingListing?.id}
             />
           </LazyModal>
         )}

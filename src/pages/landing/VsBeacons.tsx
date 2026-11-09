@@ -8,12 +8,72 @@ import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+import { PRICING_PLANS, linkAllowanceSummary } from '@/config/pricing-plans';
+import {
+  COMPETITORS,
+  COMPETITORS_VERIFIED_LABEL,
+  COMPETITOR_CELLS_NOTE,
+  competitorCell,
+} from '@/config/competitors';
+
+/*
+ * Every AgentBio figure on this page comes from PRICING_PLANS, and nothing
+ * here quotes a Beacons price (US-501, following US-156 on /vs/linktree and
+ * /vs/later). The page used to compare our Professional price with a bare
+ * Beacons figure, rate the ROI "High" against "Low" and say agents "report"
+ * a number of qualified leads a month, with nothing behind any of them, and it
+ * gave AgentBio unlimited links although Free and Starter are capped.
+ */
+const PAID_PLANS = PRICING_PLANS.filter((p) => p.price_monthly > 0).sort(
+  (a, b) => a.price_monthly - b.price_monthly
+);
+const FREE_PLAN = PRICING_PLANS.find((p) => p.price_monthly === 0);
+
+/** Every paid plan, e.g. "Starter $29, Professional $49, Team $99, Enterprise $299" */
+const AGENTBIO_PLANS_CELL =
+  PAID_PLANS.length > 0
+    ? PAID_PLANS.map((p) => `${p.name} $${p.price_monthly}`).join(', ')
+    : 'No paid plans';
+
+/** e.g. "3 listings, 5 links" */
+const AGENTBIO_FREE_CELL = FREE_PLAN
+  ? `${FREE_PLAN.limits.listings} listings, ${FREE_PLAN.limits.links} links`
+  : 'No free plan';
+
+/** e.g. "5 on Free, 15 on Starter, unlimited from Professional" */
+const AGENTBIO_LINKS_CELL = linkAllowanceSummary();
+
+/*
+ * Names every paid plan. A two-plan "from X to Y" range understated the top
+ * of the range (Team and Enterprise cost more than Professional).
+ * e.g. "paid plans at $29 (Starter), $49 (Professional), $99 (Team) and $299 (Enterprise) a month"
+ */
+const PAID_PLANS_PHRASE = ((): string => {
+  const parts = PAID_PLANS.map((p) => `$${p.price_monthly} (${p.name})`);
+  if (parts.length === 0) return '';
+  const list =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `paid plan${parts.length === 1 ? '' : 's'} at ${list} a month`;
+})();
+
+const AGENTBIO_PLANS_SENTENCE = [
+  FREE_PLAN ? `a free plan (${AGENTBIO_FREE_CELL})` : '',
+  PAID_PLANS_PHRASE,
+]
+  .filter(Boolean)
+  .join(' and ');
+
+const PRICE_FAQ_ANSWER = `${
+  AGENTBIO_PLANS_SENTENCE ? `AgentBio has ${AGENTBIO_PLANS_SENTENCE}. ` : ''
+}We do not quote Beacons' prices, because they change and a copy on our site would soon be wrong; compare their plans on beacons.ai with ours. The more useful question is which features you will use: AgentBio's plans pay for listings, lead forms and showing booking, Beacons' for creator tools like a store and a media kit.`;
 
 const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: "What's the difference between AgentBio and Beacons for real estate agents?",
     answer:
-      "AgentBio is built specifically for real estate agents with property listing galleries, real estate lead capture forms, calendar booking for showings, and MLS compliance. Beacons is designed for content creators and influencers with email marketing and store features that aren't relevant for real estate workflows.",
+      "AgentBio is built specifically for real estate agents with property listing galleries, real estate lead capture forms, calendar booking for showings, and the MLS number on each listing. Beacons is designed for content creators and influencers with email marketing and store features that aren't relevant for real estate workflows.",
   },
   {
     question: 'Is AgentBio better than Beacons for realtors?',
@@ -23,7 +83,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: 'Can Beacons show real estate listings?',
     answer:
-      "No. Beacons doesn't have property listing gallery features. You can add basic links to listings, but without built-in photo galleries, pricing displays, bed/bath counts, or active/sold status that real estate agents need to properly showcase properties.",
+      'Beacons is built for creators who sell, so check beacons.ai for what its pages can show today. On AgentBio, each listing is a card on your page with its photo gallery, price, beds and baths, Active, Pending or Sold status and MLS number, without linking out to another site.',
   },
 ];
 
@@ -53,7 +113,7 @@ export default function VsBeacons() {
         url: getCanonicalUrl('/vs/beacons'),
         name: 'AgentBio vs Beacons for Real Estate Agents: Detailed Comparison',
         description:
-          'Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and MLS compliance.',
+          'Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and Equal Housing, license and MLS number disclosures.',
       },
       faqPageSchema(FAQ_ENTRIES),
     ],
@@ -63,7 +123,7 @@ export default function VsBeacons() {
     <>
       <SEOHead
         title="AgentBio vs Beacons for Real Estate Agents: Which to Choose?"
-        description="Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and MLS compliance."
+        description="Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and Equal Housing, license and MLS number disclosures."
         keywords={[
           'AgentBio vs Beacons',
           'Beacons for real estate agents',
@@ -83,12 +143,12 @@ export default function VsBeacons() {
             <div className="max-w-4xl mx-auto">
               <p className="text-base md:text-lg glass-body leading-relaxed">
                 <strong>AgentBio is better than Beacons for real estate agents</strong> because it's
-                purpose-built for real estate workflows with property listing galleries, MLS
-                compliance, real estate-specific lead capture forms, and showing appointment
-                booking. While Beacons offers advanced features like email marketing and online
-                stores, these creator-focused tools aren't relevant for real estate agents who need
-                to showcase properties and capture buyer/seller leads, not sell digital products or
-                courses.
+                purpose-built for real estate workflows with property listing galleries, the MLS
+                number on each listing, real estate-specific lead capture forms, and showing
+                appointment booking. While Beacons offers advanced features like email marketing and
+                online stores, these creator-focused tools aren't relevant for real estate agents
+                who need to showcase properties and capture buyer/seller leads, not sell digital
+                products or courses.
               </p>
             </div>
           </div>
@@ -123,6 +183,19 @@ export default function VsBeacons() {
               </h2>
               <p className="text-xl glass-body max-w-3xl mx-auto">
                 See why real estate agents need specialized tools, not general creator platforms
+              </p>
+              <p className="mt-4 text-sm text-muted-foreground max-w-3xl mx-auto">
+                Beacons&rsquo; plans checked against{' '}
+                <a
+                  href={COMPETITORS.beacons.homepage}
+                  className="underline underline-offset-2"
+                  rel="nofollow noopener"
+                  target="_blank"
+                >
+                  beacons.ai
+                </a>{' '}
+                on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices, which change; check
+                theirs against ours rather than taking a number from us. {COMPETITOR_CELLS_NOTE}
               </p>
             </header>
 
@@ -160,38 +233,38 @@ export default function VsBeacons() {
                   <ComparisonRow
                     feature="Property Listing Galleries"
                     agentbio={true}
-                    beacons={false}
+                    beacons={competitorCell('beacons', 'listingGalleries')}
                     description="Showcase active & sold listings with photos, prices, beds/baths"
                   />
                   <ComparisonRow
-                    feature="MLS Compliance"
+                    feature="Listing Disclosures"
                     agentbio={true}
-                    beacons={false}
-                    description="Equal Housing logo, license number display, MLS attribution"
+                    beacons={competitorCell('beacons', 'listingDisclosures')}
+                    description="Equal Housing logo, license number display, MLS number on each listing"
                   />
                   <ComparisonRow
                     feature="Real Estate Lead Forms"
                     agentbio="Buyer, Seller, Valuation"
-                    beacons="Generic Contact Form"
+                    beacons={competitorCell('beacons', 'realEstateLeadForms')}
                     description="Pre-qualification questions specific to real estate"
                   />
                   <ComparisonRow
                     feature="Showing Appointment Booking"
                     agentbio={true}
-                    beacons={false}
-                    description="Calendly/Google Calendar integration for property showings"
+                    beacons={competitorCell('beacons', 'calendarBooking')}
+                    description="Your Calendly booking page, opened from your profile for showings"
                   />
                   <ComparisonRow
                     feature="Testimonials Display"
-                    agentbio="5-Star Ratings"
-                    beacons={false}
-                    description="Client reviews with verified badges and success stories"
+                    agentbio="Star ratings"
+                    beacons={competitorCell('beacons', 'testimonials')}
+                    description="Client reviews with star ratings, submitted from your own review page"
                   />
                   <ComparisonRow
                     feature="Property Analytics"
                     agentbio={true}
-                    beacons={false}
-                    description="Track which listings get most clicks, views, inquiries"
+                    beacons={competitorCell('beacons', 'realEstateAnalytics')}
+                    description="Which listings visitors open most, with views and visitors for each"
                   />
 
                   {/* Core Link-in-Bio Features */}
@@ -204,27 +277,27 @@ export default function VsBeacons() {
                     </td>
                   </tr>
                   <ComparisonRow
-                    feature="Unlimited Links"
-                    agentbio={true}
-                    beacons={true}
-                    description="Add as many links as needed"
+                    feature="Link Buttons"
+                    agentbio={AGENTBIO_LINKS_CELL}
+                    beacons={competitorCell('beacons', 'linkButtons')}
+                    description="Links to your other pages and profiles"
                   />
                   <ComparisonRow
                     feature="Custom Branding"
                     agentbio={true}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'customBranding')}
                     description="Colors, fonts, logo customization"
                   />
                   <ComparisonRow
                     feature="Mobile Optimization"
                     agentbio={true}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'mobileOptimization')}
                     description="Responsive design for all devices"
                   />
                   <ComparisonRow
                     feature="Analytics Dashboard"
                     agentbio={true}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'analyticsDashboard')}
                     description="Traffic, clicks, and engagement metrics"
                   />
 
@@ -240,25 +313,25 @@ export default function VsBeacons() {
                   <ComparisonRow
                     feature="Email Marketing"
                     agentbio={false}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'emailMarketing')}
                     description="Built-in email campaigns (not needed for agents with CRM)"
                   />
                   <ComparisonRow
                     feature="Online Store"
                     agentbio={false}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'onlineStore')}
                     description="Sell digital products (not relevant for real estate)"
                   />
                   <ComparisonRow
                     feature="Media Kit Generator"
                     agentbio={false}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'mediaKit')}
                     description="For influencer brand partnerships (not needed for agents)"
                   />
                   <ComparisonRow
                     feature="Tipping / Donations"
                     agentbio={false}
-                    beacons={true}
+                    beacons={competitorCell('beacons', 'tipping')}
                     description="Accept fan donations (not applicable to real estate)"
                   />
 
@@ -273,21 +346,15 @@ export default function VsBeacons() {
                   </tr>
                   <ComparisonRow
                     feature="Free Plan"
-                    agentbio="3 Listings, 5 Links"
-                    beacons="Limited Features"
-                    description="Basic functionality to get started"
+                    agentbio={AGENTBIO_FREE_CELL}
+                    beacons={COMPETITORS.beacons.tiers.includes('Free')}
+                    description="Get started without paying"
                   />
                   <ComparisonRow
-                    feature="Professional Plan"
-                    agentbio="$49/month"
-                    beacons="$10/month"
-                    description="Full-featured paid tier"
-                  />
-                  <ComparisonRow
-                    feature="ROI for Real Estate"
-                    agentbio="High"
-                    beacons="Low"
-                    description="Pays for itself with 1 extra lead/month"
+                    feature="Paid Plans"
+                    agentbio={AGENTBIO_PLANS_CELL}
+                    beacons={COMPETITORS.beacons.tiers.filter((t) => t !== 'Free').join(', ')}
+                    description="Monthly prices for AgentBio; check beacons.ai for theirs"
                   />
                 </tbody>
               </table>
@@ -295,43 +362,31 @@ export default function VsBeacons() {
           </div>
         </section>
 
-        {/* Why Real Estate Agents Switch from Beacons */}
+        {/* Was "Why Real Estate Agents Switch from Beacons": nothing records
+            anyone switching (US-519). */}
+        {/* Was "Where Beacons Falls Short for Real Estate", which said Beacons
+            "can't display" galleries and has "basic contact forms". Nothing
+            recorded checking that (US-648, following US-507); this block now
+            says what Beacons is built for, from COMPETITORS.beacons.builtFor. */}
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
               <header className="text-center mb-12">
                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                  <span className="glass-heading">
-                    Why Real Estate Agents Switch from Beacons to AgentBio
-                  </span>
+                  <span className="glass-heading">Creator Tools and Real Estate Tools</span>
                 </h2>
               </header>
 
               <div className="space-y-12">
                 <div className="space-y-4">
-                  <h3 className="text-2xl font-light text-foreground flex items-center gap-3">
-                    <X className="h-6 w-6 text-red-700" />
-                    The Problem with Beacons for Real Estate
-                  </h3>
-                  <div className="pl-9 space-y-3">
+                  <h3 className="text-2xl font-light text-foreground">What Beacons Is Built For</h3>
+                  <div className="space-y-3">
+                    <p className="glass-body leading-relaxed">{COMPETITORS.beacons.builtFor}</p>
                     <p className="glass-body leading-relaxed">
-                      <strong>No way to showcase property listings:</strong> Beacons can't display
-                      property galleries with photos, pricing, and details. You're limited to
-                      generic links that send visitors to external sites.
-                    </p>
-                    <p className="glass-body leading-relaxed">
-                      <strong>Creator-focused, not agent-focused:</strong> Features like "sell
-                      courses," "fan donations," and "media kits" waste screen space on tools real
-                      estate agents will never use.
-                    </p>
-                    <p className="glass-body leading-relaxed">
-                      <strong>Generic lead capture:</strong> Basic contact forms don't pre-qualify
-                      buyers or sellers. You get low-quality leads without budget, timeline, or
-                      intent information.
-                    </p>
-                    <p className="glass-body leading-relaxed">
-                      <strong>No MLS compliance:</strong> Missing Equal Housing logo, license number
-                      display, and proper attributions can create legal compliance issues.
+                      Its headline features, a store, a media kit, email marketing and tipping, are
+                      creator tools. If you sell courses or work brand deals as well as homes, they
+                      may be exactly what you want. If your bio link exists to win buyers and
+                      sellers, the features below are the ones you will use.
                     </p>
                   </div>
                 </div>
@@ -343,23 +398,23 @@ export default function VsBeacons() {
                   </h3>
                   <div className="pl-9 space-y-3">
                     <p className="glass-body leading-relaxed">
-                      <strong>Purpose-built property galleries:</strong> Showcase unlimited listings
-                      with full photo galleries, prices, bed/bath counts, square footage, and "Just
-                      Listed" or "Sold" badges.
+                      <strong>Purpose-built property galleries:</strong> Showcase your listings with
+                      full photo galleries, prices, bed/bath counts, square footage, and Active,
+                      Pending or Sold badges.
                     </p>
                     <p className="glass-body leading-relaxed">
                       <strong>Real estate-specific lead forms:</strong> Capture buyer budget,
                       pre-approval status, timeline, and property preferences. Get seller lead info
-                      including home value expectations and reason for selling.
+                      including the property, timeline and reason for selling.
                     </p>
                     <p className="glass-body leading-relaxed">
-                      <strong>Showing appointment booking:</strong> Integrated calendar lets buyers
-                      book showing times directly. No more phone tag or missed opportunities.
+                      <strong>Showing appointment booking:</strong> Add your Calendly link and
+                      buyers book showing times from your page, without the phone tag.
                     </p>
                     <p className="glass-body leading-relaxed">
-                      <strong>MLS compliance built-in:</strong> Automatic Equal Housing logo,
-                      customizable license number placement, and proper broker attribution keep you
-                      compliant.
+                      <strong>Disclosures on your page:</strong> The Equal Housing Opportunity logo
+                      and statement, your license number and state, and the MLS number on each
+                      listing. Your broker and MLS have the final word on anything else.
                     </p>
                   </div>
                 </div>
@@ -391,9 +446,7 @@ export default function VsBeacons() {
             <div className="max-w-4xl mx-auto">
               <header className="mb-8">
                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                  <span className="glass-heading">
-                    When Beacons Makes Sense (and When It Doesn't)
-                  </span>
+                  <span className="glass-heading">When to Choose Beacons, and When AgentBio</span>
                 </h2>
               </header>
 
@@ -412,26 +465,27 @@ export default function VsBeacons() {
                   </ul>
                 </div>
 
-                <div className="p-6 rounded-xl bg-red-50 border border-red-200">
-                  <h3 className="text-xl font-semibold text-red-900 mb-4 flex items-center gap-2">
-                    <X className="h-5 w-5" />
-                    Beacons is NOT Good For:
+                {/* Was "Beacons is NOT Good For:" with a cross (US-648). */}
+                <div className="p-6 rounded-xl bg-glass-background border border-glass-border">
+                  <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Check className="h-5 w-5" />
+                    AgentBio is Built For:
                   </h3>
-                  <ul className="space-y-2 text-red-800">
+                  <ul className="space-y-2 glass-body">
                     <li>• Real estate agents showcasing listings</li>
-                    <li>• Capturing qualified buyer/seller leads</li>
+                    <li>• Capturing buyer and seller leads with timeline and pre-approval</li>
                     <li>• Booking showing appointments</li>
-                    <li>• MLS compliance requirements</li>
-                    <li>• Real estate-specific analytics</li>
+                    <li>• Equal Housing, license and MLS number disclosures</li>
+                    <li>• Analytics on which listings visitors open</li>
                   </ul>
                 </div>
               </div>
 
               <div className="mt-8 p-6 rounded-xl bg-glass-background border border-glass-border">
                 <p className="glass-body text-center">
-                  <strong>Bottom Line:</strong> If you're a real estate agent, you need real estate
-                  tools. Beacons' creator features are irrelevant to your business, while AgentBio's
-                  real estate features directly convert followers into clients.
+                  <strong>Bottom Line:</strong> Beacons is built for creators who sell; AgentBio is
+                  built for agents who win clients from their bio link. Pick the one whose features
+                  you will use, or keep both and link from one to the other.
                 </p>
               </div>
             </div>
@@ -444,12 +498,10 @@ export default function VsBeacons() {
             <div className="max-w-4xl mx-auto">
               <header className="text-center mb-12">
                 <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                  <span className="glass-heading">
-                    How to Migrate from Beacons to AgentBio in 10 Minutes
-                  </span>
+                  <span className="glass-heading">How to Migrate from Beacons to AgentBio</span>
                 </h2>
                 <p className="text-xl glass-body">
-                  Switching is easier than you think. Here's the step-by-step process:
+                  There is no automatic import, but there is not much to move:
                 </p>
               </header>
 
@@ -457,7 +509,7 @@ export default function VsBeacons() {
                 <MigrationStep
                   number={1}
                   title="Create Your Free AgentBio Account"
-                  description="Sign up at agentbio.net with your email. Choose your unique username (yourname.agentbio.net)."
+                  description="Sign up at agentbio.net with your email. Choose your unique username (agentbio.net/yourname)."
                 />
                 <MigrationStep
                   number={2}
@@ -472,12 +524,12 @@ export default function VsBeacons() {
                 <MigrationStep
                   number={4}
                   title="Set Up Lead Capture Forms"
-                  description="Configure buyer inquiry form, seller lead form, and home valuation tool."
+                  description="Turn on the buyer inquiry, seller and home valuation request forms."
                 />
                 <MigrationStep
                   number={5}
                   title="Connect Your Calendar"
-                  description="Integrate Calendly or Google Calendar for showing appointment booking."
+                  description="Paste your Calendly link so buyers can book showings from your page."
                 />
                 <MigrationStep
                   number={6}
@@ -494,7 +546,7 @@ export default function VsBeacons() {
                   <span className="glass-accent">Start Your Free AgentBio Account →</span>
                 </Link>
                 <p className="text-sm text-muted-foreground mt-4">
-                  No credit card required • 5-minute setup • Cancel anytime
+                  No credit card required • Cancel anytime
                 </p>
               </div>
             </div>
@@ -513,19 +565,19 @@ export default function VsBeacons() {
             <div className="max-w-3xl mx-auto space-y-4">
               <FAQItem
                 question="Can I use both Beacons and AgentBio?"
-                answer="You could, but it would confuse your Instagram followers. It's better to use one link-in-bio tool. Since AgentBio includes everything real estate agents need (and Beacons' creator features aren't relevant to real estate), most agents switch entirely to AgentBio."
+                answer="You could, but your Instagram bio holds one link, so followers only ever see one of them. If you sell courses or take tips through Beacons, keep it for that and link to it from your AgentBio page; otherwise one tool is simpler."
               />
               <FAQItem
                 question="Is AgentBio more expensive than Beacons?"
-                answer="AgentBio's professional plan is $49/month vs Beacons' $10/month. However, AgentBio pays for itself with a single extra lead per month. Real estate agents report 15-25 qualified leads per month from AgentBio, making the ROI significantly higher despite the higher price."
+                answer={PRICE_FAQ_ANSWER}
               />
               <FAQItem
                 question="What happens to my Beacons analytics when I switch?"
-                answer="Beacons analytics stay in your Beacons account. When you switch to AgentBio, you'll start fresh with AgentBio analytics. Most agents find AgentBio analytics more valuable because they track real estate-specific metrics like 'which listings get most clicks' and 'lead form conversion rates.'"
+                answer="Beacons analytics stay in your Beacons account. AgentBio starts counting from the day your page goes live: page views, link clicks, which listings visitors open most, and how many visits became leads."
               />
               <FAQItem
                 question="Can I import my links from Beacons to AgentBio?"
-                answer="There's no automatic import, but recreating your links in AgentBio only takes 5-10 minutes. Since AgentBio is focused on real estate, you'll likely replace generic links with property listings, lead forms, and booking calendars anyway."
+                answer="There's no automatic import, so you recreate your links in AgentBio by hand. Many of them, such as links to listings or a contact page, are replaced by AgentBio's own listings, lead forms and booking."
               />
               <FAQItem
                 question="Does AgentBio have email marketing like Beacons?"
@@ -546,7 +598,7 @@ export default function VsBeacons() {
               </span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Join agents who switched from creator tools to purpose-built real estate software
+              Listings, lead forms and showing booking on the page your Instagram bio links to
             </p>
             <Link
               to="/auth/register"
@@ -555,7 +607,7 @@ export default function VsBeacons() {
               <span className="glass-accent">Create Your AgentBio Account Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
-              No credit card required • Setup in 5 minutes • Cancel anytime
+              No credit card required • Cancel anytime
             </p>
           </div>
         </section>

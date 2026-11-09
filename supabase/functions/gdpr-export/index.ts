@@ -1,6 +1,15 @@
 /**
  * GDPR Data Export Edge Function
- * Exports all user data in JSON format for GDPR compliance
+ *
+ * GET builds the export in this request and returns it as a download, written
+ * a page at a time and streamed once it outgrows a small buffer (US-584). It
+ * does not touch the subject's queued requests (US-424).
+ * POST queues it: scheduled-maintenance builds the same document into the
+ * private gdpr-exports bucket and emails the subject a link that expires
+ * (US-397, _shared/gdpr-export-queue.ts). An account too large to export in one
+ * request is served by the queue.
+ * POST { action: 'resend_link', requestId } emails a fresh link to the
+ * caller's own completed export while its file is still held (US-404).
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -9,39 +18,18 @@ import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
 import { decryptSecret } from '../_shared/encryption.ts';
-
-interface ExportData {
-  exportedAt: string;
-  user: {
-    id: string;
-    email: string;
-    createdAt: string;
-    lastSignIn: string | null;
-  };
-  profile: Record<string, unknown> | null;
-  settings: Record<string, unknown> | null;
-  listings: unknown[];
-  leads: unknown[];
-  /** The agent's client sphere, with contact details decrypted like leads. */
-  contacts: unknown[];
-  contactKeyDates: unknown[];
-  contactInteractions: unknown[];
-  openHouses: unknown[];
-  testimonials: unknown[];
-  links: unknown[];
-  blogPosts: unknown[];
-  analytics: {
-    profileViews: unknown[];
-    searchQueries: unknown[];
-  };
-  security: {
-    sessions: unknown[];
-    loginAttempts: unknown[];
-    mfaSettings: Record<string, unknown> | null;
-    auditLogs: unknown[];
-  };
-  gdprRequests: unknown[];
-}
+import { reportError } from '../_shared/report.ts';
+import { sendEmail } from '../_shared/email.ts';
+import { getSiteUrl } from '../_shared/env.ts';
+import { resendExportLink, supabaseExportResendStore } from '../_shared/gdpr-export-queue.ts';
+import {
+  ExportIncompleteError,
+  exportDocumentChunks,
+  exportDownloadStream,
+  startExportDownload,
+  supabaseExportReader,
+  type ExportSummary,
+} from '../_shared/gdpr-export.ts';
 
 serve(async (req: Request) => {
   // Per request, from the Origin header. This was the module-level static
@@ -75,19 +63,79 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Rate limit: max 1 export per hour per user. The limiter is keyed by
+    // Rate limit: 3 exports per hour per user. The limiter is keyed by
     // identifier + endpoint, so we pass the user id as the identifier to
-    // get per-user (not per-IP) enforcement.
-    if (req.method === 'POST' || req.method === 'GET') {
-      const rl = await checkRateLimitDb(serviceSupabase, user.id, 'gdpr-export', {
-        maxRequests: 1,
+    // get per-user (not per-IP) enforcement. It was 1, but the attempt is
+    // counted before the export runs, so a transient failure (now a 503
+    // rather than a silently empty file) would have locked the subject out
+    // for an hour.
+    // POST { action: 'resend_link', requestId } re-emails a fresh link to a
+    // completed export that has not expired (US-404). Any other POST body,
+    // including none, queues a new export as before.
+    let postBody: Record<string, unknown> | null = null;
+    if (req.method === 'POST') {
+      const parsed: unknown = await req.json().catch(() => null);
+      postBody = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    }
+    const isResend = postBody?.action === 'resend_link';
+
+    // Its own budget, so re-sending a link never spends the subject's export
+    // attempts (and vice versa). Each one sends an email, hence the limit.
+    if (isResend) {
+      const rl = await checkRateLimitDb(serviceSupabase, user.id, 'gdpr-export-resend', {
+        maxRequests: 3,
         windowSeconds: 3600,
       });
       if (!rl.allowed) {
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'You can only request one data export per hour. Please try again later.',
+            error: 'You have asked for the link several times in the last hour. Please check your inbox and spam folder, or try again later.',
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'Retry-After': String(rl.retryAfterSeconds),
+            },
+            status: 429,
+          }
+        );
+      }
+      const outcome = await resendExportLink(
+        supabaseExportResendStore(serviceSupabase, {
+          decrypt: decryptSecret,
+          sendEmail: (email) => sendEmail(email),
+        }),
+        { requestId: postBody?.requestId, userId: user.id, now: new Date(), siteUrl: getSiteUrl() }
+      );
+      return new Response(
+        JSON.stringify(
+          outcome.ok
+            ? {
+                success: true,
+                expiresAt: outcome.expiresAt,
+                message: 'We have emailed you a fresh download link.',
+              }
+            : { success: false, error: outcome.error }
+        ),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: outcome.ok ? 200 : outcome.status,
+        }
+      );
+    }
+
+    if (req.method === 'POST' || req.method === 'GET') {
+      const rl = await checkRateLimitDb(serviceSupabase, user.id, 'gdpr-export', {
+        maxRequests: 3,
+        windowSeconds: 3600,
+      });
+      if (!rl.allowed) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'You have requested several data exports in the last hour. Please try again later.',
           }),
           {
             headers: {
@@ -118,7 +166,7 @@ serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           requestId: requestData,
-          message: 'Data export request created. Processing will begin shortly.',
+          message: 'Data export requested. We will email you a download link when it is ready, usually within the hour.',
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -126,175 +174,104 @@ serve(async (req: Request) => {
         }
       );
     } else if (req.method === 'GET') {
-      // Generate and return data export immediately
-      // In production, this would be queued and processed async
+      // Every section, every row (paged past PostgREST's row cap), written a
+      // page at a time (US-584). A query that fails fails the export instead
+      // of exporting as empty.
+      const reader = supabaseExportReader(serviceSupabase);
+      // decryptSecret passes through any value that is not enc:v1: prefixed.
+      const chunks = exportDocumentChunks(reader, user, decryptSecret, { failFast: true });
 
-      // Fetch all user data in parallel
-      const [
-        profileResult,
-        settingsResult,
-        listingsResult,
-        leadsResult,
-        testimonialsResult,
-        linksResult,
-        blogPostsResult,
-        profileViewsResult,
-        sessionsResult,
-        loginAttemptsResult,
-        mfaSettingsResult,
-        auditLogsResult,
-        gdprRequestsResult,
-        contactsResult,
-        contactKeyDatesResult,
-        contactInteractionsResult,
-        openHousesResult,
-      ] = await Promise.all([
-        serviceSupabase.from('profiles').select('*').eq('id', user.id).single(),
-        serviceSupabase.from('user_settings').select('*').eq('user_id', user.id).single(),
-        serviceSupabase.from('listings').select('*').eq('user_id', user.id),
-        serviceSupabase.from('leads').select('*').eq('user_id', user.id),
-        serviceSupabase.from('testimonials').select('*').eq('user_id', user.id),
-        serviceSupabase.from('links').select('*').eq('user_id', user.id),
-        // The articles table holds authored posts; there is no `blog_posts`
-        // table, so this query used to fail and fall through to [] below,
-        // silently omitting the user's articles from their own data export.
-        serviceSupabase.from('articles').select('*').eq('author_id', user.id),
-        // Likewise: profile view events live in analytics_views, keyed by
-        // user_id (not a `profile_views` table keyed by profile_id).
-        serviceSupabase.from('analytics_views').select('*').eq('user_id', user.id).limit(1000),
-        serviceSupabase.from('user_sessions').select('*').eq('user_id', user.id),
-        serviceSupabase.from('login_attempts').select('*').eq('user_id', user.id).limit(100),
-        serviceSupabase.from('user_mfa_settings').select('id, mfa_enabled, mfa_method, verified_at, created_at').eq('user_id', user.id).single(),
-        serviceSupabase.from('audit_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(500),
-        serviceSupabase.from('gdpr_data_requests').select('*').eq('user_id', user.id),
-        serviceSupabase.from('contacts').select('*').eq('user_id', user.id),
-        serviceSupabase.from('contact_key_dates').select('*').eq('user_id', user.id),
-        serviceSupabase.from('contact_interactions').select('*').eq('user_id', user.id),
-        serviceSupabase.from('open_houses').select('*').eq('user_id', user.id),
-      ]);
-
-      // Decrypt the lead PII for the subject's own copy. encrypted_* are the
-      // only store since US-086; decryptSecret passes through any value that
-      // is not enc:v1: prefixed, so a row written before the backfill still
-      // exports readably.
-      const decryptedLeads = await Promise.all(
-        (leadsResult.data || []).map(async (lead) => {
-          const { encrypted_phone, encrypted_email, ...rest } = lead as Record<string, unknown>;
-          const [email, phone] = await Promise.all([
-            decryptSecret(encrypted_email as string | null),
-            decryptSecret(encrypted_phone as string | null),
-          ]);
-          return { ...rest, email: email ?? null, phone: phone ?? null };
-        })
-      );
-
-      const decryptedContacts = await Promise.all(
-        (contactsResult.data || []).map(async (contact) => {
-          const { encrypted_phone, encrypted_email, ...rest } = contact as Record<string, unknown>;
-          const [email, phone] = await Promise.all([
-            decryptSecret(encrypted_email as string | null),
-            decryptSecret(encrypted_phone as string | null),
-          ]);
-          return { ...rest, email: email ?? null, phone: phone ?? null };
-        })
-      );
-
-      // Build export data object
-      const exportData: ExportData = {
-        exportedAt: new Date().toISOString(),
-        user: {
-          id: user.id,
-          email: user.email || '',
-          createdAt: user.created_at || '',
-          lastSignIn: user.last_sign_in_at || null,
-        },
-        profile: profileResult.data || null,
-        settings: settingsResult.data || null,
-        listings: listingsResult.data || [],
-        // PII in leads must be exported in readable form, never as opaque
-        // ciphertext. US-086 dropped the plaintext columns, so the encrypted_*
-        // values are now the only copy and this decrypts them rather than
-        // stripping them — a subject access request that returned ciphertext
-        // would not be an export at all.
-        leads: decryptedLeads,
-        contacts: decryptedContacts,
-        contactKeyDates: contactKeyDatesResult.data || [],
-        contactInteractions: contactInteractionsResult.data || [],
-        openHouses: openHousesResult.data || [],
-        testimonials: testimonialsResult.data || [],
-        links: linksResult.data || [],
-        blogPosts: blogPostsResult.data || [],
-        analytics: {
-          profileViews: profileViewsResult.data || [],
-          searchQueries: [], // Add if you have search query tracking
-        },
-        security: {
-          sessions: (sessionsResult.data || []).map(s => ({
-            ...s,
-            session_token_hash: '[REDACTED]', // Don't expose token hashes
-          })),
-          loginAttempts: (loginAttemptsResult.data || []).map(a => ({
-            ...a,
-            device_fingerprint: a.device_fingerprint ? '[PRESENT]' : null,
-          })),
-          mfaSettings: mfaSettingsResult.data ? {
-            ...mfaSettingsResult.data,
-            totp_secret: '[REDACTED]',
-            backup_codes: '[REDACTED]',
-          } : null,
-          auditLogs: auditLogsResult.data || [],
-        },
-        gdprRequests: gdprRequestsResult.data || [],
+      const auditFailure = async (err: ExportIncompleteError, streamed: boolean) => {
+        console.error('[gdpr-export] export incomplete:', err.failed, streamed ? '(after streaming began)' : '');
+        void reportError(err, { functionName: 'gdpr-export', status: streamed ? 200 : 503, method: 'GET' });
+        await serviceSupabase.rpc('log_audit_event', {
+          p_user_id: user.id,
+          p_action: 'gdpr_data_export',
+          p_status: 'failure',
+          p_resource_type: 'gdpr',
+          p_ip_address: clientIP,
+          p_user_agent: userAgent,
+          p_details: { failed_sections: err.failed.map((f) => f.section), streamed },
+          p_risk_level: 'medium',
+        });
       };
 
-      // Update the export request status
-      await serviceSupabase
-        .from('gdpr_data_requests')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id)
-        .eq('request_type', 'export')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      // Log the export
-      await serviceSupabase.rpc('log_audit_event', {
-        p_user_id: user.id,
-        p_action: 'gdpr_data_export',
-        p_status: 'success',
-        p_resource_type: 'gdpr',
-        p_ip_address: clientIP,
-        p_user_agent: userAgent,
-        p_details: JSON.stringify({
-          records_exported: {
-            listings: exportData.listings.length,
-            leads: exportData.leads.length,
-            testimonials: exportData.testimonials.length,
-            links: exportData.links.length,
-            blog_posts: exportData.blogPosts.length,
-            audit_logs: exportData.security.auditLogs.length,
-          },
-        }),
-        p_risk_level: 'medium',
-      });
-
-      // Return as downloadable JSON
-      const filename = `agentbio-data-export-${new Date().toISOString().split('T')[0]}.json`;
-
-      return new Response(
-        JSON.stringify(exportData, null, 2),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'Content-Disposition': `attachment; filename="${filename}"`,
-          },
-          status: 200,
+      // A queued export the subject made earlier is deliberately left alone
+      // (US-424). This download has no file in the bucket and sends no email,
+      // so marking the request completed showed 'Completed' with no link; the
+      // queue still builds it and emails the link the subject asked for.
+      const auditSuccess = async (summary: ExportSummary) => {
+        const { error: auditError } = await serviceSupabase.rpc('log_audit_event', {
+          p_user_id: user.id,
+          p_action: 'gdpr_data_export',
+          p_status: 'success',
+          p_resource_type: 'gdpr',
+          p_ip_address: clientIP,
+          p_user_agent: userAgent,
+          p_details: { records_exported: summary.counts, truncated: summary.truncated },
+          p_risk_level: 'medium',
+        });
+        if (auditError) {
+          console.error('[gdpr-export] could not write audit entry:', auditError.message);
         }
-      );
+      };
+
+      const start = await startExportDownload(chunks);
+
+      if (start.kind === 'failed') {
+        await auditFailure(start.error, false);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: start.error.message,
+            failedSections: start.error.failed.map((f) => f.section),
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
+        );
+      }
+
+      const filename = `agentbio-data-export-${new Date().toISOString().split('T')[0]}.json`;
+      const downloadHeaders = {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      };
+
+      if (start.kind === 'complete') {
+        await auditSuccess(start.summary);
+        return new Response(start.body, { headers: downloadHeaders, status: 200 });
+      }
+
+      // Larger than the buffer: streamed, one page held at a time. A section
+      // that fails from here on aborts the body before the closing brace.
+      const body = exportDownloadStream(start.head, start.rest, async (outcome) => {
+        if (outcome.ok) {
+          await auditSuccess(outcome.summary);
+        } else if ('cancelled' in outcome) {
+          // The client stopped reading (tab closed, the dashboard's timeout, a
+          // caller that read part and left). Part of the PII was released, so
+          // the download is still recorded.
+          const { error: auditError } = await serviceSupabase.rpc('log_audit_event', {
+            p_user_id: user.id,
+            p_action: 'gdpr_data_export',
+            p_status: 'failure',
+            p_resource_type: 'gdpr',
+            p_ip_address: clientIP,
+            p_user_agent: userAgent,
+            p_details: { streamed: true, cancelled: true },
+            p_risk_level: 'medium',
+          });
+          if (auditError) {
+            console.error('[gdpr-export] could not write audit entry:', auditError.message);
+          }
+        } else if (outcome.error instanceof ExportIncompleteError) {
+          await auditFailure(outcome.error, true);
+        } else {
+          console.error('[gdpr-export] streamed export failed:', outcome.error);
+          void reportError(outcome.error, { functionName: 'gdpr-export', status: 200, method: 'GET' });
+        }
+      });
+      return new Response(body, { headers: downloadHeaders, status: 200 });
     } else {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),

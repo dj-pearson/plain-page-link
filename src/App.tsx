@@ -15,6 +15,7 @@ import { AnnouncerProvider } from './components/ui/live-region';
 import { RouteAnnouncer } from './components/ui/route-announcer';
 import { AccessibilityWidget } from './components/ui/accessibility-widget';
 import { CookieConsent } from './components/ui/cookie-consent';
+import { ProfileRoute } from './components/profile/ProfileRoute';
 
 // Public pages (eager load for better UX on landing)
 import Landing from './pages/public/Landing';
@@ -23,6 +24,7 @@ import NotFound from './pages/public/NotFound';
 // Lazy load public review page
 const SubmitReview = lazy(() => import('./pages/public/SubmitReview'));
 const OpenHouseSignIn = lazy(() => import('./pages/public/OpenHouseSignIn'));
+const Unsubscribe = lazy(() => import('./pages/public/Unsubscribe'));
 const TeamAccept = lazy(() => import('./pages/team/TeamAccept'));
 
 /**
@@ -138,6 +140,11 @@ const SearchAnalyticsPage = lazy(() => import('./pages/admin/SearchAnalyticsPage
  * site, whether or not they ever opened a profile.
  */
 const ProfilePage = lazy(() => import('./pages/public/FullProfilePage'));
+// One listing on a profile (US-275). Through ProfileRoute too: it reads the
+// same profile query, so the read starts while the chunk downloads.
+const ListingPage = lazy(() => import('./pages/public/ListingPage'));
+// Rendered through ProfileRoute, which starts the profile's data read while
+// this chunk downloads rather than after it (US-267).
 
 function App() {
   // Selectors, not the whole store (US-241): App wraps every route, and a bare
@@ -150,8 +157,9 @@ function App() {
   //
   // This also called offlineStorage.init(), opening an IndexedDB database on
   // every visit - and its static import put the idb library in the entry chunk
-  // every visitor downloads. Nothing reads that database: sync-manager and
-  // useOfflineStorage, its only consumers, have no importers (US-260).
+  // every visitor downloads. Nothing read that database (US-260); sync-manager
+  // was deleted in US-494, and offline-storage, useOfflineStorage and the idb
+  // dependency in US-618.
   useEffect(() => {
     // Clean up any interfering service workers first
     cleanupServiceWorkers();
@@ -333,8 +341,14 @@ function App() {
                   username catch-all. */}
               {/* Open house sign-in kiosk. Before the username catch-all. */}
               <Route path="/open-house/:openHouseId" element={<OpenHouseSignIn />} />
+              {/* US-425: the Unsubscribe link in the free-tool emails. */}
+              <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/:username/review" element={<SubmitReview />} />
-              <Route path="/:slug" element={<ProfilePage />} />
+              <Route
+                path="/:username/listing/:listingId"
+                element={<ProfileRoute page={ListingPage} />}
+              />
+              <Route path="/:slug" element={<ProfileRoute page={ProfilePage} />} />
             </Route>
 
             {/* Everything that needs a session. One guard (US-120): this was

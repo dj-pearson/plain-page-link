@@ -50,6 +50,7 @@ variables lives in **`.env.example`** — treat it as the source of truth. Summa
 | `STRIPE_WEBHOOK_SECRET` | ✅ (billing) | `whsec_…` from the webhook endpoint |
 | `RESEND_API_KEY` | ✅ (email) | https://resend.com/api-keys |
 | `FROM_EMAIL` | ⬜ | Verified sender (default noreply@agentbio.net) |
+| `COMPANY_POSTAL_ADDRESS` | ✅ (marketing email) | CAN-SPAM postal address printed in every free-tool drip footer (US-447). Not a secret, but set on the same deployment. Unset = the footer has no address line |
 | `PII_ENCRYPTION_KEY` | ✅ | At-rest encryption: lead email/phone, profile phone, MFA seeds. See §2.1 |
 | `SITE_URL` | ⬜ | Base URL for links in emails |
 
@@ -192,6 +193,12 @@ supabase secrets set RESEND_API_KEY=re_xxx STRIPE_SECRET_KEY=sk_live_xxx \
 Stripe webhook endpoint: point Stripe → Developers → Webhooks at
 `<functions-url>/stripe-webhook` and copy its signing secret into
 `STRIPE_WEBHOOK_SECRET`.
+
+Resend webhook endpoint (US-448): in Resend → Webhooks add
+`<functions-url>/resend-webhook` for the `email.bounced` and
+`email.complained` events and copy its signing secret (`whsec_...`) into
+`RESEND_WEBHOOK_SECRET`. Hard bounces and spam complaints then go into
+`email_suppressions`, and the drips stop mailing those addresses.
 
 ---
 

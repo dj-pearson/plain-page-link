@@ -23,6 +23,15 @@ export interface PricingTier {
    */
 }
 
+/**
+ * The yes/no features of a plan, key for key the `features` jsonb that
+ * 20260902000014 seeds into subscription_plans (plus openHouseManagement from
+ * 20260923000002); pricing-plans.test.ts holds the two together. A key belongs
+ * here only when the database carries it and something reads it (US-296: the
+ * unbuilt followUpSequences, marketReports, virtualStaging, predictiveAnalytics,
+ * videoTours, mortgageCalculator and cmaGenerator keys, and the pay-per-use
+ * overage table that priced them and SMS, were removed).
+ */
 export interface PlanFeatures {
   // Core features
   customDomain: boolean;
@@ -32,16 +41,9 @@ export interface PlanFeatures {
   customThemes: boolean;
 
   // Advanced features
-  aiListingDescriptions: boolean | 'limited';
+  aiListingDescriptions: boolean;
   leadScoring: boolean;
-  followUpSequences: boolean | 'limited';
-  marketReports: boolean | 'limited';
-  virtualStaging: boolean | 'limited';
-  predictiveAnalytics: boolean;
-  videoTours: boolean | 'limited';
   openHouseManagement: boolean;
-  mortgageCalculator: boolean;
-  cmaGenerator: boolean | 'limited';
 }
 
 export interface PlanLimits {
@@ -91,14 +93,7 @@ export const PRICING_PLANS: PricingTier[] = [
       customThemes: false,
       aiListingDescriptions: false,
       leadScoring: false,
-      followUpSequences: false,
-      marketReports: false,
-      virtualStaging: false,
-      predictiveAnalytics: false,
-      videoTours: false,
       openHouseManagement: true, // one a month, to try the sign-in kiosk
-      mortgageCalculator: true, // Free tool
-      cmaGenerator: false,
     },
     limits: {
       listings: 3,
@@ -132,16 +127,9 @@ export const PRICING_PLANS: PricingTier[] = [
       prioritySupport: false,
       analytics: true,
       customThemes: true,
-      aiListingDescriptions: 'limited',
+      aiListingDescriptions: true,
       leadScoring: true,
-      followUpSequences: 'limited',
-      marketReports: false,
-      virtualStaging: false,
-      predictiveAnalytics: true,
-      videoTours: false,
       openHouseManagement: true,
-      mortgageCalculator: true,
-      cmaGenerator: false,
     },
     limits: {
       listings: 10,
@@ -178,14 +166,7 @@ export const PRICING_PLANS: PricingTier[] = [
       customThemes: true,
       aiListingDescriptions: true,
       leadScoring: true,
-      followUpSequences: true,
-      marketReports: 'limited',
-      virtualStaging: 'limited',
-      predictiveAnalytics: true,
-      videoTours: 'limited',
       openHouseManagement: true,
-      mortgageCalculator: true,
-      cmaGenerator: 'limited',
     },
     limits: {
       listings: 25,
@@ -221,14 +202,7 @@ export const PRICING_PLANS: PricingTier[] = [
       customThemes: true,
       aiListingDescriptions: true,
       leadScoring: true,
-      followUpSequences: true,
-      marketReports: true,
-      virtualStaging: true,
-      predictiveAnalytics: true,
-      videoTours: true,
       openHouseManagement: true,
-      mortgageCalculator: true,
-      cmaGenerator: true,
     },
     limits: {
       listings: -1, // unlimited
@@ -264,14 +238,7 @@ export const PRICING_PLANS: PricingTier[] = [
       customThemes: true,
       aiListingDescriptions: true,
       leadScoring: true,
-      followUpSequences: true,
-      marketReports: true,
-      virtualStaging: true,
-      predictiveAnalytics: true,
-      videoTours: true,
       openHouseManagement: true,
-      mortgageCalculator: true,
-      cmaGenerator: true,
     },
     limits: {
       listings: -1,
@@ -295,84 +262,6 @@ export const PRICING_PLANS: PricingTier[] = [
 ];
 
 // ============================================
-// PAY-PER-USE PRICING (for overage/add-ons)
-// ============================================
-
-export interface UsagePricing {
-  feature_key: string;
-  name: string;
-  price_per_use: number;
-  cost_to_provide: number;
-  min_purchase?: number; // Minimum units to purchase
-}
-
-export const USAGE_PRICING: UsagePricing[] = [
-  {
-    feature_key: 'ai_listing_description',
-    name: 'AI Listing Description',
-    price_per_use: 2.0,
-    cost_to_provide: 0.3,
-  },
-  {
-    feature_key: 'market_reports',
-    name: 'Market Report',
-    price_per_use: 10.0,
-    cost_to_provide: 2.0,
-  },
-  {
-    feature_key: 'virtual_staging',
-    name: 'Virtual Staging (per photo)',
-    price_per_use: 5.0,
-    cost_to_provide: 3.0,
-  },
-  {
-    feature_key: 'video_tours',
-    name: 'Video Tour',
-    price_per_use: 15.0,
-    cost_to_provide: 8.0,
-  },
-  {
-    feature_key: 'cma_generator',
-    name: 'CMA Report',
-    price_per_use: 19.99,
-    cost_to_provide: 3.0,
-  },
-  {
-    feature_key: 'sms_messages',
-    name: 'SMS Messages (per 100)',
-    price_per_use: 10.0,
-    cost_to_provide: 0.75, // ~$0.0075 per SMS
-    min_purchase: 100,
-  },
-];
-
-// ============================================
-// FEATURE KEYS MAPPING
-// ============================================
-
-export const FEATURE_KEYS = {
-  // AI Generation
-  AI_LISTING_DESCRIPTION: 'ai_listing_description',
-  MARKET_REPORTS: 'market_reports',
-  VIRTUAL_STAGING: 'virtual_staging',
-  VIDEO_TOURS: 'video_tours',
-  CMA_GENERATOR: 'cma_generator',
-
-  // Analytics & Scoring
-  LEAD_SCORING: 'lead_scoring',
-  PREDICTIVE_ANALYTICS: 'predictive_analytics',
-
-  // Automation
-  FOLLOW_UP_SEQUENCES: 'follow_up_sequences',
-  EMAIL_AUTOMATION: 'email_automation',
-  SMS_AUTOMATION: 'sms_automation',
-
-  // Tools
-  OPEN_HOUSE_MANAGEMENT: 'open_house_management',
-  MORTGAGE_CALCULATOR: 'mortgage_calculator',
-} as const;
-
-// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -384,116 +273,50 @@ export function getPlanById(planId: string): PricingTier | undefined {
 }
 
 /**
- * Get usage pricing for a feature
+ * How many active listings each plan allows, in one sentence for marketing
+ * copy (US-355). The /features/property-listings page said "unlimited
+ * listings" and "Unlimited Listings on Pro Plan"; Professional allows 25 and
+ * only Team and above are unlimited. Copy built from this moves with the plans.
+ *
+ * e.g. "3 listings on Free, 10 on Starter, 25 on Professional and unlimited from Team"
  */
-export function getUsagePricing(featureKey: string): UsagePricing | undefined {
-  return USAGE_PRICING.find((pricing) => pricing.feature_key === featureKey);
+export function listingAllowanceSummary(plans: PricingTier[] = PRICING_PLANS): string {
+  const ordered = [...plans].sort((a, b) => a.price_monthly - b.price_monthly);
+  const unlimitedIndex = ordered.findIndex((plan) => plan.limits.listings === -1);
+  const capped = unlimitedIndex === -1 ? ordered : ordered.slice(0, unlimitedIndex);
+  const parts = capped.map((plan, i) =>
+    i === 0
+      ? `${plan.limits.listings} listings on ${plan.name}`
+      : `${plan.limits.listings} on ${plan.name}`
+  );
+  if (unlimitedIndex !== -1) parts.push(`unlimited from ${ordered[unlimitedIndex].name}`);
+  if (parts.length <= 1) return parts.join('');
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
 
 /**
- * Check if a plan has a feature enabled
+ * How many link buttons each plan allows, short enough for a comparison-table
+ * cell (US-501). /vs/beacons and /vs/later ticked "Unlimited Links" for
+ * AgentBio, but Free and Starter are capped.
+ *
+ * e.g. "5 on Free, 15 on Starter, unlimited from Professional"
  */
-export function planHasFeature(planId: string, featureKey: string): boolean {
-  const plan = getPlanById(planId);
-  if (!plan) return false;
-
-  // Map feature keys to plan features
-  const featureMap: Record<string, keyof PlanFeatures> = {
-    ai_listing_description: 'aiListingDescriptions',
-    market_reports: 'marketReports',
-    virtual_staging: 'virtualStaging',
-    video_tours: 'videoTours',
-    cma_generator: 'cmaGenerator',
-    lead_scoring: 'leadScoring',
-    predictive_analytics: 'predictiveAnalytics',
-    follow_up_sequences: 'followUpSequences',
-    open_house_management: 'openHouseManagement',
-    mortgage_calculator: 'mortgageCalculator',
-  };
-
-  const planFeatureKey = featureMap[featureKey];
-  if (!planFeatureKey) return false;
-
-  const featureValue = plan.features[planFeatureKey];
-  return featureValue === true || featureValue === 'limited';
+export function linkAllowanceSummary(plans: PricingTier[] = PRICING_PLANS): string {
+  const ordered = [...plans].sort((a, b) => a.price_monthly - b.price_monthly);
+  const unlimitedIndex = ordered.findIndex((plan) => plan.limits.links === -1);
+  const capped = unlimitedIndex === -1 ? ordered : ordered.slice(0, unlimitedIndex);
+  const parts = capped.map((plan) => `${plan.limits.links} on ${plan.name}`);
+  if (unlimitedIndex !== -1) parts.push(`unlimited from ${ordered[unlimitedIndex].name}`);
+  return parts.join(', ');
 }
 
-/**
- * Get feature limit for a plan
- */
-export function getFeatureLimit(planId: string, limitKey: keyof PlanLimits): number {
-  const plan = getPlanById(planId);
-  if (!plan) return 0;
-
-  return plan.limits[limitKey];
-}
-
-/**
- * Calculate overage charges
- */
-export function calculateOverageCharge(featureKey: string, overageCount: number): number {
-  const pricing = getUsagePricing(featureKey);
-  if (!pricing) return 0;
-
-  return pricing.price_per_use * overageCount;
-}
-
-/**
- * Get recommended plan based on usage
- */
-export function getRecommendedPlan(monthlyUsage: {
-  listings: number;
-  aiGenerations: number;
-  leads: number;
-  emailsPerMonth: number;
-}): PricingTier {
-  // Logic to recommend plan based on usage patterns
-  if (monthlyUsage.listings <= 3 && monthlyUsage.aiGenerations === 0) {
-    return PRICING_PLANS[0]; // Free
-  }
-
-  if (monthlyUsage.listings <= 10 && monthlyUsage.aiGenerations <= 10) {
-    return PRICING_PLANS[1]; // Starter
-  }
-
-  if (monthlyUsage.listings <= 25 && monthlyUsage.aiGenerations <= 25) {
-    return PRICING_PLANS[2]; // Professional
-  }
-
-  if (monthlyUsage.listings <= 100 && monthlyUsage.aiGenerations <= 100) {
-    return PRICING_PLANS[3]; // Team
-  }
-
-  return PRICING_PLANS[4]; // Enterprise
-}
-
-/**
- * Calculate monthly cost with usage
- */
-export function calculateMonthlyCost(planId: string, usage: Partial<PlanLimits>): number {
-  const plan = getPlanById(planId);
-  if (!plan) return 0;
-
-  let totalCost = plan.price_monthly;
-
-  // Calculate overage charges for each feature
-  Object.entries(usage).forEach(([key, value]) => {
-    const limitKey = key as keyof PlanLimits;
-    const limit = plan.limits[limitKey];
-
-    if (typeof value === 'number' && limit !== -1 && value > limit) {
-      const overage = value - limit;
-      // Map limit keys to feature keys for pricing
-      const featureKey = limitKey
-        .replace('PerMonth', '')
-        .replace(/([A-Z])/g, '_$1')
-        .toLowerCase();
-      const charge = calculateOverageCharge(featureKey, overage);
-      totalCost += charge;
-    }
-  });
-
-  return totalCost;
+/** The cheapest plan whose listing allowance is unlimited, if any. */
+export function firstUnlimitedListingsPlan(
+  plans: PricingTier[] = PRICING_PLANS
+): PricingTier | undefined {
+  return [...plans]
+    .sort((a, b) => a.price_monthly - b.price_monthly)
+    .find((plan) => plan.limits.listings === -1);
 }
 
 export default PRICING_PLANS;

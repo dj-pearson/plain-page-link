@@ -12,8 +12,9 @@
  * to a file and passed the render gate. A URL cannot be listed unless the page
  * behind it exists, has its own title and description, and is not the 404.
  *
- * On lastmod: articles carry a real one from articles.updated_at. The static
- * routes do not have a truthful source for it — the build date is not when the
+ * On lastmod: articles carry a real one from articles.updated_at, and the seven
+ * legal pages carry the date their text last changed (src/config/legal-dates.ts,
+ * US-459). The other static routes do not have a truthful source for it — the build date is not when the
  * pricing page last changed, and a sitemap where every lastmod is "today" is
  * one Google learns to disregard. Where the date is unknown the element is
  * omitted, which the protocol allows and which is the honest answer.

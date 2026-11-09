@@ -9,7 +9,9 @@ import { CalendlyModal } from './CalendlyModal';
 const submitLead = vi.fn(async (..._args: unknown[]) => ({ success: true, leadId: 'lead-1' }));
 const initInlineWidget = vi.fn();
 
-vi.mock('@/lib/leadSubmission', () => ({ submitLead: (...args: unknown[]) => submitLead(...args) }));
+vi.mock('@/lib/leadSubmission', () => ({
+  submitLead: (...args: unknown[]) => submitLead(...args),
+}));
 vi.mock('@/lib/attribution', () => ({ getLeadAttribution: () => ({ utm_source: 'instagram' }) }));
 vi.mock('@/lib/calendly', async (orig) => ({
   ...(await orig<typeof import('@/lib/calendly')>()),
@@ -47,14 +49,23 @@ describe('CalendlyModal', () => {
 
     // A message from anywhere else is ignored.
     window.dispatchEvent(
-      new MessageEvent('message', { origin: 'https://evil.example', data: { event: 'calendly.event_scheduled' } })
+      new MessageEvent('message', {
+        origin: 'https://evil.example',
+        data: { event: 'calendly.event_scheduled' },
+      })
     );
     window.dispatchEvent(
-      new MessageEvent('message', { origin: 'https://calendly.com', data: { event: 'calendly.event_scheduled' } })
+      new MessageEvent('message', {
+        origin: 'https://calendly.com',
+        data: { event: 'calendly.event_scheduled' },
+      })
     );
     // …and a repeated booking message records one lead, not two.
     window.dispatchEvent(
-      new MessageEvent('message', { origin: 'https://calendly.com', data: { event: 'calendly.event_scheduled' } })
+      new MessageEvent('message', {
+        origin: 'https://calendly.com',
+        data: { event: 'calendly.event_scheduled' },
+      })
     );
 
     await waitFor(() => expect(submitLead).toHaveBeenCalledTimes(1));
@@ -68,4 +79,23 @@ describe('CalendlyModal', () => {
     });
     expect(await screen.findByText(/you're booked/i)).toBeInTheDocument();
   });
+
+  it.each(['javascript:alert(1)', 'http://calendly.com/jane'])(
+    'does not embed or link a calendly_url that is not https (%s) (US-290)',
+    (calendlyUrl) => {
+      const { container } = render(
+        <CalendlyModal
+          isOpen
+          onClose={() => undefined}
+          calendlyUrl={calendlyUrl}
+          agentId="agent-1"
+        />
+      );
+      expect(screen.getByText(/online booking isn't available/i)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /pick a time/i })).toBeNull();
+      expect(document.body.querySelector(`a[href="${calendlyUrl}"]`)).toBeNull();
+      expect(container.innerHTML).not.toContain('javascript:');
+      expect(initInlineWidget).not.toHaveBeenCalled();
+    }
+  );
 });

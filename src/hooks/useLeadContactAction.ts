@@ -22,11 +22,21 @@ import type { Lead } from '@/types/lead';
 
 export type ContactChannel = 'call' | 'email' | 'sms';
 
+/**
+ * What was actually sent, when the agent sent a quick response rather than
+ * just opening their mail or messages app (US-130 slice 2). Without it the
+ * timeline records a placeholder; with it, the subject and text that went out.
+ */
+export interface ContactMessage {
+  subject?: string;
+  body: string;
+}
+
 export function useLeadContactAction(onRecorded?: (patchedStatus: string) => void) {
   const { logCall, logEmail, logActivity } = useLeadActivities(undefined);
 
   return useCallback(
-    async (lead: Lead, channel: ContactChannel) => {
+    async (lead: Lead, channel: ContactChannel, message?: ContactMessage) => {
       try {
         const patch = buildContactPatch(lead);
         if (patch) {
@@ -43,16 +53,16 @@ export function useLeadContactAction(onRecorded?: (patchedStatus: string) => voi
         } else if (channel === 'email') {
           logEmail({
             leadId: lead.id,
-            subject: `Reply to ${lead.name}`,
+            subject: message?.subject || `Reply to ${lead.name}`,
             recipient: lead.email ?? '',
-            body: 'Opened from the CRM',
+            body: message?.body ?? 'Opened from the CRM',
           });
         } else {
           logActivity({
             leadId: lead.id,
             activityType: 'sms',
             title: 'Text message',
-            content: 'Opened the SMS app from the CRM',
+            content: message?.body ?? 'Opened the SMS app from the CRM',
           });
         }
       } catch (error) {

@@ -15,7 +15,13 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PRICING_PLANS } from './pricing-plans';
+import {
+  PRICING_PLANS,
+  firstUnlimitedListingsPlan,
+  listingAllowanceSummary,
+  linkAllowanceSummary,
+  type PricingTier,
+} from './pricing-plans';
 
 const MIGRATION = join(
   process.cwd(),
@@ -92,5 +98,119 @@ describe('pricing config matches the seeded plans', () => {
     const source = readFileSync(join(process.cwd(), 'src/config/pricing-plans.ts'), 'utf8');
     const declared = source.match(/stripe_price_id\w*:\s*'[^']+'/g) ?? [];
     expect(declared).toEqual([]);
+  });
+});
+
+describe('listing allowance copy (US-355)', () => {
+  const plan = (id: string, price: number, listings: number): PricingTier => ({
+    ...PRICING_PLANS[0],
+    id,
+    name: id[0].toUpperCase() + id.slice(1),
+    price_monthly: price,
+    limits: { ...PRICING_PLANS[0].limits, listings },
+  });
+
+  it('states every capped plan and the first unlimited one, cheapest first', () => {
+    expect(
+      listingAllowanceSummary([
+        plan('team', 99, -1),
+        plan('free', 0, 3),
+        plan('pro', 49, 25),
+        plan('enterprise', 299, -1),
+      ])
+    ).toBe('3 listings on Free, 25 on Pro and unlimited from Team');
+  });
+
+  it('never says unlimited when no plan is', () => {
+    expect(listingAllowanceSummary([plan('free', 0, 3), plan('pro', 49, 25)])).toBe(
+      '3 listings on Free and 25 on Pro'
+    );
+    expect(firstUnlimitedListingsPlan([plan('free', 0, 3)])).toBeUndefined();
+  });
+
+  it('matches the real plans: Professional is capped, Team is the first unlimited plan', () => {
+    const professional = PRICING_PLANS.find((p) => p.id === 'professional');
+    expect(professional?.limits.listings).toBeGreaterThan(0);
+    expect(listingAllowanceSummary()).toContain(`${professional?.limits.listings} on Professional`);
+    expect(firstUnlimitedListingsPlan()?.id).toBe('team');
+  });
+});
+
+describe('link allowance copy (US-501)', () => {
+  const plan = (id: string, price: number, links: number): PricingTier => ({
+    ...PRICING_PLANS[0],
+    id,
+    name: id[0].toUpperCase() + id.slice(1),
+    price_monthly: price,
+    limits: { ...PRICING_PLANS[0].limits, links },
+  });
+
+  it('states every capped plan and the first unlimited one, cheapest first', () => {
+    expect(
+      linkAllowanceSummary([plan('team', 99, -1), plan('free', 0, 5), plan('pro', 49, 15)])
+    ).toBe('5 on Free, 15 on Pro, unlimited from Team');
+  });
+
+  it('never says unlimited when no plan is', () => {
+    expect(linkAllowanceSummary([plan('free', 0, 5)])).toBe('5 on Free');
+  });
+
+  it('matches the real plans: Free is capped', () => {
+    const free = PRICING_PLANS.find((p) => p.price_monthly === 0);
+    expect(free?.limits.links).toBeGreaterThan(0);
+    expect(linkAllowanceSummary().startsWith(`${free?.limits.links} on ${free?.name}`)).toBe(true);
+  });
+});
+
+/**
+ * US-296: PlanFeatures carried seven keys for features that were never built
+ * (followUpSequences, marketReports, virtualStaging, predictiveAnalytics,
+ * videoTours, mortgageCalculator, cmaGenerator), read by nothing, and the file
+ * priced them per use in USAGE_PRICING alongside SMS, which has no provider.
+ * What is left must be exactly what the database sells.
+ */
+describe('plan features match the seeded plans (US-296)', () => {
+  /** Plan name → features object from the seed's jsonb_build_object(...). */
+  function seededFeatures(): Record<string, Record<string, boolean>> {
+    const sql = readFileSync(MIGRATION, 'utf8');
+    const out: Record<string, Record<string, boolean>> = {};
+    const rowPattern =
+      /\(\s*'(\w+)',\s*\d+,\s*\d+,\s*\d+,\s*true,\s*jsonb_build_object\(([\s\S]*?)\)/g;
+    for (const m of sql.matchAll(rowPattern)) {
+      const features: Record<string, boolean> = {};
+      for (const pair of m[2].matchAll(/'(\w+)',\s*(true|false)/g)) {
+        features[pair[1]] = pair[2] === 'true';
+      }
+      out[m[1]] = features;
+    }
+    return out;
+  }
+
+  // Added to every plan by 20260923000002 (planLimits.test.ts checks its values).
+  const ADDED_LATER = ['openHouseManagement'];
+  const seeded = seededFeatures();
+
+  it('parses a features object for every plan', () => {
+    expect(Object.keys(seeded).sort()).toEqual(PRICING_PLANS.map((p) => p.id).sort());
+    expect(Object.keys(seeded.free).length).toBeGreaterThan(0);
+  });
+
+  for (const plan of PRICING_PLANS) {
+    it(`${plan.id}: declares exactly the seeded keys, with the same values`, () => {
+      const dbFeatures = seeded[plan.id];
+      expect(Object.keys(plan.features).sort()).toEqual(
+        [...Object.keys(dbFeatures), ...ADDED_LATER].sort()
+      );
+      for (const [key, value] of Object.entries(dbFeatures)) {
+        expect(plan.features[key as keyof typeof plan.features], `${plan.id}.${key}`).toBe(value);
+      }
+    });
+  }
+
+  it('prices nothing per use', () => {
+    // USAGE_PRICING sold overages for market reports, virtual staging, video
+    // tours, CMA reports and SMS: none of them exists.
+    const source = readFileSync(join(process.cwd(), 'src/config/pricing-plans.ts'), 'utf8');
+    expect(source).not.toMatch(/price_per_use|USAGE_PRICING|calculateOverageCharge/);
   });
 });

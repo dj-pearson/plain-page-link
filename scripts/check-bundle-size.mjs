@@ -177,7 +177,7 @@ const ENTRY_MUST_NOT_INCLUDE = {
   "form-vendor":
     "react-hook-form + zod. No public profile has a form on first paint; " +
     "auth pages and dashboard forms are lazy routes.",
-  "charts-vendor": "recharts. Dashboard analytics only.",
+  "charts-vendor": "recharts. Admin screens only (the agent Analytics chart is plain SVG since US-395).",
   "three-vendor": "Three.js. Only a 3D theme or the 3D hero needs it.",
   "markdown-vendor": "react-markdown. Blog article rendering only.",
   // US-255: with VITE_SENTRY_DSN set, the SDK and Session Replay were 81 KB
@@ -272,8 +272,9 @@ console.log(
 
 // US-260: the idb library is not a vendor chunk, so the list above cannot name
 // it. App.tsx statically imported offline-storage to open an IndexedDB database
-// nothing read, which inlined idb into the entry chunk itself. Recognise it by
-// the event name only an IndexedDB open uses.
+// nothing read, which inlined idb into the entry chunk itself. Both are gone
+// (US-618); the check stays so IndexedDB never returns to first paint.
+// Recognise it by the event name only an IndexedDB open uses.
 const entryWithIdb = [...eager].filter((f) => (sources.get(f) ?? "").includes('"upgradeneeded"'));
 if (entryWithIdb.length) {
   console.error(
@@ -298,7 +299,7 @@ const PROFILE_MUST_NOT_INCLUDE = {
     "Radix primitives. The profile's modals are lazy; nothing on first paint " +
     "needs them (UpcomingOpenHouses uses a plain disclosure).",
   "three-vendor": "Three.js. 3D themes load it after load + idle (useDeferred3D).",
-  "charts-vendor": "recharts. Dashboard analytics only.",
+  "charts-vendor": "recharts. Admin screens only (the agent Analytics chart is plain SVG since US-395).",
   "form-vendor": "react-hook-form + zod. The lead forms are lazy modals.",
 };
 

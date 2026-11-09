@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { onRequestGet } from '../[username]';
+import { onRequestGet as onListingRequestGet } from '../[username]/listing/[listingId]';
 
 /**
  * What next() really returns for /:username: dist/index.html, which since
@@ -60,6 +61,7 @@ const PROFILE_ROW = {
 
 const LISTING_ROW = {
   id: 'abc-123',
+  status: 'active',
   address: '412 Maple Avenue',
   city: 'Salt Lake City',
   state: 'UT',
@@ -75,6 +77,14 @@ const LISTING_ROW = {
 const CRAWLER = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
 const HUMAN =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
+
+const MANIFEST_LINK = /<link\b[^>]*\brel=["']?manifest["']?[^>]*>/gi;
+const manifestLinks = (html: string) => html.match(MANIFEST_LINK) ?? [];
+const withoutManifestLinks = (html: string) => html.replace(MANIFEST_LINK, '');
+const APPLE_TITLE = /<meta\b[^>]*\bname=["']?apple-mobile-web-app-title["']?[^>]*>/gi;
+const appleTitles = (html: string) => html.match(APPLE_TITLE) ?? [];
+/** The asset server's document minus what an agent's page must not carry (US-553, US-569). */
+const withoutAppMetadata = (html: string) => withoutManifestLinks(html).replace(APPLE_TITLE, '');
 
 const indexResponse = () =>
   new Response(INDEX_HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
@@ -105,6 +115,8 @@ beforeEach(() => {
     const url = String(input);
     if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
     if (url.includes('/rest/v1/listings')) return Response.json([LISTING_ROW]);
+    // No settings row: the defaults, which show every listing.
+    if (url.includes('/rest/v1/user_settings')) return Response.json([]);
     return new Response('[]', { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -128,6 +140,39 @@ describe('GET /:username', () => {
     expect(html).not.toContain('Cover.png');
   });
 
+  it("serves an answer engine's crawler the agent, and a 404 for an unknown handle (US-520)", async () => {
+    const GPTBOT =
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.1; +https://openai.com/gptbot';
+    const html = await (await call({ userAgent: GPTBOT }).promise).text();
+    expect(html).toContain('<h1>Jane Doe — Associate Broker at Summit Realty</h1>');
+    expect(html).toContain('"@type":"RealEstateAgent"');
+    expect(html).not.toContain('"@type":"SoftwareApplication"');
+
+    fetchMock.mockImplementation(async () => Response.json([]));
+    const missing = await call({
+      path: '/nobody',
+      username: 'nobody',
+      userAgent:
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)',
+    }).promise;
+    expect(missing.status).toBe(404);
+  });
+
+  it("links the agent's own web app manifest, not the dashboard's (US-471)", async () => {
+    expect(INDEX_HTML).toContain('<link rel="manifest" href="/manifest.json">');
+    const html = await (await call({}).promise).text();
+    expect(html.match(/rel="manifest"/g)).toHaveLength(1);
+    expect(html).toContain('<link rel="manifest" href="/jane/manifest.json" />');
+    expect(html).not.toContain('href="/manifest.json"');
+  });
+
+  it('drops the AgentBio home-screen label so Safari names the icon after the agent (US-569)', async () => {
+    expect(appleTitles(INDEX_HTML)).toHaveLength(1);
+    const html = await (await call({}).promise).text();
+    expect(appleTitles(html)).toEqual([]);
+    expect(html).toContain('<title>Jane Doe');
+  });
+
   it("does not serve the homepage's body or structured data under the agent's URL (US-242)", async () => {
     // The fixture really is the homepage; prove it, or the rest proves nothing.
     expect(INDEX_HTML).toContain('"@type":"SoftwareApplication"');
@@ -145,8 +190,9 @@ describe('GET /:username', () => {
     expect(html).not.toContain('id="main-content"');
     expect(html).not.toContain('Link in Bio for Real Estate Agents');
     expect(html).toContain(
-      '<div id="root"><main><h1>Jane Doe — Associate Broker at Summit Realty</h1><p>Fifteen years on the east bench.</p></main></div>'
+      '<div id="root"><main><h1>Jane Doe — Associate Broker at Summit Realty</h1><p>Fifteen years on the east bench.</p>'
     );
+    expect(html).toMatch(/<div id="root"><main>[\s\S]*<\/main><\/div>/);
     // Exactly one of each head tag, all the agent's.
     expect(html.match(/<title>/g)).toHaveLength(1);
     expect(html.match(/rel="canonical"/g)).toHaveLength(1);
@@ -201,23 +247,99 @@ describe('GET /:username', () => {
     expect(html).toContain('<title>Jane Doe — Associate Broker at Summit Realty</title>');
   });
 
-  it('leaves a person the SPA untouched, and does not query the database for them', async () => {
+  it("gives a person the SPA naming the agent's manifest, without a database read (US-553)", async () => {
     const { promise, next } = call({ userAgent: HUMAN });
     const response = await promise;
+    const html = await response.text();
 
-    expect(await response.text()).toBe(INDEX_HTML);
+    expect(manifestLinks(html)).toEqual(['<link rel="manifest" href="/jane/manifest.json" />']);
+    // The AgentBio home-screen label is gone before any script runs (US-569).
+    expect(appleTitles(html)).toEqual([]);
+    // Apart from those two tags, the document is the asset server's.
+    expect(withoutAppMetadata(html)).toBe(withoutAppMetadata(INDEX_HTML));
+    expect(response.status).toBe(200);
     expect(response.headers.get('x-agentbio-prerender')).toBeNull();
     expect(next).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('does not touch an app route that happens to be one segment', async () => {
-    for (const segment of ['dashboard', 'auth', 'blog']) {
-      fetchMock.mockClear();
-      const { promise } = call({ path: `/${segment}`, username: segment });
-      await promise;
-      expect(fetchMock, segment).not.toHaveBeenCalled();
+  it("drops the asset's length and ETag but keeps its caching for a person", async () => {
+    const next = vi.fn(
+      async () =>
+        new Response(INDEX_HTML, {
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            'content-length': String(INDEX_HTML.length),
+            etag: '"asset-etag"',
+            'cache-control': 'public, max-age=0, must-revalidate',
+          },
+        })
+    );
+    const response = await call({ userAgent: HUMAN, next }).promise;
+    expect(response.headers.get('content-length')).toBeNull();
+    expect(response.headers.get('etag')).toBeNull();
+    expect(response.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate');
+  });
+
+  it('passes a non-HTML or failed asset response to a person unchanged', async () => {
+    for (const asset of [
+      new Response('{}', { headers: { 'content-type': 'application/json' } }),
+      new Response('<html><head></head></html>', {
+        status: 500,
+        headers: { 'content-type': 'text/html' },
+      }),
+    ]) {
+      const response = await call({ userAgent: HUMAN, next: async () => asset }).promise;
+      expect(response).toBe(asset);
     }
+  });
+
+  it('does not touch an app route that happens to be one segment', async () => {
+    for (const segment of ['dashboard', 'pricing', 'blog']) {
+      fetchMock.mockClear();
+      const next = vi.fn(async () => indexResponse());
+      const response = await call({ path: `/${segment}`, username: segment, next }).promise;
+      expect(fetchMock, segment).not.toHaveBeenCalled();
+      expect(next, segment).toHaveBeenCalledTimes(1);
+      expect(response.status, segment).toBe(200);
+    }
+  });
+
+  it('answers 404 for a reserved word that is not a page, for people and crawlers (US-435)', async () => {
+    // /about, /legal, /api ... are kept out of the username lookup but are not
+    // routes; they used to fall through to the /:username rewrite and answer
+    // 200 with the prerendered homepage.
+    for (const userAgent of [CRAWLER, HUMAN]) {
+      for (const segment of [
+        'about',
+        'legal',
+        'contact',
+        'help',
+        'support',
+        'api',
+        'auth',
+        'About',
+      ]) {
+        fetchMock.mockClear();
+        const next = vi.fn(async () => indexResponse());
+        const response = await call({ path: `/${segment}`, username: segment, userAgent, next })
+          .promise;
+        expect(response.status, segment).toBe(404);
+        expect(await response.text(), segment).toBe(NOT_FOUND_HTML);
+        expect(response.headers.get('x-agentbio-prerender'), segment).toBe('not-found');
+        expect(next, segment).not.toHaveBeenCalled();
+        expect(fetchMock, segment).not.toHaveBeenCalled();
+      }
+    }
+  });
+
+  it('still serves an asset whose name is reserved', async () => {
+    const next = vi.fn(
+      async () => new Response('User-agent: *', { headers: { 'content-type': 'text/plain' } })
+    );
+    const response = await call({ path: '/robots.txt', username: 'robots.txt', next }).promise;
+    expect(response.status).toBe(200);
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('describes the listing when one is deep-linked', async () => {
@@ -226,7 +348,7 @@ describe('GET /:username', () => {
 
     expect(html).toContain('412 Maple Avenue, Salt Lake City, UT — $525,000');
     expect(html).toContain('content="https://cdn.example.com/412-maple.jpg"');
-    expect(html).toContain('"@type":"SingleFamilyResidence"');
+    expect(html).toContain('"@type":"RealEstateListing"');
   });
 
   it('keeps the agent card when the deep-linked listing no longer exists', async () => {
@@ -302,5 +424,530 @@ describe('GET /:username', () => {
     );
     const response = await call({ next }).promise;
     expect(await response.text()).toBe('{"ok":true}');
+  });
+});
+
+describe("the agent's page body for crawlers (US-539)", () => {
+  const SOLD_ROW = { ...LISTING_ROW, id: 'sold-1', status: 'sold', address: '9 Birch Court' };
+  const DRAFT_ROW = { ...LISTING_ROW, id: 'draft-1', status: 'draft', address: '1 Secret Lane' };
+  const FULL_PROFILE = {
+    ...PROFILE_ROW,
+    service_cities: ['Salt Lake City', 'Park City'],
+    license_number: 'UT-12345',
+    license_state: 'UT',
+    phone: '(801) 555-0100',
+    email_display: 'jane@summit.example',
+  };
+
+  const serve = (opts: {
+    profile?: Record<string, unknown>;
+    listings?: Record<string, unknown>[] | 'error';
+    settings?: Record<string, unknown>[] | 'error';
+  }) => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/profiles')) return Response.json([opts.profile ?? FULL_PROFILE]);
+      if (url.includes('/rest/v1/listings')) {
+        return opts.listings === 'error'
+          ? new Response('{}', { status: 500 })
+          : Response.json(opts.listings ?? [SOLD_ROW, LISTING_ROW, DRAFT_ROW]);
+      }
+      if (url.includes('/rest/v1/user_settings')) {
+        return opts.settings === 'error'
+          ? new Response('{}', { status: 500 })
+          : Response.json(opts.settings ?? []);
+      }
+      return new Response('[]', { status: 404 });
+    });
+  };
+
+  const profileHtml = async () => (await call({}).promise).text();
+
+  it('names the service areas, brokerage, licence, listings and contact links', async () => {
+    serve({});
+    const html = await profileHtml();
+    expect(html).toContain('<li>Associate Broker at Summit Realty</li>');
+    expect(html).toContain('<li>License #UT-12345 (UT)</li>');
+    expect(html).toContain(
+      '<section><h2>Service areas</h2><ul><li>Salt Lake City</li><li>Park City</li></ul></section>'
+    );
+    expect(html).toContain(
+      '<a href="https://agentbio.net/jane/listing/abc-123">412 Maple Avenue, Salt Lake City, UT</a>'
+    );
+    expect(html).toContain('<a href="https://agentbio.net/jane/listing/sold-1">9 Birch Court');
+    // Available before sold, as the page orders them.
+    expect(html.indexOf('412 Maple Avenue')).toBeLessThan(html.indexOf('9 Birch Court'));
+    // A draft is never public.
+    expect(html).not.toContain('1 Secret Lane');
+    expect(html).toContain('<a href="tel:8015550100">(801) 555-0100</a>');
+    expect(html).toContain('<a href="mailto:jane@summit.example">jane@summit.example</a>');
+  });
+
+  it('lists the same visible homes in the JSON-LD as in the body (US-551)', async () => {
+    serve({});
+    const html = await profileHtml();
+    const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+    expect(blocks).toHaveLength(1);
+    const agent = JSON.parse(blocks[0][1]) as {
+      '@type': string;
+      makesOffer: { url: string; itemOffered: { '@id': string } }[];
+    };
+    expect(agent['@type']).toBe('RealEstateAgent');
+    expect(agent.makesOffer.map((offer) => offer.url)).toEqual([
+      'https://agentbio.net/jane/listing/abc-123',
+      'https://agentbio.net/jane/listing/sold-1',
+    ]);
+    expect(agent.makesOffer[0].itemOffered['@id']).toBe(
+      'https://agentbio.net/jane/listing/abc-123#listing'
+    );
+    expect(blocks[0][1]).not.toContain('draft-1');
+  });
+
+  it('names no hidden home in the JSON-LD either (US-551)', async () => {
+    serve({ settings: [{ show_listings: true, show_sold_properties: false }] });
+    const html = await profileHtml();
+    expect(html).toContain('"makesOffer"');
+    expect(html).not.toContain('sold-1');
+
+    serve({ settings: [{ show_listings: false, show_sold_properties: false }] });
+    expect(await profileHtml()).not.toContain('makesOffer');
+
+    serve({ settings: 'error' });
+    expect(await profileHtml()).not.toContain('makesOffer');
+  });
+
+  describe('the legacy ?listing= link when its home is not shown (US-552)', () => {
+    const SERVICE_AREAS = '<section><h2>Service areas</h2>';
+
+    it('serves the profile body, naming only the homes the page shows', async () => {
+      serve({ settings: [{ show_listings: true, show_sold_properties: false }] });
+      const response = await call({ path: '/jane?listing=sold-1' }).promise;
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('profile');
+      const html = await response.text();
+      expect(html).toContain(SERVICE_AREAS);
+      expect(html).toContain('<li>License #UT-12345 (UT)</li>');
+      expect(html).toContain(
+        '<a href="https://agentbio.net/jane/listing/abc-123">412 Maple Avenue, Salt Lake City, UT</a>'
+      );
+      expect(html).toContain('"makesOffer"');
+      expect(html).toContain('<link rel="canonical" href="https://agentbio.net/jane" />');
+      // The hidden home is named nowhere: not in the body, the JSON-LD or the card.
+      expect(html).not.toContain('sold-1');
+      expect(html).not.toContain('9 Birch Court');
+    });
+
+    it('serves the profile body for a listing id that does not exist', async () => {
+      serve({});
+      const response = await call({ path: '/jane?listing=gone' }).promise;
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('profile');
+      const html = await response.text();
+      expect(html).toContain(SERVICE_AREAS);
+      expect(html).toContain('"makesOffer"');
+    });
+
+    it('names no home when the agent hides every listing', async () => {
+      serve({ settings: [{ show_listings: false, show_sold_properties: false }] });
+      const html = await (await call({ path: '/jane?listing=abc-123' }).promise).text();
+      expect(html).toContain(SERVICE_AREAS);
+      expect(html).not.toContain('412 Maple Avenue');
+      expect(html).not.toContain('makesOffer');
+    });
+
+    it('still describes a home the page shows', async () => {
+      serve({});
+      const response = await call({ path: '/jane?listing=abc-123' }).promise;
+      expect(response.headers.get('x-agentbio-prerender')).toBe('listing');
+      const html = await response.text();
+      expect(html).toContain('412 Maple Avenue, Salt Lake City, UT — $525,000');
+      expect(html).not.toContain(SERVICE_AREAS);
+    });
+
+    it("leaves the listing's own address a 404 with the agent card, not the profile body", async () => {
+      serve({ settings: [{ show_listings: true, show_sold_properties: false }] });
+      const response = await onListingRequestGet({
+        request: new Request('https://agentbio.net/jane/listing/sold-1', {
+          headers: { 'user-agent': CRAWLER },
+        }),
+        env: ENV as never,
+        params: { username: 'jane', listingId: 'sold-1' },
+        next: async () => indexResponse(),
+      });
+      expect(response.status).toBe(404);
+      const html = await response.text();
+      expect(html).not.toContain(SERVICE_AREAS);
+      expect(html).not.toContain('9 Birch Court');
+    });
+  });
+
+  it('reads the listings and the toggles scoped to the agent, without photos', async () => {
+    serve({});
+    await profileHtml();
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    const listingUrl = urls.find((url) => url.includes('/rest/v1/listings'));
+    expect(listingUrl).toContain('user_id=eq.profile-jane');
+    expect(listingUrl).not.toContain('photos');
+    const settingsUrl = urls.find((url) => url.includes('/rest/v1/user_settings'));
+    expect(settingsUrl).toContain('user_id=eq.profile-jane');
+    expect(settingsUrl).toContain('show_contact_buttons');
+  });
+
+  it('names no listing while the agent hides listings', async () => {
+    serve({ settings: [{ show_listings: false, show_sold_properties: true }] });
+    const html = await profileHtml();
+    expect(html).not.toContain('412 Maple Avenue');
+    expect(html).not.toContain('9 Birch Court');
+    expect(html).not.toContain('<h2>Listings</h2>');
+  });
+
+  it('names no sold home while sold properties are hidden', async () => {
+    serve({ settings: [{ show_listings: true, show_sold_properties: false }] });
+    const html = await profileHtml();
+    expect(html).toContain('412 Maple Avenue');
+    expect(html).not.toContain('9 Birch Court');
+  });
+
+  it('withholds listings and contact links when the settings read fails', async () => {
+    serve({ settings: 'error' });
+    const response = await call({}).promise;
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain('<h2>Service areas</h2>');
+    expect(html).not.toContain('412 Maple Avenue');
+    expect(html).not.toContain('tel:');
+  });
+
+  it('still serves the agent when the listings read fails', async () => {
+    serve({ listings: 'error' });
+    const html = await profileHtml();
+    expect(html).toContain('<li>License #UT-12345 (UT)</li>');
+    expect(html).not.toContain('<h2>Listings</h2>');
+  });
+
+  it('leaves out contact links while the agent hides contact buttons', async () => {
+    serve({ settings: [{ show_contact_buttons: false }] });
+    const html = await profileHtml();
+    expect(html).toContain('412 Maple Avenue');
+    expect(html).not.toContain('tel:');
+    expect(html).not.toContain('mailto:');
+  });
+
+  it('gives the listing page its facts and a link back to the agent', async () => {
+    serve({});
+    const html = await (
+      await onListingRequestGet({
+        request: new Request('https://agentbio.net/jane/listing/abc-123', {
+          headers: { 'user-agent': CRAWLER },
+        }),
+        env: ENV as never,
+        params: { username: 'jane', listingId: 'abc-123' },
+        next: async () => indexResponse(),
+      })
+    ).text();
+    expect(html).toContain('<p>Active · $525,000 · 3 bd · 2 ba · 1,980 sqft</p>');
+    expect(html).toContain(
+      '<p>Listed by <a href="https://agentbio.net/jane">Jane Doe</a>, Associate Broker at Summit Realty.</p>'
+    );
+    // The listing page does not read the agent's whole gallery.
+    const listingReads = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/rest/v1/listings')
+    );
+    expect(listingReads).toHaveLength(1);
+  });
+});
+
+describe('/:username/listing/:listingId (US-275)', () => {
+  const callListing = (opts: {
+    path: string;
+    username?: string;
+    listingId?: string;
+    userAgent?: string;
+  }) => {
+    const next = vi.fn(async () => indexResponse());
+    const promise = onListingRequestGet({
+      request: new Request(`https://agentbio.net${opts.path}`, {
+        headers: { 'user-agent': opts.userAgent ?? CRAWLER },
+      }),
+      env: ENV as never,
+      params: { username: opts.username ?? 'jane', listingId: opts.listingId ?? 'abc-123' },
+      next,
+    });
+    return { promise, next };
+  };
+
+  it("links the agent's manifest on a listing page, including a withdrawn one (US-471)", async () => {
+    const html = await (await callListing({ path: '/jane/listing/abc-123' }).promise).text();
+    expect(html.match(/rel="manifest"/g)).toHaveLength(1);
+    expect(html).toContain('<link rel="manifest" href="/jane/manifest.json" />');
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+      return Response.json([]);
+    });
+    const gone = await callListing({ path: '/jane/listing/abc-123' }).promise;
+    expect(gone.status).toBe(404);
+    const goneHtml = await gone.text();
+    expect(goneHtml.match(/rel="manifest"/g)).toHaveLength(1);
+    expect(goneHtml).toContain('<link rel="manifest" href="/jane/manifest.json" />');
+    expect(appleTitles(html)).toEqual([]);
+    expect(appleTitles(goneHtml)).toEqual([]);
+  });
+
+  it("gives a crawler the listing's card, scoped to the agent, with the page as its URL", async () => {
+    const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+    const html = await response.text();
+
+    expect(response.headers.get('x-agentbio-prerender')).toBe('listing');
+    expect(html).toContain('412 Maple Avenue, Salt Lake City, UT — $525,000');
+    expect(html).toContain('https://agentbio.net/jane/listing/abc-123');
+    const listingUrl = fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .find((url) => url.includes('/rest/v1/listings'));
+    expect(listingUrl).toContain('id=eq.abc-123');
+    expect(listingUrl).toContain('user_id=eq.profile-jane');
+  });
+
+  it('301s a mixed-case username to the lowercase listing URL', async () => {
+    const { promise, next } = callListing({
+      path: '/JaneDoe/listing/abc-123?utm_source=ig',
+      username: 'JaneDoe',
+      userAgent: HUMAN,
+    });
+    const response = await promise;
+    expect(response.status).toBe(301);
+    expect(response.headers.get('location')).toBe(
+      'https://agentbio.net/janedoe/listing/abc-123?utm_source=ig'
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("gives a person the SPA naming the agent's manifest (US-553)", async () => {
+    const { promise, next } = callListing({ path: '/jane/listing/abc-123', userAgent: HUMAN });
+    const html = await (await promise).text();
+    expect(manifestLinks(html)).toEqual(['<link rel="manifest" href="/jane/manifest.json" />']);
+    expect(appleTitles(html)).toEqual([]);
+    expect(withoutAppMetadata(html)).toBe(withoutAppMetadata(INDEX_HTML));
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('points the legacy ?listing= card at the listing page too', async () => {
+    const html = await (await call({ path: '/jane?listing=abc-123' }).promise).text();
+    expect(html).toContain('https://agentbio.net/jane/listing/abc-123');
+  });
+
+  describe('visibility toggles (US-382)', () => {
+    const AGENT_TITLE = '<title>Jane Doe — Associate Broker at Summit Realty</title>';
+    const LISTING_TITLE = '412 Maple Avenue, Salt Lake City, UT — $525,000';
+
+    const serve = (
+      listing: Record<string, unknown>,
+      settings: Record<string, unknown>[] | 'error'
+    ) => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+        if (url.includes('/rest/v1/listings')) return Response.json([listing]);
+        if (url.includes('/rest/v1/user_settings')) {
+          return settings === 'error'
+            ? new Response('{}', { status: 500 })
+            : Response.json(settings);
+        }
+        return new Response('[]', { status: 404 });
+      });
+    };
+
+    const listingHtml = async () =>
+      (await callListing({ path: '/jane/listing/abc-123' }).promise).text();
+
+    it("reads only the agent's two public toggles, scoped to the agent", async () => {
+      await listingHtml();
+      const settingsUrl = fetchMock.mock.calls
+        .map(([input]) => String(input))
+        .find((url) => url.includes('/rest/v1/user_settings'));
+      expect(settingsUrl).toContain('select=show_listings,show_sold_properties');
+      expect(settingsUrl).toContain('user_id=eq.profile-jane');
+    });
+
+    it('answers 404 with the agent card when the agent hides their listings (US-416)', async () => {
+      serve(LISTING_ROW, [{ show_listings: false, show_sold_properties: true }]);
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(404);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('listing-not-found');
+      const html = await response.text();
+      expect(html).toContain(AGENT_TITLE);
+      expect(html).not.toContain('412 Maple Avenue');
+      expect(html).not.toContain('412-maple.jpg');
+    });
+
+    it('answers 404 for a sold home while sold properties are hidden (US-416)', async () => {
+      serve({ ...LISTING_ROW, status: 'sold' }, [
+        { show_listings: true, show_sold_properties: false },
+      ]);
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(404);
+      const html = await response.text();
+      expect(html).toContain(AGENT_TITLE);
+      expect(html).not.toContain('412 Maple Avenue');
+    });
+
+    it('describes a sold home while sold properties are shown', async () => {
+      serve({ ...LISTING_ROW, status: 'sold' }, [
+        { show_listings: true, show_sold_properties: true },
+      ]);
+      expect(await listingHtml()).toContain(LISTING_TITLE);
+    });
+
+    it('describes an available home when only sold properties are hidden', async () => {
+      serve({ ...LISTING_ROW, status: 'pending' }, [
+        { show_listings: true, show_sold_properties: false },
+      ]);
+      expect(await listingHtml()).toContain(LISTING_TITLE);
+    });
+
+    it('withholds the listing when the settings read fails, rather than guess', async () => {
+      serve(LISTING_ROW, 'error');
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain(AGENT_TITLE);
+      expect(html).not.toContain('412 Maple Avenue');
+    });
+
+    it('applies the same rules to the legacy ?listing= link, which stays 200 because it is the profile', async () => {
+      serve(LISTING_ROW, [{ show_listings: false, show_sold_properties: true }]);
+      const response = await call({ path: '/jane?listing=abc-123' }).promise;
+      expect(response.status).toBe(200);
+      // The profile, so the profile's body (US-552).
+      expect(response.headers.get('x-agentbio-prerender')).toBe('profile');
+      const html = await response.text();
+      expect(html).toContain(AGENT_TITLE);
+      expect(html).not.toContain('412 Maple Avenue');
+    });
+  });
+
+  describe('a listing that is not public answers a hard 404, not a soft one (US-416)', () => {
+    const NO_LISTING = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+      return Response.json([]);
+    };
+
+    it('404s a listing id that does not exist for this agent', async () => {
+      fetchMock.mockImplementation(NO_LISTING);
+      const response = await callListing({ path: '/jane/listing/gone', listingId: 'gone' }).promise;
+      expect(response.status).toBe(404);
+      expect(response.headers.get('x-robots-tag')).toBe('noindex');
+    });
+
+    it('404s a withdrawn listing', async () => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+        if (url.includes('/rest/v1/listings'))
+          return Response.json([{ ...LISTING_ROW, status: 'withdrawn' }]);
+        return Response.json([]);
+      });
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(404);
+    });
+
+    it("swaps the homepage's robots index for noindex and points at the agent", async () => {
+      fetchMock.mockImplementation(NO_LISTING);
+      const html = await (
+        await callListing({ path: '/jane/listing/gone', listingId: 'gone' }).promise
+      ).text();
+      expect(html).toContain('<meta name="robots" content="noindex, follow" />');
+      expect(html).not.toMatch(/<meta name="robots" content="index/);
+      expect(html.match(/<meta\s+name="robots"/g)).toHaveLength(1);
+      expect(html).toContain('<link rel="canonical" href="https://agentbio.net/jane" />');
+      expect(html).toContain('<title>Jane Doe — Associate Broker at Summit Realty</title>');
+    });
+
+    it('does not 404 when the listings read failed — a blip is not an answer', async () => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+        if (url.includes('/rest/v1/listings')) throw new Error('upstream down');
+        return Response.json([]);
+      });
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('listing');
+    });
+
+    it('keeps the legacy ?listing= link at 200 for a missing listing', async () => {
+      fetchMock.mockImplementation(NO_LISTING);
+      const response = await call({ path: '/jane?listing=gone' }).promise;
+      expect(response.status).toBe(200);
+    });
+
+    it('still leaves a person the SPA, which shows its own "no longer listed" page', async () => {
+      fetchMock.mockImplementation(NO_LISTING);
+      const { promise, next } = callListing({
+        path: '/jane/listing/gone',
+        listingId: 'gone',
+        userAgent: HUMAN,
+      });
+      const response = await promise;
+      expect(response.status).toBe(200);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('the canonical origin (US-595)', () => {
+  /** The production *.pages.dev alias answers for the same project. */
+  const ALIAS = 'https://agentbio.pages.dev';
+
+  const crawl = (path: string, env: Record<string, unknown> = ENV) => {
+    const [, username, , listingId] = path.split('/');
+    const context = {
+      request: new Request(`${ALIAS}${path}`, { headers: { 'user-agent': CRAWLER } }),
+      env: env as never,
+      params: { username, listingId },
+      next: async () => indexResponse(),
+    };
+    return listingId ? onListingRequestGet(context) : onRequestGet(context);
+  };
+
+  it("names agentbio.net in an agent's page served on another host", async () => {
+    const html = await (await crawl('/jane')).text();
+    expect(html).toContain('<link rel="canonical" href="https://agentbio.net/jane" />');
+    expect(html).toContain('https://agentbio.net/jane#');
+    expect(html).toContain('https://agentbio.net/jane/listing/abc-123');
+    expect(html).not.toContain('pages.dev');
+  });
+
+  it('names agentbio.net in a listing page served on another host', async () => {
+    const response = await crawl('/jane/listing/abc-123');
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(
+      '<link rel="canonical" href="https://agentbio.net/jane/listing/abc-123" />'
+    );
+    expect(html).not.toContain('pages.dev');
+  });
+
+  it('follows VITE_APP_URL when the project sets one', async () => {
+    const html = await (
+      await crawl('/jane', { ...ENV, VITE_APP_URL: 'https://staging.example.test/' })
+    ).text();
+    expect(html).toContain('<link rel="canonical" href="https://staging.example.test/jane" />');
+    expect(html).not.toContain('pages.dev');
+  });
+
+  it('still redirects a mixed-case handle on the host it was asked on', async () => {
+    const response = await onRequestGet({
+      request: new Request(`${ALIAS}/JaneDoe`, { headers: { 'user-agent': CRAWLER } }),
+      env: ENV as never,
+      params: { username: 'JaneDoe' },
+      next: async () => indexResponse(),
+    });
+    expect(response.status).toBe(301);
+    expect(response.headers.get('location')).toBe(`${ALIAS}/janedoe`);
   });
 });

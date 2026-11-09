@@ -41,12 +41,12 @@ export function OfflineIndicator() {
       className={cn(
         'fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-lg shadow-lg',
         'flex items-center gap-2 text-sm font-medium transition-all duration-300',
-        'safe-area-inset-top',
-        isOnline
-          ? 'bg-green-500 text-white'
-          : 'bg-red-500 text-white',
+        isOnline ? 'bg-green-500 text-white' : 'bg-red-500 text-white',
         showToast ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
       )}
+      // The inset belongs in `top` only. A safe-area-inset-top class here as
+      // well replaced py-2.5's top padding with the inset (US-596): a lopsided
+      // pill on most phones, a ~47px-tall one under an iPhone notch.
       style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
     >
       {isOnline ? (

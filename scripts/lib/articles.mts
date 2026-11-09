@@ -22,6 +22,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { categoryByName } from '../../src/config/blog-categories';
+import { ARTICLE_AUTHOR_COLUMNS, type ArticleAuthorRow } from '../../src/lib/articleAuthor';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..', '..');
@@ -50,6 +51,14 @@ export interface Article {
   updated_at: string | null;
   generated_from_suggestion_id: string | null;
   keyword_id: string | null;
+  /**
+   * NOT a column. The author's published profile, resolved at build time from
+   * author_id (US-181) and carried in the snapshot/fixture so the prerender can
+   * answer BlogArticle's `profiles` lookup without a database. Null when the
+   * author has no published profile; absent in a snapshot written before this
+   * existed, which reads the same as null.
+   */
+  author?: ArticleAuthorRow | null;
 }
 
 export interface ArticleLoad {
@@ -82,10 +91,106 @@ async function fetchFromSupabase(url: string, key: string): Promise<Article[]> {
     if (!response.ok) {
       throw new Error(`PostgREST answered ${response.status} ${response.statusText}`);
     }
-    return (await response.json()) as Article[];
+    const articles = (await response.json()) as Article[];
+    return await attachAuthors(url, key, articles);
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Resolve each article's author_id to its published profile — the same lookup
+ * BlogArticle.tsx makes in the browser, with the same filter, under the same
+ * anon RLS. Not fatal: a failure here credits the articles to the organisation,
+ * which is what the page would do too; it must not cost the build its blog.
+ */
+export async function attachAuthors(
+  url: string,
+  key: string,
+  articles: Article[],
+  fetcher: typeof fetch = fetch
+): Promise<Article[]> {
+  const ids = [...new Set(articles.map((a) => a.author_id).filter((id): id is string => !!id))];
+  if (ids.length === 0) return articles.map((a) => ({ ...a, author: null }));
+
+  let byId = new Map<string, ArticleAuthorRow>();
+  try {
+    const select = ARTICLE_AUTHOR_COLUMNS.replace(/\s+/g, '');
+    const endpoint =
+      `${url}/rest/v1/profiles?select=${select}` +
+      `&is_published=eq.true&id=in.(${ids.map(encodeURIComponent).join(',')})`;
+    const response = await fetcher(endpoint, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error(`PostgREST answered ${response.status} ${response.statusText}`);
+    }
+    const rows = (await response.json()) as ArticleAuthorRow[];
+    byId = new Map(rows.map((row) => [row.id, row]));
+  } catch (error) {
+    console.warn(
+      `[articles] could not resolve article authors (${(error as Error).message}); ` +
+        `they will be credited to the organisation`
+    );
+  }
+
+  return articles.map((a) => ({ ...a, author: (a.author_id && byId.get(a.author_id)) || null }));
+}
+
+/**
+ * The author rows the prerender should answer `profiles` lookups with, keyed by
+ * profile id. Only rows an article actually carries — nothing else about
+ * profiles is known to, or faked by, the build.
+ */
+export function authorsById(articles: Article[]): Map<string, ArticleAuthorRow> {
+  const map = new Map<string, ArticleAuthorRow>();
+  for (const article of articles) {
+    if (article.author && article.author_id === article.author.id) {
+      map.set(article.author.id, article.author);
+    }
+  }
+  return map;
+}
+
+/**
+ * The rows the prerender answers a `profiles` request with, or null when the
+ * request is not an article-author lookup and must fall through untouched.
+ *
+ * Two shapes are author lookups, both GETs filtered to published profiles:
+ *   - BlogArticle's single author:   id=eq.<id>
+ *   - the blog list cards' batch:    id=in.(<id>,<id>,...)   (US-399)
+ * Without the second, the prerendered /blog and /blog/category/* pages would
+ * send the batch to the build's VITE_SUPABASE_URL and ship with no bylines
+ * while the live pages showed them.
+ */
+export function answerAuthorLookup(
+  method: string,
+  searchParams: URLSearchParams,
+  authors: Map<string, ArticleAuthorRow>
+): ArticleAuthorRow[] | null {
+  if (method !== 'GET' || searchParams.get('is_published') !== 'eq.true') return null;
+  const id = searchParams.get('id');
+  if (!id) return null;
+
+  let wanted: string[];
+  if (id.startsWith('eq.')) {
+    wanted = [id.slice(3)];
+  } else if (id.startsWith('in.(') && id.endsWith(')')) {
+    wanted = id
+      .slice(4, -1)
+      .split(',')
+      .map((value) => value.trim().replace(/^"(.*)"$/, '$1'))
+      .filter(Boolean);
+  } else {
+    return null;
+  }
+
+  const rows: ArticleAuthorRow[] = [];
+  for (const value of new Set(wanted.map((v) => decodeURIComponent(v)))) {
+    const row = authors.get(value);
+    if (row) rows.push(row);
+  }
+  return rows;
 }
 
 async function readSnapshot(): Promise<Article[] | null> {

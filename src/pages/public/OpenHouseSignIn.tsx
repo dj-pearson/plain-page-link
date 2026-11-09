@@ -12,7 +12,6 @@
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { format } from 'date-fns';
 import { z } from 'zod';
 import { Bath, BedDouble, CalendarClock, CheckCircle2, Loader2, Ruler } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
@@ -25,9 +24,15 @@ import { EdgeFunctionError } from '@/lib/edgeFunctions';
 import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { formatNumber, formatPrice, getInitials, parsePrice } from '@/lib/format';
 import { toStringList } from '@/types/profile';
+import {
+  formatOpenHouseWhen,
+  needsZoneLabel,
+  visitorOpenHouseTimeZone,
+} from '@/lib/openHouseSchedule';
 import { cn } from '@/lib/utils';
 import { useSpamGuard } from '@/hooks/useSpamGuard';
 import { HoneypotField } from '@/components/forms/HoneypotField';
+import { AvatarImage } from '@/components/profile/AvatarImage';
 
 /** How long the thank-you stays up before the form clears for the next visitor. */
 const KIOSK_RESET_MS = 8000;
@@ -49,6 +54,8 @@ interface KioskOpenHouse {
   agentId: string;
   startsAt: string;
   endsAt: string;
+  /** The agent's zone (US-669), else this device's: what the window is shown in. */
+  timeZone: string;
   publicNotes: string | null;
   address: string;
   city: string;
@@ -83,6 +90,7 @@ function toKioskOpenHouse(row: Record<string, unknown>): KioskOpenHouse | null {
     agentId,
     startsAt,
     endsAt,
+    timeZone: visitorOpenHouseTimeZone(row.time_zone),
     publicNotes: str(row.public_notes),
     address,
     city: str(row.city) ?? '',
@@ -107,14 +115,16 @@ function displayPrice(price: string | null): string | null {
   return n > 0 ? formatPrice(n) : price;
 }
 
-function formatWindow(startsAt: string, endsAt: string): string {
-  const s = new Date(startsAt);
-  const e = new Date(endsAt);
-  const time =
-    format(s, 'a') === format(e, 'a')
-      ? `${format(s, 'h:mm')}–${format(e, 'h:mm a')}`
-      : `${format(s, 'h:mm a')}–${format(e, 'h:mm a')}`;
-  return `${format(s, 'EEEE, MMMM d')} · ${time}`;
+/**
+ * "Saturday, November 14 · 1:00–3:00 PM" at the property, in the agent's zone
+ * (US-669) rather than whatever zone the tablet at the door is set to. A
+ * device on another zone also shows the zone's name.
+ */
+function formatWindow(oh: KioskOpenHouse): string {
+  return formatOpenHouseWhen(oh.startsAt, oh.endsAt, oh.timeZone, new Date(), {
+    long: true,
+    zoneLabel: needsZoneLabel(oh.timeZone, new Date(oh.startsAt)),
+  });
 }
 
 // US-228: an email or a phone. A visitor happy to leave a number but not an
@@ -384,7 +394,7 @@ export default function OpenHouseSignIn() {
 
           <p className="inline-flex items-center gap-2 text-base">
             <CalendarClock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-            {formatWindow(openHouse.startsAt, openHouse.endsAt)}
+            {formatWindow(openHouse)}
           </p>
 
           {openHouse.publicNotes && (
@@ -395,8 +405,8 @@ export default function OpenHouseSignIn() {
 
           <div className="flex items-center gap-4 border-t border-border pt-5">
             {openHouse.agentAvatar ? (
-              <img
-                src={openHouse.agentAvatar}
+              <AvatarImage
+                url={openHouse.agentAvatar}
                 alt=""
                 className="h-14 w-14 shrink-0 rounded-full object-cover"
               />

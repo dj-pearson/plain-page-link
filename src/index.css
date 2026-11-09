@@ -41,6 +41,17 @@
     --destructive: 0 72.2% 46%;
     --destructive-foreground: 210 40% 98%;
 
+    /*
+     * US-351: a caution callout (e.g. "copy this key now"). --warning is the
+     * surface, --warning-foreground the text on it (>= 4.5:1), --warning-border
+     * its edge. Hard-coded amber-50/800 had no dark variant, so the box glared
+     * as a light patch on the dark dashboard. destructiveContrast.test.ts
+     * measures both themes.
+     */
+    --warning: 48 100% 96%;
+    --warning-foreground: 22.7 82.5% 31.4%;
+    --warning-border: 45.9 96.7% 64.5%;
+
     --border: 214.3 31.8% 91.4%;
     /*
      * US-261: --input is a form field's border, the only edge that shows where
@@ -85,6 +96,11 @@
      */
     --destructive: 0 90.6% 70.8%;
     --destructive-foreground: 222.2 47.4% 11.2%;
+
+    /* US-351: a dim amber surface with light amber text (see :root). */
+    --warning: 32 50% 12%;
+    --warning-foreground: 48 96.6% 76.7%;
+    --warning-border: 32 60% 32%;
 
     --border: 217.2 32.6% 17.5%;
     /* US-261: 4.32 on --background, 3.16 on --muted (was 1.3 / 1.0). */
@@ -500,4 +516,64 @@ html {
 }
 .page-exit-active {
   @apply opacity-0 -translate-y-4 transition-all duration-300 ease-in;
+}
+
+/*
+ * US-637: iOS Safari, and the installed iOS app, zoom the whole page in when
+ * a form field under 16px takes focus, and leave it zoomed after the keyboard
+ * closes. Input was already 16px on phones, but Textarea, native <select>s and
+ * every field given `text-sm` were 14px, so a buyer tapping "Message" in the
+ * lead form on an agent's page found the dialog blown up and half off screen.
+ *
+ * Two rules, both for touch screens only (mouse-and-keyboard screens keep the
+ * compact 14px sizes), and both raise small fields without touching big ones:
+ *
+ * 1. A field given a small size utility (text-sm, text-xs, sm:text-sm, ...)
+ *    is set to 16px. `!important` because the utilities come later in the
+ *    stylesheet; outside any @layer so Tailwind does not hoist it above them.
+ *    It names the small utilities rather than flooring every field with
+ *    max(16px, 1em): in font-size, 1em is the *parent's* size, so a floor on
+ *    every field would pull text-lg kiosk fields and text-2xl OTP digits down
+ *    to 16px.
+ * 2. A field with no size class of its own inherits its parent's size
+ *    (preflight sets font-size: 100%), so one inside a text-sm container would
+ *    be 14px. It defaults to at least 16px, without !important and at element
+ *    specificity in @layer base, so any size utility on the field still wins.
+ */
+@media (pointer: coarse) {
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+        [type='file']
+      ):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not(
+        [type='hidden']
+      ),
+    select,
+    textarea
+  ):is(
+    .text-xs,
+    .text-sm,
+    .text-\[10px\],
+    .text-\[11px\],
+    .sm\:text-xs,
+    .sm\:text-sm,
+    .md\:text-sm
+  ) {
+    font-size: 16px !important;
+  }
+}
+
+@layer base {
+  @media (pointer: coarse) {
+    input:where(
+      :not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+          [type='file']
+        ):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not(
+          [type='hidden']
+        )
+    ),
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
+  }
 }

@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePageBuilderStore } from '@/stores/pageBuilderStore';
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 import { pageSnapshot } from '@/lib/pageSnapshot';
 import { slugify, validateSlug } from '@/lib/pageSlug';
 import { getBlockTemplates } from '@/lib/pageBuilder';
@@ -166,6 +167,50 @@ export default function PageBuilderEditor() {
     // its value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot, lastSavedSnapshot, savePage]);
+
+  // Edits not yet written. Autosave waits three seconds after the last one, so
+  // there is always a window in which leaving the editor would lose them: a
+  // reload, a closed tab or a dashboard link used to drop them silently
+  // (US-671).
+  const hasUnsavedChanges = !!page && !!snapshot && snapshot !== lastSavedSnapshot;
+  useUnsavedChangesWarning(hasUnsavedChanges);
+
+  // "Pages" used to call setPage(null) at once. That cleared the pending
+  // autosave timer along with the page, so the last few seconds of edits were
+  // thrown away without a word. Write them first; ask only if that fails.
+  const handleBackToPages = async () => {
+    if (hasUnsavedChanges) {
+      let saved = false;
+      if (slugCheck.valid) {
+        try {
+          await savePage();
+          setLastSaved(new Date());
+          saved = true;
+        } catch (error) {
+          // The autosave timer can fire during this save. For a page not yet
+          // stored, the two writes race to insert and the loser fails on the
+          // primary key while the winner wrote exactly these edits.
+          const latest = usePageBuilderStore.getState();
+          saved = pageSnapshot(latest.page) === latest.lastSavedSnapshot;
+          if (!saved) logger.error('Save before leaving the editor failed', error as Error);
+        }
+      }
+      if (
+        !saved &&
+        !window.confirm(
+          slugCheck.valid
+            ? 'Your latest changes could not be saved. Leave the editor and lose them?'
+            : `Your latest changes cannot be saved until the page address is fixed (${
+                slugCheck.error ?? 'invalid address'
+              }). Leave the editor and lose them?`
+        )
+      ) {
+        return;
+      }
+    }
+    setPage(null);
+    setShowPageList(true);
+  };
 
   const handleSave = async () => {
     if (!slugCheck.valid) {
@@ -362,10 +407,8 @@ export default function PageBuilderEditor() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setPage(null);
-                setShowPageList(true);
-              }}
+              onClick={() => void handleBackToPages()}
+              disabled={isSaving}
               className="gap-1.5"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -477,10 +520,17 @@ export default function PageBuilderEditor() {
                 <Save className="w-3.5 h-3.5" />
                 {isSaving ? 'Saving...' : 'Save'}
               </Button>
-              {lastSaved && !isSaving && (
-                <span className="text-xs text-gray-400">
-                  {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {!isSaving && hasUnsavedChanges ? (
+                <span className="text-xs text-gray-500" role="status">
+                  Unsaved changes
                 </span>
+              ) : (
+                lastSaved &&
+                !isSaving && (
+                  <span className="text-xs text-gray-400">
+                    {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )
               )}
             </div>
 

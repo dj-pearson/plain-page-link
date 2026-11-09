@@ -3,8 +3,9 @@
  *
  * Admin-only, sortable/filterable view of the full audit trail (all users).
  * Relies on the audit_logs admin "read all" RLS policy. Filters by date
- * range, user, action, and resource type; rows expand to show the raw jsonb
- * details. Paginated 50 events per page.
+ * range, user, action, resource type and source (server-written vs reported
+ * by the browser, US-675); rows expand to show the raw jsonb details.
+ * Paginated 50 events per page.
  */
 
 import { useState, Fragment } from 'react';
@@ -17,6 +18,19 @@ import type { AuditLogEntry } from '@/hooks/useAuditLog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  AUDIT_SOURCE_OPTIONS,
+  CLIENT_REPORTED_HINT,
+  CLIENT_REPORTED_LABEL,
+  SERVER_FILTER_CAVEAT,
+  auditSourceQuery,
+  isAuditSourceFilter,
+  isClientReported,
+  type AuditSourceFilter,
+} from '@/lib/auditSource';
+
+const SELECT_CLASS =
+  'flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
 
 const PAGE_SIZE = 50;
 
@@ -33,6 +47,7 @@ interface AuditChain extends PromiseLike<AuditResult> {
   range: (a: number, b: number) => AuditChain;
   ilike: (c: string, v: string) => AuditChain;
   eq: (c: string, v: string) => AuditChain;
+  or: (f: string) => AuditChain;
   gte: (c: string, v: string) => AuditChain;
   lte: (c: string, v: string) => AuditChain;
 }
@@ -43,12 +58,20 @@ interface AuditFrom {
 export default function AuditLogPage() {
   const { user, role } = useAuthStore();
 
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    action: string;
+    resourceType: string;
+    userId: string;
+    startDate: string;
+    endDate: string;
+    source: AuditSourceFilter;
+  }>({
     action: '',
     resourceType: '',
     userId: '',
     startDate: '',
     endDate: '',
+    source: 'all',
   });
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -69,6 +92,9 @@ export default function AuditLogPage() {
       if (filters.userId) query = query.eq('user_id', filters.userId);
       if (filters.startDate) query = query.gte('created_at', filters.startDate);
       if (filters.endDate) query = query.lte('created_at', `${filters.endDate}T23:59:59`);
+      const source = auditSourceQuery(filters.source);
+      if (source.kind === 'eq') query = query.eq(source.column, source.value);
+      if (source.kind === 'or') query = query.or(source.filter);
 
       const { data: logs, count, error } = await query;
       if (error) throw error;
@@ -85,9 +111,15 @@ export default function AuditLogPage() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const updateFilter = (key: keyof typeof filters, value: string) => {
+  const updateFilter = (key: Exclude<keyof typeof filters, 'source'>, value: string) => {
     setPage(0);
     setFilters((f) => ({ ...f, [key]: value }));
+  };
+
+  const updateSource = (value: string) => {
+    if (!isAuditSourceFilter(value)) return;
+    setPage(0);
+    setFilters((f) => ({ ...f, source: value }));
   };
 
   return (
@@ -107,7 +139,7 @@ export default function AuditLogPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div>
           <Label htmlFor="f-action">Action</Label>
           <Input
@@ -152,6 +184,24 @@ export default function AuditLogPage() {
             value={filters.endDate}
             onChange={(e) => updateFilter('endDate', e.target.value)}
           />
+        </div>
+        <div>
+          <Label htmlFor="f-source">Source</Label>
+          <select
+            id="f-source"
+            className={SELECT_CLASS}
+            value={filters.source}
+            onChange={(e) => updateSource(e.target.value)}
+          >
+            {AUDIT_SOURCE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {filters.source === 'server' && (
+            <p className="mt-1 text-xs text-muted-foreground">{SERVER_FILTER_CAVEAT}</p>
+          )}
         </div>
       </div>
 
@@ -215,7 +265,17 @@ export default function AuditLogPage() {
                         <span className="text-muted-foreground">system</span>
                       )}
                     </td>
-                    <td className="p-3">{log.action}</td>
+                    <td className="p-3">
+                      {log.action}
+                      {isClientReported(log.details) && (
+                        <span
+                          className="ml-2 inline-block whitespace-nowrap rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground"
+                          title={CLIENT_REPORTED_HINT}
+                        >
+                          {CLIENT_REPORTED_LABEL}
+                        </span>
+                      )}
+                    </td>
                     <td className="p-3 text-muted-foreground">
                       {log.resource_type ?? '—'}
                       {log.resource_id ? ` #${log.resource_id.slice(0, 8)}` : ''}

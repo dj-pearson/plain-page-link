@@ -5,9 +5,15 @@
  * Slack and LinkedIn never run.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
+  buildListingBody,
   buildListingTags,
+  buildProfileBody,
   buildProfileTags,
+  PROFILE_BODY_LISTING_LIMIT,
+  type BodyListing,
   injectSocialTags,
   isCrawler,
   isReservedSegment,
@@ -60,7 +66,60 @@ describe('isCrawler', () => {
     }
   });
 
+  it("recognises answer engines' crawlers and fetchers, which run no scripts either (US-520)", () => {
+    for (const ua of [
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.1; +https://openai.com/gptbot',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +Claude-User@anthropic.com)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-SearchBot/1.0; +Claude-SearchBot@anthropic.com)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot) Chrome/119.0.6045.214 Safari/537.36',
+      'DuckAssistBot/1.2; (+http://duckduckgo.com/duckassistbot.html)',
+      'DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)',
+      'Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)',
+    ]) {
+      expect(isCrawler(ua), ua).toBe(true);
+    }
+  });
+
+  it('prerenders for every crawler robots.txt invites by name (US-520)', () => {
+    // robots.txt allows these bots "for citation and search results". One that
+    // is not prerendered for reads the homepage under every agent's URL.
+    // Google-Extended is a robots.txt product token only; no request carries it.
+    const robots = readFileSync(join(__dirname, '..', '..', 'public', 'robots.txt'), 'utf8');
+    const invited: string[] = [];
+    let agents: string[] = [];
+    for (const raw of robots.split('\n')) {
+      const line = raw.replace(/#.*/, '').trim();
+      const colon = line.indexOf(':');
+      const field = colon === -1 ? line : line.slice(0, colon).trim();
+      const value = colon === -1 ? '' : line.slice(colon + 1).trim();
+      if (/^user-agent$/i.test(field)) {
+        agents.push(value);
+      } else if (/^allow$/i.test(field) && value === '/') {
+        invited.push(...agents);
+      } else if (line === '') {
+        agents = [];
+      }
+    }
+    const named = invited.filter((agent) => agent !== '*' && agent !== 'Google-Extended');
+    expect(named).toEqual(expect.arrayContaining(['GPTBot', 'ClaudeBot', 'PerplexityBot']));
+    for (const agent of named) {
+      expect(isCrawler(`Mozilla/5.0 (compatible; ${agent}/1.0)`), agent).toBe(true);
+    }
+  });
+
   it('does not divert a person', () => {
+    for (const ua of [
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1',
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 YaBrowser/24.10.0.0 Safari/537.36',
+    ]) {
+      expect(isCrawler(ua), ua).toBe(false);
+    }
     expect(
       isCrawler(
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36'
@@ -125,6 +184,87 @@ describe('buildProfileTags', () => {
   });
 });
 
+describe('buildProfileTags listings in the JSON-LD (US-551)', () => {
+  const home = (over: Partial<BodyListing> = {}): BodyListing => ({
+    id: 'abc-123',
+    status: 'active',
+    address: '412 Maple Avenue',
+    city: 'Salt Lake City',
+    state: 'UT',
+    price: '$525,000',
+    bedrooms: 3,
+    bathrooms: 2,
+    square_feet: 1980,
+    ...over,
+  });
+
+  it('names no homes when none are passed', () => {
+    const tags = buildProfileTags(profile, ORIGIN);
+    expect(tags.jsonLd).not.toHaveProperty('makesOffer');
+    expect(tags.jsonLd['@id']).toBe('https://agentbio.net/jane#agent');
+  });
+
+  it("offers each visible home, linked to its listing page's node by @id", () => {
+    const tags = buildProfileTags(profile, ORIGIN, [
+      home(),
+      home({ id: 'sold-1', status: 'sold', address: '9 Birch Court', price: 'call' }),
+    ]);
+    expect(tags.jsonLd.makesOffer).toEqual([
+      {
+        '@type': 'Offer',
+        url: 'https://agentbio.net/jane/listing/abc-123',
+        availability: 'https://schema.org/InStock',
+        price: 525000,
+        priceCurrency: 'USD',
+        itemOffered: {
+          '@type': 'RealEstateListing',
+          '@id': 'https://agentbio.net/jane/listing/abc-123#listing',
+          name: '412 Maple Avenue, Salt Lake City, UT',
+          url: 'https://agentbio.net/jane/listing/abc-123',
+        },
+      },
+      {
+        '@type': 'Offer',
+        url: 'https://agentbio.net/jane/listing/sold-1',
+        availability: 'https://schema.org/SoldOut',
+        itemOffered: {
+          '@type': 'RealEstateListing',
+          '@id': 'https://agentbio.net/jane/listing/sold-1#listing',
+          name: '9 Birch Court, Salt Lake City, UT',
+          url: 'https://agentbio.net/jane/listing/sold-1',
+        },
+      },
+    ]);
+  });
+
+  it('uses the @id the listing page itself declares', () => {
+    const offer = (
+      buildProfileTags(profile, ORIGIN, [home()]).jsonLd.makesOffer as {
+        itemOffered: { '@id': string };
+      }[]
+    )[0];
+    const graph = buildListingTags(profile, listing, ORIGIN).jsonLd['@graph'] as {
+      '@id': string;
+    }[];
+    expect(offer.itemOffered['@id']).toBe(graph[0]['@id']);
+  });
+
+  it('caps the offers at the same number of homes the body links to', () => {
+    const many = Array.from({ length: PROFILE_BODY_LISTING_LIMIT + 5 }, (_, i) =>
+      home({ id: `l-${i}` })
+    );
+    const offers = buildProfileTags(profile, ORIGIN, many).jsonLd.makesOffer as unknown[];
+    expect(offers).toHaveLength(PROFILE_BODY_LISTING_LIMIT);
+  });
+
+  it('keeps a hostile address inert inside the serialised script', () => {
+    const tags = buildProfileTags(profile, ORIGIN, [home({ address: '</script><b>x' })]);
+    const html = injectSocialTags('<html><head></head><body></body></html>', tags);
+    expect(html).not.toContain('</script><b>');
+    expect(html).toContain('\\u003c/script>\\u003cb>x');
+  });
+});
+
 describe('buildListingTags', () => {
   it('describes the property, with its own photo', () => {
     const tags = buildListingTags(profile, listing, ORIGIN);
@@ -132,10 +272,41 @@ describe('buildListingTags', () => {
     expect(tags.description).toContain('3 bd');
     expect(tags.description).toContain('1,980 sqft');
     expect(tags.image).toBe('https://cdn.example.com/412-maple.jpg');
-    expect(tags.url).toBe('https://agentbio.net/jane?listing=abc-123');
-    expect(tags.jsonLd['@type']).toBe('SingleFamilyResidence');
+    expect(tags.url).toBe('https://agentbio.net/jane/listing/abc-123');
+    const graph = tags.jsonLd['@graph'] as Record<string, unknown>[];
+    expect(graph.map((n) => n['@type'])).toEqual(['RealEstateListing', 'Accommodation']);
     // A property is not a person; og:type=profile would be wrong for it.
     expect(tags.ogType).toBe('website');
+  });
+
+  // US-578: the SPA's ListingPage.tsx builds the same graph from the same
+  // module, so the `#listing` node the agent's page links to has one type.
+  it("declares the #listing node as the RealEstateListing the agent's page offers", () => {
+    const tags = buildListingTags(
+      profile,
+      { ...listing, property_type: 'condo', status: 'sold', bathrooms: 2.5 },
+      ORIGIN
+    );
+    const [node, home] = tags.jsonLd['@graph'] as Record<string, Record<string, unknown>>[];
+    const offered = (
+      buildProfileTags(profile, ORIGIN, [{ ...listing, status: 'sold' }]).jsonLd.makesOffer as {
+        itemOffered: Record<string, unknown>;
+      }[]
+    )[0].itemOffered;
+
+    expect(node['@id']).toBe(offered['@id']);
+    expect(node['@type']).toBe(offered['@type']);
+    expect(node.mainEntity).toEqual({ '@id': 'https://agentbio.net/jane/listing/abc-123#home' });
+    expect(node.image).toEqual(['https://cdn.example.com/412-maple.jpg']);
+    expect(node.offers).toMatchObject({
+      price: 525000,
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/SoldOut',
+    });
+    expect(home['@type']).toBe('Apartment');
+    expect(home.numberOfBedrooms).toBe(3);
+    expect(home.numberOfBathroomsTotal).toBe(3);
+    expect(home.address).toMatchObject({ streetAddress: '412 Maple Avenue', addressRegion: 'UT' });
   });
 
   it('falls back to the agent card when the listing has no photo', () => {
@@ -226,5 +397,91 @@ describe('replaceRootContent', () => {
     );
     const unbalanced = '<body><div id="root"><div>open</body>';
     expect(replaceRootContent(unbalanced, 'x')).toBe(unbalanced);
+  });
+});
+
+describe('buildProfileBody (US-539)', () => {
+  const bodyListing = (over: Partial<BodyListing> = {}): BodyListing => ({
+    id: 'abc-123',
+    status: 'active',
+    address: '412 Maple Avenue',
+    city: 'Salt Lake City',
+    state: 'UT',
+    price: '525000',
+    bedrooms: 3,
+    bathrooms: 2,
+    square_feet: 1980,
+    ...over,
+  });
+  const body = (p: ProfileMeta, listings: BodyListing[] = [], showContact = true) =>
+    buildProfileBody(p, buildProfileTags(p, ORIGIN), ORIGIN, { listings, showContact });
+
+  it('escapes markup in the bio, name, cities and licence', () => {
+    const hostile: ProfileMeta = {
+      ...profile,
+      full_name: 'Jane <img src=x onerror=alert(1)>',
+      bio: 'Call me </main><script>alert(1)</script>',
+      service_cities: ['<b>Holladay</b>'],
+      license_number: '"><svg onload=alert(1)>',
+      license_state: 'UT',
+    };
+    const html = body(hostile);
+    expect(html).not.toMatch(/<(img|script|svg|b)\b/);
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('<li>&lt;b&gt;Holladay&lt;/b&gt;</li>');
+    expect(html.match(/<\/main>/g)).toHaveLength(1);
+  });
+
+  it('escapes markup in a listing address and encodes its id into the link', () => {
+    const html = body(profile, [
+      bodyListing({ id: 'a"b c', address: '1 <script>x</script> Way', city: 'O"Fallon' }),
+    ]);
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('href="https://agentbio.net/jane/listing/a%22b%20c"');
+    expect(html).toContain('1 &lt;script&gt;x&lt;/script&gt; Way, O&quot;Fallon, UT');
+  });
+
+  it(`links to at most ${PROFILE_BODY_LISTING_LIMIT} listings`, () => {
+    const many = Array.from({ length: PROFILE_BODY_LISTING_LIMIT + 5 }, (_, i) =>
+      bodyListing({ id: `l-${i}` })
+    );
+    expect(body(profile, many).match(/\/listing\//g)).toHaveLength(PROFILE_BODY_LISTING_LIMIT);
+  });
+
+  it('puts only a number in a tel: link and only a plausible address in a mailto: link', () => {
+    const html = body({
+      ...profile,
+      phone: '+1 801-555-0100" onclick="x',
+      email_display: 'jane@x.com?bcc=everyone@x.com',
+    });
+    expect(html).toContain('href="tel:+18015550100"');
+    expect(html).not.toContain('mailto:');
+    expect(html).not.toContain('onclick="');
+  });
+
+  it('leaves contact links out when they are not allowed', () => {
+    const html = body(
+      { ...profile, phone: '801 555 0100', email_display: 'jane@x.com' },
+      [],
+      false
+    );
+    expect(html).not.toContain('tel:');
+    expect(html).not.toContain('mailto:');
+  });
+
+  it('does not repeat the bio when it is already the description', () => {
+    const html = body(profile);
+    expect(html.match(/Fifteen years selling homes/g)).toHaveLength(1);
+  });
+});
+
+describe('buildListingBody (US-539)', () => {
+  it('states the facts and links back to the agent, escaped', () => {
+    const p = { ...profile, full_name: 'Jane & <Co>' };
+    const l = { ...listing, status: 'pending', description: 'Lovely <b>porch</b>' };
+    const html = buildListingBody(p, l, buildListingTags(p, l, ORIGIN), ORIGIN);
+    expect(html).toContain('<p>Pending · $525,000 · 3 bd · 2 ba · 1,980 sqft</p>');
+    expect(html).toContain('<p>Lovely &lt;b&gt;porch&lt;/b&gt;</p>');
+    expect(html).toContain('<a href="https://agentbio.net/jane">Jane &amp; &lt;Co&gt;</a>');
   });
 });

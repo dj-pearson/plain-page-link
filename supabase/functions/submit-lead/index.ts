@@ -4,17 +4,20 @@ import { sendEmail, createLeadAutoReply } from '../_shared/email.ts'
 import { reportError } from '../_shared/report.ts'
 import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts'
 import { encryptSecret } from '../_shared/encryption.ts'
-import { readSpamSignals, botReason, emailLookupHash } from '../_shared/spam-guard.ts'
+import { readSpamSignals, botReason, leadLookupHashes } from '../_shared/spam-guard.ts'
 import {
   buildEnrichment,
+  enrichmentUpdate,
   generateEnrichToken,
   hashEnrichToken,
   ENRICH_TOKEN_RE,
   ENRICH_TOKEN_TTL_MINUTES,
 } from '../_shared/lead-enrichment.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { mergeRepeatEnquiry } from '../_shared/lead-repeat.ts'
+import { resolveOwnedListing, type OwnedListing } from '../_shared/lead-listing.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
-import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl } from '../_shared/validation.ts'
+import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl, leadVisitorId } from '../_shared/validation.ts'
 import { safeFetch } from '../_shared/ssrf-guard.ts'
 import { getAgentContact } from '../_shared/agent-contact.ts'
 import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts'
@@ -39,6 +42,11 @@ interface LeadData {
   utm_medium?: string
   utm_campaign?: string
   device?: string
+  /**
+   * The browser's client-generated visitor id (US-531), so the lead detail can
+   * list the listings this visitor opened. Never set for a kiosk sign-in.
+   */
+  visitor_id?: string
   /**
    * Structured extras the capture form collected that have no dedicated column
    * (bedrooms, condition, year built, …). Persisted to leads.form_data so the
@@ -158,7 +166,7 @@ serve(async (req) => {
 
       const { data: target, error: targetError } = await supabase
         .from('leads')
-        .select('id, form_data')
+        .select('id, message, form_data')
         .eq('id', rawData.lead_id)
         .eq('update_token_hash', await hashEnrichToken(token))
         .gt('update_token_expires_at', new Date().toISOString())
@@ -169,8 +177,8 @@ serve(async (req) => {
       const { error: enrichError } = await supabase
         .from('leads')
         .update({
-          ...enrichment.columns,
-          form_data: { ...(target.form_data ?? {}), ...enrichment.formData },
+          // US-565: a step-two message is appended, never written over step one's.
+          ...enrichmentUpdate(target, enrichment),
           update_token_hash: null,
           update_token_expires_at: null,
           updated_at: new Date().toISOString(),
@@ -208,6 +216,7 @@ serve(async (req) => {
       utm_medium: rawData.utm_medium ? sanitizeString(rawData.utm_medium) : undefined,
       utm_campaign: rawData.utm_campaign ? sanitizeString(rawData.utm_campaign) : undefined,
       device: rawData.device ? sanitizeString(rawData.device) : undefined,
+      visitor_id: leadVisitorId(rawData),
       form_data: sanitizeFormData(rawData.form_data),
     };
 
@@ -231,6 +240,24 @@ serve(async (req) => {
       leadData.source = 'open_house'
     }
 
+    // US-555: the listing id arrives from the visitor's browser too. It is kept
+    // only when it names one of this agent's own listings. A listing deleted
+    // since the page was opened used to fail the insert on the foreign key and
+    // lose the enquiry, and another agent's listing id was filed (and named in
+    // the auto-reply) as given. The open house's listing is the agent's by the
+    // check above, and an open house cascades away with its listing.
+    let ownedListing: OwnedListing | null = null
+    if (leadData.listing_id) {
+      const resolved = await resolveOwnedListing(supabase, leadData.user_id, leadData.listing_id)
+      ownedListing = resolved.listing
+      if (resolved.dropped) {
+        console.warn(
+          `[submit-lead] stored an enquiry for ${leadData.user_id} without listing ${leadData.listing_id}: ${resolved.dropped}`
+        )
+      }
+      leadData.listing_id = ownedListing?.id
+    }
+
     // US-086: encrypt the PII before it is stored. This path — the one every
     // public capture form uses — wrote no ciphertext at all, so coverage was
     // inconsistent as well as ineffective: useLeads dual-wrote encrypted_*,
@@ -246,32 +273,64 @@ serve(async (req) => {
 
     // US-220: the same person enquiring again within a day — a double submit,
     // a refresh, or a bot replaying one address — is folded into the lead they
-    // already have: its form answers are merged, and nothing is notified,
-    // auto-replied or counted against the agent's allowance a second time.
+    // already have, and nothing is notified, auto-replied or counted against
+    // the agent's allowance a second time. US-513: the fold keeps both
+    // messages (it used to overwrite the first), fills in a listing only when
+    // the lead had none, and puts anything new on the lead's timeline.
+    // US-522: a phone-only enquiry (US-228) folds by phone_hash the same way;
+    // an enquiry that gives an email folds by email only.
     const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY')
-    const emailHash = hashSecret && leadData.email ? await emailLookupHash(leadData.email, hashSecret) : null
-    if (emailHash) {
+    const lookup = await leadLookupHashes({ email: leadData.email, phone: leadData.phone }, hashSecret)
+    if (lookup.fold) {
       const { data: earlier, error: earlierError } = await supabase
         .from('leads')
-        .select('id, form_data, message')
+        .select('id, form_data, message, listing_id')
         .eq('user_id', leadData.user_id)
         .eq('lead_type', leadData.lead_type)
-        .eq('email_hash', emailHash)
+        .eq(lookup.fold.column, lookup.fold.value)
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
       if (earlierError) throw earlierError
       if (earlier) {
+        // Only one of this agent's own listings may be attached to (or named
+        // on) their lead; ownedListing was resolved above (US-555).
+        const repeatListing =
+          ownedListing && ownedListing.id !== earlier.listing_id ? ownedListing : null
+
+        const merge = mergeRepeatEnquiry(
+          {
+            message: earlier.message ?? null,
+            listing_id: earlier.listing_id ?? null,
+            form_data: (earlier.form_data as Record<string, unknown> | null) ?? null,
+          },
+          {
+            message: leadData.message,
+            listing_id: repeatListing?.id ?? null,
+            listing_address: repeatListing?.address ?? null,
+            form_data: leadData.form_data,
+            source: leadData.source,
+          }
+        )
+
         const { error: mergeError } = await supabase
           .from('leads')
-          .update({
-            form_data: { ...(earlier.form_data ?? {}), ...(leadData.form_data ?? {}) },
-            message: leadData.message ?? earlier.message,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ ...merge.update, updated_at: new Date().toISOString() })
           .eq('id', earlier.id)
         if (mergeError) throw mergeError
+
+        if (merge.activity) {
+          // Best effort: the enquiry is already stored on the lead.
+          const { error: activityError } = await supabase.from('lead_activities').insert({
+            lead_id: earlier.id,
+            user_id: leadData.user_id,
+            ...merge.activity,
+          })
+          if (activityError) {
+            console.error(`[submit-lead] could not log the repeat enquiry on ${earlier.id}: ${activityError.message}`)
+          }
+        }
         return successResponse({ lead_id: earlier.id, update_token: await issueEnrichToken(earlier.id) }, req)
       }
     }
@@ -283,7 +342,8 @@ serve(async (req) => {
         ...storedLead,
         encrypted_email: encryptedEmail,
         encrypted_phone: encryptedPhone,
-        email_hash: emailHash,
+        email_hash: lookup.email_hash,
+        phone_hash: lookup.phone_hash,
       })
       .select()
       .single()
@@ -394,9 +454,9 @@ serve(async (req) => {
         .select('username, avatar_url, calendly_url')
         .eq('id', leadData.user_id)
         .maybeSingle()
-      const { data: listingRow } = leadData.listing_id
-        ? await supabase.from('listings').select('address').eq('id', leadData.listing_id).maybeSingle()
-        : { data: null }
+      // ownedListing is already checked to be this agent's (US-555), so the
+      // auto-reply can never name another agent's address.
+      const listingRow = ownedListing
       const siteUrl = getSiteUrl()
       const profileUrl = agentProfile?.username ? `${siteUrl}/${agentProfile.username}` : null
 
@@ -415,7 +475,7 @@ serve(async (req) => {
           },
           listing: listingRow?.address
             ? {
-                address: listingRow.address as string,
+                address: listingRow.address,
                 url: profileUrl && leadData.listing_id ? `${profileUrl}?listing=${leadData.listing_id}` : null,
               }
             : null,

@@ -1,7 +1,8 @@
 import { Helmet } from 'react-helmet-async';
 import { X_HANDLE } from '@/config/social-profiles';
 import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
-import { getBaseUrl } from '@/config/seo.config';
+import { getBaseUrl, SEO_CONFIG } from '@/config/seo.config';
+import { buildStructuredData } from '@/lib/structured-data-graph';
 
 interface SEOHeadProps {
   title: string;
@@ -91,38 +92,10 @@ export const SEOHead = ({
     ', '
   );
 
-  // Generate speakable schema for voice search if selectors provided
-  const speakableSchema =
-    speakableSelectors.length > 0 && canonicalUrl
-      ? {
-          '@context': 'https://schema.org',
-          '@type': 'WebPage',
-          speakable: {
-            '@type': 'SpeakableSpecification',
-            cssSelector: speakableSelectors,
-          },
-          url: canonicalUrl,
-        }
-      : null;
-
-  // Combine schemas if multiple exist
-  const combinedSchema = (() => {
-    const schemas: object[] = [];
-    if (schema) schemas.push(schema);
-    if (speakableSchema) schemas.push(speakableSchema);
-
-    if (schemas.length === 0) return null;
-    if (schemas.length === 1) return schemas[0];
-
-    // Use @graph for multiple schemas
-    return {
-      '@context': 'https://schema.org',
-      '@graph': schemas.map((s) => {
-        const { '@context': _, ...rest } = s as Record<string, unknown>;
-        return rest;
-      }),
-    };
-  })();
+  // One JSON-LD document: the page's schema flattened, its WebPage node named
+  // by the canonical URL, and the speakable specification merged into that
+  // node rather than published as a second, anonymous WebPage (US-480).
+  const combinedSchema = buildStructuredData({ schema, canonicalUrl, speakableSelectors });
 
   return (
     <Helmet>
@@ -195,7 +168,7 @@ export const SEOHead = ({
       <meta name="twitter:image:alt" content={fullTitle} />
 
       {/* Additional SEO Tags */}
-      <meta name="theme-color" content="#0ea5e9" />
+      <meta name="theme-color" content={SEO_CONFIG.themeColor} />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 

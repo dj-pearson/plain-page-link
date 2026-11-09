@@ -217,18 +217,11 @@ supabase functions deploy send-scheduled-bio-emails
 
 ### Change Email Timing
 
-Modify the day schedule in `send-scheduled-bio-emails/index.ts`:
-
-```typescript
-// Current schedule
-if (daysSinceCapture >= 1 && !sentNumbers.includes(2)) sequenceToSend = 2
-else if (daysSinceCapture >= 2 && !sentNumbers.includes(3)) sequenceToSend = 3
-// ... etc
-
-// Example: Speed up to send all in 3 days
-if (daysSinceCapture >= 0.5 && !sentNumbers.includes(2)) sequenceToSend = 2
-else if (daysSinceCapture >= 1 && !sentNumbers.includes(3)) sequenceToSend = 3
-```
+Change `BIO_DRIP_DAY` in `_shared/bio-drip-emails.ts` (days after capture at
+which each email becomes due). The sender picks the earliest due email not yet
+sent (`_shared/drip-schedule.ts`) and looks back `dripLookbackDays()` — the last
+due day plus a grace period — so a missed run or failed send is retried and the
+last email is never cut off by the window. `drip-schedule.test.ts` pins this.
 
 ## Performance Optimization
 

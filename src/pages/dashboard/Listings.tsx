@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, useState } from 'react';
 import {
   Plus,
   Search,
@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ArrowLeft,
   ArrowRight,
+  Eye,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -30,15 +31,18 @@ import { parseSquareFeet } from '@/lib/format';
 import { logger } from '@/lib/logger';
 import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
 import { todayCalendarDate } from '@/lib/localDate';
+import { describeListingSaveError, normalizeVirtualTourUrl } from '@/lib/listingUrls';
 import { buildImportedListing } from '@/lib/listingImport';
+import type { CsvImportListing, CsvImportResult } from '@/lib/listingCsvImport';
 import { reorderWithinView, sortOrderChanges } from '@/lib/listingOrder';
-import { AddListingModal } from '@/components/modals/AddListingModal';
-import { EditListingModal, EditListingFormData } from '@/components/modals/EditListingModal';
+import type { EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
-import { CSVUploadDialog } from '@/components/listings/CSVUploadDialog';
-import { URLImportDialog } from '@/components/listings/URLImportDialog';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
 import { useToast } from '@/hooks/use-toast';
 import { useListings, type Listing, type NewListing } from '@/hooks/useListings';
+import { useListingViewStats } from '@/hooks/useListingViewStats';
+import { describeListingViews, formatListingViews } from '@/lib/listingViews';
 import type { ImportedListingData } from '@/components/listings/URLImportDialog';
 import type { SharedListing } from '@/components/listings/SocialShareDialog';
 import { useListingImageUpload } from '@/hooks/useListingImageUpload';
@@ -46,9 +50,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
-import { UpgradeModal } from '@/components/UpgradeModal';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
-import { SocialShareDialog } from '@/components/listings/SocialShareDialog';
 import { useProfile } from '@/hooks/useProfile';
 import { KeyboardShortcutsHelper } from '@/components/dashboard/KeyboardShortcutsHelper';
 import { QuickStatusUpdate } from '@/components/dashboard/QuickStatusUpdate';
@@ -56,6 +58,44 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { parsePrice, formatPrice } from '@/lib/format';
 import { fallBackToOriginal, getImageUrl } from '@/lib/images';
+
+/*
+ * The dialogs load when they are first opened, not with the page (US-412).
+ * Statically imported, they put react-hook-form and zod (form-vendor, 23 KB
+ * gzip) and the add, edit, import and share UIs on the route of an agent who
+ * only came to look at their listings. Each loader is also called on intent
+ * (hovering or focusing the button that opens it), so the chunk is usually
+ * there by the time the click lands.
+ */
+const loadAddListingModal = () => import('@/components/modals/AddListingModal');
+const loadCSVUploadDialog = () => import('@/components/listings/CSVUploadDialog');
+const loadURLImportDialog = () => import('@/components/listings/URLImportDialog');
+const AddListingModal = lazy(() =>
+  loadAddListingModal().then((m) => ({ default: m.AddListingModal }))
+);
+const CSVUploadDialog = lazy(() =>
+  loadCSVUploadDialog().then((m) => ({ default: m.CSVUploadDialog }))
+);
+const URLImportDialog = lazy(() =>
+  loadURLImportDialog().then((m) => ({ default: m.URLImportDialog }))
+);
+const EditListingModal = lazy(() =>
+  import('@/components/modals/EditListingModal').then((m) => ({ default: m.EditListingModal }))
+);
+const loadSocialShareDialog = () => import('@/components/listings/SocialShareDialog');
+const SocialShareDialog = lazy(() =>
+  loadSocialShareDialog().then((m) => ({ default: m.SocialShareDialog }))
+);
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+
+/** Warm the chunks behind the Add menu; a failed prefetch is retried by the click. */
+const preloadAddDialogs = () => {
+  void loadAddListingModal().catch(() => undefined);
+  void loadCSVUploadDialog().catch(() => undefined);
+  void loadURLImportDialog().catch(() => undefined);
+};
 
 type ViewMode = 'grid' | 'list';
 type StatusFilter = 'all' | (typeof LISTING_STATUSES)[number]['value'];
@@ -76,6 +116,11 @@ export default function Listings() {
   const [listingToDelete, setListingToDelete] = useState<{ id: string; address: string } | null>(
     null
   );
+  const addModal = useMountOnFirstOpen(isAddModalOpen);
+  const csvDialog = useMountOnFirstOpen(isCSVDialogOpen);
+  const urlDialog = useMountOnFirstOpen(isURLDialogOpen);
+  const upgradeModal = useMountOnFirstOpen(showUpgradeModal);
+  const shareDialog = useMountOnFirstOpen(showSocialShareDialog);
   const { toast } = useToast();
   const {
     listings,
@@ -87,7 +132,12 @@ export default function Listings() {
     updateListing,
     deleteListing,
     reorderListings,
+    importListings,
+    discardUnsavedPhotos,
   } = useListings();
+  // Views per listing from the public profile (US-263). Absent until loaded,
+  // and after a failure, so a card never claims "No views" it did not count.
+  const { stats: viewStats, isReady: viewStatsReady } = useListingViewStats();
   const { uploadListingImages } = useListingImageUpload();
   const { subscription, canAdd } = useSubscriptionLimits();
   const { profile } = useProfile();
@@ -152,6 +202,8 @@ export default function Listings() {
   };
 
   const handleAddListing = async (data: ListingFormData) => {
+    // The share dialog opens when this succeeds; fetch it while the save runs.
+    void loadSocialShareDialog().catch(() => undefined);
     try {
       // uploadListingImages throws now, so a failure lands in the catch below
       // and is rethrown — the modal stays open with the form intact. This used
@@ -159,6 +211,11 @@ export default function Listings() {
       // modal treated as success: it closed and reset, so a 6 MB photo against
       // a 5 MB limit made the agent re-enter the whole six-step listing
       // (US-107).
+      // Checked before any upload: a refused virtual tour would otherwise
+      // fail the insert after the photos were already in the bucket (US-517).
+      const tour = normalizeVirtualTourUrl(data.virtualTourUrl);
+      if ('error' in tour) throw new Error(tour.error);
+
       let imageUrls: string[] = [];
       if (data.images && data.images.length > 0) {
         imageUrls = await uploadListingImages(data.images);
@@ -188,7 +245,7 @@ export default function Listings() {
         mls_number: data.mlsNumber || null,
         property_type: data.propertyType || null,
         lot_size_acres: data.lotSize ? parseFloat(data.lotSize) : null,
-        virtual_tour_url: data.virtualTourUrl || null,
+        virtual_tour_url: tour.value || null,
         is_featured: data.isFeatured || false,
         year_built: data.yearBuilt ? Number(data.yearBuilt) : null,
         stories: data.stories ? Number(data.stories) : null,
@@ -230,53 +287,44 @@ export default function Listings() {
       // by the upload hook, so this only reports what it can add.
       toast({
         title: 'Error',
-        description:
+        description: describeListingSaveError(
+          error,
           error instanceof Error && error.message
             ? error.message
-            : 'Failed to add listing. Please try again.',
+            : 'Failed to add listing. Please try again.'
+        ),
         variant: 'destructive',
       });
       throw error;
     }
   };
 
-  const handleCSVImport = async (importedListings: Record<string, unknown>[]) => {
-    let successCount = 0;
-    let failCount = 0;
-    for (const listing of importedListings) {
-      try {
-        await addListing.mutateAsync({
-          address: listing.address as string,
-          city: listing.city as string,
-          state: listing.state as string,
-          zip_code: listing.zip_code as string,
-          price: String(listing.price),
-          bedrooms: listing.bedrooms as number,
-          bathrooms: listing.bathrooms as number,
-          square_feet: listing.square_feet as number,
-          status: listing.status as string,
-          description: listing.description as string,
-          mls_number: listing.mls_number as string,
-          property_type: listing.property_type as string,
-          lot_size_acres: listing.lot_size_acres as number,
-          is_featured: listing.is_featured as boolean,
-          virtual_tour_url: listing.virtual_tour_url as string,
-          // The template has advertised year_built all along (US-106).
-          year_built: (listing.year_built as number | null) ?? null,
-        });
-        successCount++;
-      } catch {
-        failCount++;
-      }
-    }
-    toast({
-      title: 'Import complete',
-      description:
-        failCount > 0
-          ? `Imported ${successCount} of ${importedListings.length} listings. ${failCount} failed.`
-          : `Successfully imported ${successCount} of ${importedListings.length} listings.`,
-      variant: failCount > 0 ? 'destructive' : 'default',
+  /**
+   * Save the valid rows of a CSV and report what landed. Each refused row
+   * keeps its reason (a plan limit, a refused tour URL) instead of becoming an
+   * anonymous "failed" count, and the dialog shows the real total (US-587).
+   * Rows are inserted in chunks with one refetch at the end (US-597).
+   */
+  const handleCSVImport = async (rows: CsvImportListing[]): Promise<CsvImportResult> => {
+    const result = await importListings.mutateAsync({
+      rows,
+      describeError: (error) =>
+        describeListingSaveError(
+          error,
+          'The listing could not be saved. Check the row and try again.'
+        ),
+      today: todayCalendarDate(),
     });
+    const total = rows.length;
+    toast({
+      title: result.failures.length > 0 ? 'Import finished with problems' : 'Import complete',
+      description:
+        result.failures.length > 0
+          ? `Imported ${result.imported} of ${total} listings. ${result.failures.length} could not be saved.`
+          : `Imported ${result.imported} of ${total} listings.`,
+      variant: result.failures.length > 0 ? 'destructive' : 'default',
+    });
+    return result;
   };
 
   /**
@@ -359,8 +407,12 @@ export default function Listings() {
     await moveListing(id, neighbour.id);
   };
 
-  const handleEditListing = async (data: EditListingFormData) => {
-    if (!editingListing) return;
+  /** Resolves true once the save landed (US-512: the dialog then keeps its uploads). */
+  const handleEditListing = async (
+    data: EditListingFormData,
+    uploaded: string[]
+  ): Promise<boolean> => {
+    if (!editingListing) return false;
     try {
       await updateListing.mutateAsync({
         id: editingListing.id,
@@ -387,6 +439,8 @@ export default function Listings() {
         state: data.state || null,
         zip_code: data.zip_code || null,
         lot_size_acres: data.lot_size_acres ?? null,
+        // EditListingModal has normalised it (US-517); anything that still
+        // gets refused is explained by describeListingSaveError below.
         virtual_tour_url: data.virtual_tour_url || null,
         is_featured: data.is_featured ?? false,
         highlights: data.highlights
@@ -401,13 +455,23 @@ export default function Listings() {
         title: 'Listing updated!',
         description: 'Your property listing has been updated successfully.',
       });
+      // Photos uploaded in the dialog and removed again before saving never
+      // reached the row, and updateListing only diffs the row's own photos
+      // (US-461).
+      const saved = new Set(data.photos);
+      const dropped = uploaded.filter((url) => !saved.has(url));
+      if (dropped.length > 0) void discardUnsavedPhotos(dropped);
       setEditingListing(null);
-    } catch {
+      return true;
+    } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to update listing. Please try again.',
+        // A refused virtual tour or a plan limit is explained; it used to read
+        // as a transient failure to retry (US-517).
+        description: describeListingSaveError(error, 'Failed to update listing. Please try again.'),
         variant: 'destructive',
       });
+      return false;
     }
   };
 
@@ -434,6 +498,8 @@ export default function Listings() {
           <div className="flex gap-1 w-full sm:w-auto">
             <button
               onClick={handleAddClick}
+              onPointerEnter={preloadAddDialogs}
+              onFocus={preloadAddDialogs}
               className="flex-1 sm:flex-none inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-l-lg hover:bg-primary/90 active:scale-[0.98] transition-all font-medium min-h-[44px] justify-center shadow-sm"
             >
               <Plus className="h-4 w-4" />
@@ -442,6 +508,8 @@ export default function Listings() {
             <button
               type="button"
               onClick={() => setShowAddMenu(!showAddMenu)}
+              onPointerEnter={preloadAddDialogs}
+              onFocus={preloadAddDialogs}
               aria-label="More ways to add a property"
               aria-haspopup="true"
               aria-expanded={showAddMenu}
@@ -786,6 +854,25 @@ export default function Listings() {
                     {listing.mls_number && (
                       <div className="truncate">MLS# {listing.mls_number}</div>
                     )}
+                    {viewStatsReady && (
+                      <div
+                        className="mt-1 flex items-center gap-1 text-foreground"
+                        title={describeListingViews(viewStats[listing.id])}
+                      >
+                        <Eye
+                          className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">
+                          <span className="sr-only">
+                            {describeListingViews(viewStats[listing.id])}
+                          </span>
+                          <span aria-hidden="true">
+                            {formatListingViews(viewStats[listing.id])}
+                          </span>
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {/* Reorder without drag, for keyboard and touch (US-257). */}
                   <div className="flex shrink-0 gap-1">
@@ -843,6 +930,13 @@ export default function Listings() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground hidden lg:table-cell">
                   Sqft
                 </th>
+                {viewStatsReady && (
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground hidden md:table-cell">
+                    <span title="Times visitors opened this listing on your public page in the last 30 days">
+                      Views (30d)
+                    </span>
+                  </th>
+                )}
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
                   Actions
                 </th>
@@ -896,6 +990,14 @@ export default function Listings() {
                   <td className="px-4 py-3 text-right text-sm hidden lg:table-cell">
                     {(listing.sqft ?? listing.square_feet)?.toLocaleString() ?? '-'}
                   </td>
+                  {viewStatsReady && (
+                    <td
+                      className="px-4 py-3 text-right text-sm tabular-nums hidden md:table-cell"
+                      title={describeListingViews(viewStats[listing.id])}
+                    >
+                      {(viewStats[listing.id]?.views30d ?? 0).toLocaleString()}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
@@ -952,7 +1054,11 @@ export default function Listings() {
             Add your first property listing manually, import from a CSV file, or paste listing
             details from any real estate website.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div
+            className="flex flex-col sm:flex-row gap-3 justify-center"
+            onPointerEnter={preloadAddDialogs}
+            onFocus={preloadAddDialogs}
+          >
             <button
               onClick={handleAddClick}
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all font-medium shadow-md min-h-[44px]"
@@ -976,74 +1082,120 @@ export default function Listings() {
       )}
 
       {/* Modals */}
-      <AddListingModal
-        open={isAddModalOpen}
-        onOpenChange={setIsAddModalOpen}
-        onSave={handleAddListing}
-      />
-      <CSVUploadDialog
-        open={isCSVDialogOpen}
-        onOpenChange={setIsCSVDialogOpen}
-        onImport={handleCSVImport}
-      />
-      <URLImportDialog
-        open={isURLDialogOpen}
-        onOpenChange={setIsURLDialogOpen}
-        onImport={handleURLImport}
-      />
-
-      {editingListing && (
-        <EditListingModal
-          // Keyed so a different listing mounts a fresh form; the modal no
-          // longer resets its state from initialData (US-257).
-          key={editingListing.id}
-          isOpen={!!editingListing}
-          onClose={() => setEditingListing(null)}
-          onSubmit={handleEditListing}
-          listingId={editingListing.id}
-          initialData={{
-            address: editingListing.address,
-            city: editingListing.city,
-            price: editingListing.price,
-            bedrooms: editingListing.bedrooms,
-            bathrooms: editingListing.bathrooms,
-            square_feet: editingListing.square_feet ?? undefined,
-            status: editingListing.status ?? 'active',
-            photos: Array.isArray(editingListing.photos)
-              ? (editingListing.photos as string[])
-              : editingListing.image
-                ? [editingListing.image]
-                : [],
-            state: editingListing.state ?? undefined,
-            zip_code: editingListing.zip_code ?? undefined,
-            lot_size_acres: editingListing.lot_size_acres ?? undefined,
-            virtual_tour_url: editingListing.virtual_tour_url ?? undefined,
-            highlights: Array.isArray(editingListing.highlights)
-              ? (editingListing.highlights as string[]).join(', ')
-              : undefined,
-            is_featured: editingListing.is_featured ?? false,
-            description: editingListing.description ?? undefined,
-            mls_number: editingListing.mls_number ?? undefined,
-            property_type: editingListing.property_type ?? undefined,
+      {addModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsAddModalOpen(false);
+            addModal.unmount();
           }}
-        />
+        >
+          <AddListingModal
+            open={isAddModalOpen}
+            onOpenChange={setIsAddModalOpen}
+            onSave={handleAddListing}
+          />
+        </LazyModal>
+      )}
+      {csvDialog.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsCSVDialogOpen(false);
+            csvDialog.unmount();
+          }}
+        >
+          <CSVUploadDialog
+            open={isCSVDialogOpen}
+            onOpenChange={setIsCSVDialogOpen}
+            onImport={handleCSVImport}
+          />
+        </LazyModal>
+      )}
+      {urlDialog.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsURLDialogOpen(false);
+            urlDialog.unmount();
+          }}
+        >
+          <URLImportDialog
+            open={isURLDialogOpen}
+            onOpenChange={setIsURLDialogOpen}
+            onImport={handleURLImport}
+          />
+        </LazyModal>
       )}
 
-      <UpgradeModal
-        open={showUpgradeModal}
-        onOpenChange={setShowUpgradeModal}
-        feature="listings"
-        currentPlan={subscription?.plan_name || 'Free'}
-        requiredPlan="Starter"
-      />
+      {editingListing && (
+        <LazyModal onClose={() => setEditingListing(null)}>
+          <EditListingModal
+            // Keyed so a different listing mounts a fresh form; the modal no
+            // longer resets its state from initialData (US-257).
+            key={editingListing.id}
+            isOpen={!!editingListing}
+            onClose={() => setEditingListing(null)}
+            onSubmit={handleEditListing}
+            onDiscardUploads={(urls) => void discardUnsavedPhotos(urls)}
+            listingId={editingListing.id}
+            initialData={{
+              address: editingListing.address,
+              city: editingListing.city,
+              price: editingListing.price,
+              bedrooms: editingListing.bedrooms,
+              bathrooms: editingListing.bathrooms,
+              square_feet: editingListing.square_feet ?? undefined,
+              status: editingListing.status ?? 'active',
+              photos: Array.isArray(editingListing.photos)
+                ? (editingListing.photos as string[])
+                : editingListing.image
+                  ? [editingListing.image]
+                  : [],
+              state: editingListing.state ?? undefined,
+              zip_code: editingListing.zip_code ?? undefined,
+              lot_size_acres: editingListing.lot_size_acres ?? undefined,
+              virtual_tour_url: editingListing.virtual_tour_url ?? undefined,
+              highlights: Array.isArray(editingListing.highlights)
+                ? (editingListing.highlights as string[]).join(', ')
+                : undefined,
+              is_featured: editingListing.is_featured ?? false,
+              description: editingListing.description ?? undefined,
+              mls_number: editingListing.mls_number ?? undefined,
+              property_type: editingListing.property_type ?? undefined,
+            }}
+          />
+        </LazyModal>
+      )}
 
-      {newlyCreatedListing && (
-        <SocialShareDialog
-          open={showSocialShareDialog}
-          onOpenChange={setShowSocialShareDialog}
-          listing={newlyCreatedListing}
-          agentName={profile?.full_name ?? undefined}
-        />
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowUpgradeModal(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={showUpgradeModal}
+            onOpenChange={setShowUpgradeModal}
+            feature="listings"
+            currentPlan={subscription?.plan_name || 'Free'}
+            requiredPlan="Starter"
+          />
+        </LazyModal>
+      )}
+
+      {newlyCreatedListing && shareDialog.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowSocialShareDialog(false);
+            shareDialog.unmount();
+          }}
+        >
+          <SocialShareDialog
+            open={showSocialShareDialog}
+            onOpenChange={setShowSocialShareDialog}
+            listing={newlyCreatedListing}
+            agentName={profile?.full_name ?? undefined}
+          />
+        </LazyModal>
       )}
 
       <AlertDialog

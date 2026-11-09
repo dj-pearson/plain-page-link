@@ -9,13 +9,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
 
-const { analytics, refetchMock } = vi.hoisted(() => ({
+const { analytics, refetchMock, linksState } = vi.hoisted(() => ({
   analytics: { current: {} as Record<string, unknown> },
   refetchMock: vi.fn(),
+  linksState: { current: { links: [] as unknown[], isError: false, refetch: vi.fn() } },
 }));
 
 vi.mock('@/hooks/useAnalytics', () => ({ useAnalytics: () => analytics.current }));
-vi.mock('@/hooks/useLinks', () => ({ useLinks: () => ({ links: [] }) }));
+vi.mock('@/hooks/useLinks', () => ({ useLinks: () => linksState.current }));
 vi.mock('@/hooks/useProfile', () => ({
   useProfile: () => ({
     profile: { username: 'jane', full_name: 'Jane Doe', created_at: '2025-01-01T00:00:00Z' },
@@ -31,6 +32,7 @@ vi.mock('@/components/dashboard/ConversionFunnel', () => ({ ConversionFunnel: ()
 vi.mock('@/components/dashboard/DueFollowUps', () => ({ DueFollowUps: () => null }));
 vi.mock('@/components/dashboard/ComingUp', () => ({ ComingUp: () => null }));
 vi.mock('@/components/dashboard/PlanUsageCard', () => ({ PlanUsageCard: () => null }));
+vi.mock('@/components/dashboard/TimeZonePrompt', () => ({ TimeZonePrompt: () => null }));
 
 import Overview from './Overview';
 
@@ -46,6 +48,7 @@ describe('Overview', () => {
   beforeEach(() => {
     refetchMock.mockReset();
     analytics.current = { ...base };
+    linksState.current = { links: [], isError: false, refetch: vi.fn() };
   });
 
   it('shows an error card with Retry instead of zeros when analytics fail', async () => {
@@ -94,5 +97,51 @@ describe('Overview', () => {
     // No "Welcome to <plan>" modal built from a plan the webhook has not set yet.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     window.history.pushState({}, '', '/');
+  });
+
+  // US-590
+  it('says links did not load instead of offering "Add your first link" and 0 clicks', async () => {
+    const refetch = vi.fn();
+    linksState.current = { links: [], isError: true, refetch };
+    renderWithProviders(<Overview />);
+
+    expect(screen.getByText(/your links did not load/i)).toBeInTheDocument();
+    expect(screen.queryByText(/add your first link/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Link Clicks').nextElementSibling).toHaveTextContent('—');
+
+    await userEvent.click(screen.getByRole('button', { name: /retry loading links/i }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  // US-602
+  it('opens the page behind each stat card', () => {
+    renderWithProviders(<Overview />);
+
+    const href = (label: string) => screen.getByText(label).closest('a')?.getAttribute('href');
+    expect(href('Profile Views')).toBe('/dashboard/analytics');
+    expect(href('Leads (30d)')).toBe('/dashboard/leads');
+    expect(href('Link Clicks')).toBe('/dashboard/links');
+    expect(href('Conversion Rate')).toBe('/dashboard/analytics');
+  });
+
+  it('labels and groups recent lead statuses instead of colouring a lost lead green', () => {
+    analytics.current = {
+      ...base,
+      recentLeads: [
+        {
+          id: 'l1',
+          name: 'Nora Nurture',
+          email: 'n@example.com',
+          phone: null,
+          status: 'nurturing',
+        },
+        { id: 'l2', name: 'Lou Lost', email: 'l@example.com', phone: null, status: 'lost' },
+      ],
+    };
+    renderWithProviders(<Overview />);
+
+    expect(screen.getByText('Nurturing')).toHaveAttribute('data-tone', 'in_progress');
+    expect(screen.queryByText('nurturing')).not.toBeInTheDocument();
+    expect(screen.getByText('Lost')).toHaveAttribute('data-tone', 'lost');
   });
 });

@@ -23,6 +23,7 @@ import { useSpamGuard } from '@/hooks/useSpamGuard';
 import { HoneypotField } from '@/components/forms/HoneypotField';
 import { getLeadAttribution } from '@/lib/attribution';
 import { edgeFunctions } from '@/lib/edgeFunctions';
+import { getVisitorId } from '@/lib/analyticsEvents';
 
 interface ContactBlockProps {
   config: ContactBlockConfig;
@@ -111,6 +112,8 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
         // device was already sent from here, with its own copy of the
         // user-agent test; the campaign it came from was not (US-188).
         ...getLeadAttribution(),
+        // Joins the lead to this browser's listing views (US-531).
+        visitor_id: getVisitorId() ?? undefined,
         ...signals(),
       };
 
@@ -157,7 +160,9 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
         <div className="text-center space-y-3">
           <CheckCircle className="w-12 h-12 text-green-600 mx-auto" />
           <h3 className="text-lg font-semibold text-green-900">Message Sent!</h3>
-          <p className="text-green-700">{config.successMessage}</p>
+          <p className="text-green-700">
+            {config.successMessage || 'Thanks, your message was sent.'}
+          </p>
         </div>
       </div>
     );

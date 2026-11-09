@@ -22,13 +22,16 @@ import { ConversionFunnel } from '@/components/dashboard/ConversionFunnel';
 import { DueFollowUps } from '@/components/dashboard/DueFollowUps';
 import { ComingUp } from '@/components/dashboard/ComingUp';
 import { PlanUsageCard } from '@/components/dashboard/PlanUsageCard';
+import { TimeZonePrompt } from '@/components/dashboard/TimeZonePrompt';
+import { SectionLoadError } from '@/components/dashboard/SectionLoadError';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { LeadStatusPill } from '@/components/leads/LeadStatusPill';
 import { topByClicks } from '@/lib/linkOrder';
 import { CHECKOUT_RETURN_PATH, CHECKOUT_STATUS_PARAM } from '@/lib/checkoutReturn';
 
 export default function Overview() {
   const { stats, recentLeads, isLoading, isError, refetch } = useAnalytics();
-  const { links } = useLinks();
+  const { links, isError: linksFailed, refetch: refetchLinks } = useLinks();
   const { profile } = useProfile();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -77,6 +80,9 @@ export default function Overview() {
         <p className="text-sm sm:text-base text-muted-foreground">{subtitle}</p>
       </div>
 
+      {/* US-560: agents onboarded before US-537 have no saved time zone. */}
+      <TimeZonePrompt />
+
       {/* Profile Completion Widget */}
       <ProfileCompletionWidget />
 
@@ -110,6 +116,7 @@ export default function Overview() {
           <StatCard
             icon={<Eye className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />}
             label="Profile Views"
+            to="/dashboard/analytics"
             value={stats.totalViews.toLocaleString()}
           />
           <StatCard
@@ -118,16 +125,20 @@ export default function Overview() {
             // status, so the label contradicted the Leads page's New count
             // (US-104).
             label="Leads (30d)"
+            to="/dashboard/leads"
             value={stats.totalLeads.toString()}
           />
           <StatCard
             icon={<MousePointerClick className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />}
             label="Link Clicks"
-            value={totalLinkClicks.toLocaleString()}
+            to="/dashboard/links"
+            // US-590: a failed links query is not zero clicks.
+            value={linksFailed ? '—' : totalLinkClicks.toLocaleString()}
           />
           <StatCard
             icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />}
             label="Conversion Rate"
+            to="/dashboard/analytics"
             value={`${stats.conversionRate.toFixed(2)}%`}
           />
         </div>
@@ -174,24 +185,14 @@ export default function Overview() {
                         </p>
                       )}
                     </div>
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full flex-shrink-0 font-medium ${
-                        lead.status === 'new'
-                          ? 'bg-blue-100 text-blue-700'
-                          : lead.status === 'contacted'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-green-100 text-green-700'
-                      }`}
-                    >
-                      {lead.status}
-                    </span>
+                    <LeadStatusPill status={lead.status} />
                   </Link>
                 ))}
               </div>
             ) : (
               <div className="text-center py-6 sm:py-8">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-3">
-                  <Users className="h-6 w-6 text-blue-600" />
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
+                  <Users className="h-6 w-6 text-primary" aria-hidden="true" />
                 </div>
                 <h4 className="font-semibold text-sm mb-1">Start Capturing Leads</h4>
                 <p className="text-xs text-muted-foreground mb-3 max-w-xs mx-auto">
@@ -229,7 +230,15 @@ export default function Overview() {
             <CardTitle className="text-base sm:text-lg">Top Links</CardTitle>
           </CardHeader>
           <CardContent>
-            {links.length > 0 ? (
+            {/* US-590: a failed query offered "Add your first link" to an
+                agent who already has links. */}
+            {linksFailed ? (
+              <SectionLoadError
+                message="Your links did not load."
+                onRetry={() => void refetchLinks()}
+                retryLabel="Retry loading links"
+              />
+            ) : links.length > 0 ? (
               <div className="space-y-2 sm:space-y-3">
                 {topByClicks(links, 5).map((link) => (
                   <div
@@ -251,8 +260,8 @@ export default function Overview() {
               </div>
             ) : (
               <div className="text-center py-6 sm:py-8">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 mb-3">
-                  <MousePointerClick className="h-6 w-6 text-purple-600" />
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
+                  <MousePointerClick className="h-6 w-6 text-primary" aria-hidden="true" />
                 </div>
                 <h4 className="font-semibold text-sm mb-1">Add Your First Link</h4>
                 <p className="text-xs text-muted-foreground mb-3 max-w-xs mx-auto">
@@ -260,7 +269,7 @@ export default function Overview() {
                 </p>
                 <Link
                   to="/dashboard/links"
-                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  className="inline-flex items-center gap-1 text-xs text-primary underline-offset-4 hover:underline font-medium"
                 >
                   Manage Links <ExternalLink className="h-3 w-3" />
                 </Link>
@@ -275,16 +284,33 @@ export default function Overview() {
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+// US-602: the card looked tappable (pointer cursor, press animation) but did
+// nothing. Each one now opens the page behind its number.
+function StatCard({
+  icon,
+  label,
+  value,
+  to,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  to: string;
+}) {
   return (
-    <div className="bg-card rounded-lg border border-border p-3 sm:p-4 md:p-6 hover:shadow-md transition-shadow active:scale-[0.98] cursor-pointer">
+    <Link
+      to={to}
+      className="block bg-card rounded-lg border border-border p-3 sm:p-4 md:p-6 hover:shadow-md transition-shadow motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
       <div className="flex items-center mb-2 sm:mb-3 md:mb-4">
-        <div className="p-1.5 sm:p-2 bg-muted rounded-lg">{icon}</div>
+        <div className="p-1.5 sm:p-2 bg-muted rounded-lg" aria-hidden="true">
+          {icon}
+        </div>
       </div>
       <div>
         <p className="text-xs sm:text-sm text-muted-foreground mb-1">{label}</p>
         <p className="text-xl sm:text-2xl font-bold text-foreground break-all">{value}</p>
       </div>
-    </div>
+    </Link>
   );
 }

@@ -1,0 +1,178 @@
+import { describe, it, expect } from 'vitest';
+import {
+  agentListingOffers,
+  AGENT_OFFER_LIMIT,
+  homeNodeId,
+  listingJsonLdNodes,
+  listingNodeId,
+  listingPageUrl,
+  listingReference,
+  residenceType,
+} from './listingJsonLd';
+
+const PAGE = 'https://agentbio.net/jane/listing/abc-123';
+
+describe('residenceType', () => {
+  it('maps the property types the listing forms write', () => {
+    expect(residenceType('single_family')).toBe('SingleFamilyResidence');
+    expect(residenceType('Single Family')).toBe('SingleFamilyResidence');
+    expect(residenceType('condo')).toBe('Apartment');
+    expect(residenceType('townhouse')).toBe('House');
+    expect(residenceType('land')).toBe('Place');
+    expect(residenceType('commercial')).toBe('Place');
+  });
+
+  it('claims no more than Accommodation for an unknown or missing type', () => {
+    expect(residenceType(null)).toBe('Accommodation');
+    expect(residenceType('multi_family')).toBe('Accommodation');
+    expect(residenceType('castle')).toBe('Accommodation');
+  });
+});
+
+describe('listingJsonLdNodes', () => {
+  it('splits the listing (a web page with an offer) from the property it is about', () => {
+    const [listing, home] = listingJsonLdNodes({
+      pageUrl: PAGE,
+      name: '412 Maple Avenue, Salt Lake City',
+      description: '  Light-filled bungalow.  ',
+      images: ['https://cdn.example.com/a.jpg'],
+      streetAddress: '412 Maple Avenue',
+      city: 'Salt Lake City',
+      state: 'UT',
+      postalCode: '84105',
+      bedrooms: 3,
+      bathrooms: 2,
+      squareFeet: 1980,
+      price: 525000,
+      status: 'active',
+      propertyType: 'single_family',
+    });
+
+    expect(listing).toEqual({
+      '@type': 'RealEstateListing',
+      '@id': `${PAGE}#listing`,
+      name: '412 Maple Avenue, Salt Lake City',
+      url: PAGE,
+      description: 'Light-filled bungalow.',
+      image: ['https://cdn.example.com/a.jpg'],
+      mainEntity: { '@id': `${PAGE}#home` },
+      offers: {
+        '@type': 'Offer',
+        url: PAGE,
+        price: 525000,
+        priceCurrency: 'USD',
+        availability: 'https://schema.org/InStock',
+      },
+    });
+    expect(home).toEqual({
+      '@type': 'SingleFamilyResidence',
+      '@id': `${PAGE}#home`,
+      name: '412 Maple Avenue, Salt Lake City',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '412 Maple Avenue',
+        addressLocality: 'Salt Lake City',
+        addressRegion: 'UT',
+        postalCode: '84105',
+      },
+      numberOfBedrooms: 3,
+      numberOfBathroomsTotal: 2,
+      floorSize: { '@type': 'QuantitativeValue', value: 1980, unitCode: 'FTK' },
+    });
+    // Room and address facts belong to the place, not to the web page.
+    expect(listing).not.toHaveProperty('numberOfBedrooms');
+    expect(listing).not.toHaveProperty('address');
+  });
+
+  it('marks a sold home SoldOut and leaves out a price that is not a number', () => {
+    const [listing] = listingJsonLdNodes({ pageUrl: PAGE, name: 'x', price: NaN, status: 'sold' });
+    expect(listing.offers).toEqual({
+      '@type': 'Offer',
+      url: PAGE,
+      availability: 'https://schema.org/SoldOut',
+    });
+  });
+
+  it('rounds half baths up to whole bathrooms and gives land no rooms', () => {
+    expect(listingJsonLdNodes({ pageUrl: PAGE, name: 'x', bathrooms: 2.5 })[1]).toMatchObject({
+      numberOfBathroomsTotal: 3,
+    });
+    const [, plot] = listingJsonLdNodes({
+      pageUrl: PAGE,
+      name: 'x',
+      bedrooms: 2,
+      bathrooms: 1,
+      propertyType: 'land',
+    });
+    expect(plot['@type']).toBe('Place');
+    expect(plot).not.toHaveProperty('numberOfBedrooms');
+    expect(plot).not.toHaveProperty('numberOfBathroomsTotal');
+    expect(plot).not.toHaveProperty('address');
+  });
+});
+
+describe('listingReference', () => {
+  it('names the listing node by @id with an explicit type', () => {
+    expect(listingReference(PAGE, 'Home')).toEqual({
+      '@type': 'RealEstateListing',
+      '@id': listingNodeId(PAGE),
+      name: 'Home',
+      url: PAGE,
+    });
+    expect(homeNodeId(PAGE)).toBe(`${PAGE}#home`);
+  });
+});
+
+describe('agentListingOffers (US-586)', () => {
+  const ORIGIN = 'https://agentbio.net/';
+
+  it('names each home by its listing page url and #listing node id', () => {
+    const [offer] = agentListingOffers(
+      [
+        {
+          id: 'abc-123',
+          status: 'active',
+          address: ' 412 Maple Avenue ',
+          city: 'Salt Lake City',
+          state: 'UT',
+          price: '$525,000',
+        },
+      ],
+      'jane',
+      ORIGIN
+    );
+    expect(offer).toEqual({
+      '@type': 'Offer',
+      url: PAGE,
+      availability: 'https://schema.org/InStock',
+      price: 525000,
+      priceCurrency: 'USD',
+      itemOffered: listingReference(PAGE, '412 Maple Avenue, Salt Lake City, UT'),
+    });
+    expect((offer.itemOffered as { '@id': string })['@id']).toBe(listingNodeId(PAGE));
+  });
+
+  it('marks sold homes SoldOut and leaves out a price that is not a number', () => {
+    const [offer] = agentListingOffers(
+      [{ id: 's', status: 'sold', address: null, city: null, state: null, price: 'call' }],
+      'jane',
+      ORIGIN
+    );
+    expect(offer.availability).toBe('https://schema.org/SoldOut');
+    expect(offer).not.toHaveProperty('price');
+    expect(offer).not.toHaveProperty('priceCurrency');
+    expect((offer.itemOffered as { name: string }).name).toBe('Property');
+  });
+
+  it(`offers at most ${AGENT_OFFER_LIMIT} homes unless told otherwise`, () => {
+    const many = Array.from({ length: AGENT_OFFER_LIMIT + 3 }, (_, i) => ({ id: `l-${i}` }));
+    expect(agentListingOffers(many, 'jane', ORIGIN)).toHaveLength(AGENT_OFFER_LIMIT);
+    expect(agentListingOffers(many, 'jane', ORIGIN, 2)).toHaveLength(2);
+  });
+
+  it('encodes the username and id in the page url', () => {
+    expect(listingPageUrl('https://agentbio.net', 'jane doe', 'a/b')).toBe(
+      'https://agentbio.net/jane%20doe/listing/a%2Fb'
+    );
+  });
+});

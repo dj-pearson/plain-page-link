@@ -1,27 +1,31 @@
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
+import { LEGAL_PAGE_DATES, formatLegalDate } from '@/config/legal-dates';
 
 export default function PrivacyPolicy() {
-  const lastUpdated = new Date().toLocaleDateString();
+  const dates = LEGAL_PAGE_DATES.privacy;
+  const lastUpdated = formatLegalDate(dates.modified);
 
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    '@id': 'https://agentbio.net/privacy#webpage',
-    url: 'https://agentbio.net/privacy',
+    '@id': `${getCanonicalUrl('/privacy')}#webpage`,
+    url: getCanonicalUrl('/privacy'),
     name: 'Privacy Policy - AgentBio',
     description:
       'AgentBio Privacy Policy detailing how we collect, use, and protect your personal information. Learn about your rights under CCPA, data security, and privacy practices.',
     isPartOf: {
-      '@id': 'https://agentbio.net/#website',
+      '@id': websiteId(getBaseUrl()),
     },
     about: {
       '@type': 'Thing',
       name: 'Privacy Policy',
     },
-    datePublished: '2024-01-01',
-    dateModified: lastUpdated,
+    datePublished: dates.published,
+    dateModified: dates.modified,
     inLanguage: 'en-US',
   };
 
@@ -40,7 +44,7 @@ export default function PrivacyPolicy() {
           'real estate privacy',
           'GDPR compliance',
         ]}
-        canonicalUrl="https://agentbio.net/privacy"
+        canonicalUrl={getCanonicalUrl('/privacy')}
         schema={schema}
       />
       <PublicHeader />
@@ -49,7 +53,9 @@ export default function PrivacyPolicy() {
           <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
 
           <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
-            <p className="text-muted-foreground mb-6">Last updated: {lastUpdated}</p>
+            <p className="text-muted-foreground mb-6">
+              Last updated: <time dateTime={dates.modified}>{lastUpdated}</time>
+            </p>
 
             <section>
               <h2 className="text-2xl font-semibold mb-4">1. Introduction</h2>

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   organizationSchema,
   realEstateAgentSchema,
-  realEstateListingSchema,
   articleSchema,
   breadcrumbSchema,
 } from './structured-data';
@@ -41,34 +40,6 @@ describe('structured-data helpers', () => {
     expect(s.address['@type']).toBe('PostalAddress');
     expect(s.address.addressLocality).toBe('Miami');
     expect(s.worksFor.name).toBe('Acme Realty');
-  });
-
-  it('realEstateListingSchema includes price, address, and details', () => {
-    const s = realEstateListingSchema({
-      title: '3BR Home',
-      price: 450000,
-      address: '123 Main St',
-      city: 'Austin',
-      state: 'TX',
-      bedrooms: 3,
-      bathrooms: 2,
-      squareFeet: 1800,
-    }) as Record<string, Record<string, unknown>>;
-    expect(s['@type']).toBe('RealEstateListing');
-    expect(s.numberOfBedrooms).toBe(3);
-    expect(s.offers.price).toBe(450000);
-    expect(s.offers.priceCurrency).toBe('USD');
-    expect(s.offers.availability).toBe('https://schema.org/InStock');
-    expect(s.address.streetAddress).toBe('123 Main St');
-    expect(s.floorSize.value).toBe(1800);
-  });
-
-  it('realEstateListingSchema marks sold listings as SoldOut', () => {
-    const s = realEstateListingSchema({ title: 'Sold Home', price: 1, status: 'sold' }) as Record<
-      string,
-      Record<string, unknown>
-    >;
-    expect(s.offers.availability).toBe('https://schema.org/SoldOut');
   });
 
   it('articleSchema builds a blog URL and publisher', () => {

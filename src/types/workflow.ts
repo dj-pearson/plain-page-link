@@ -3,6 +3,8 @@
  * Type definitions for the visual workflow builder
  */
 
+import { LEAD_STATUS_VALUES } from '@/lib/leadStatus';
+
 export type WorkflowNodeType = 'trigger' | 'action' | 'condition' | 'delay' | 'loop' | 'transform';
 
 export type WorkflowTriggerSubtype =
@@ -232,7 +234,7 @@ export const NODE_CONFIG_SCHEMAS: Record<string, Record<string, any>> = {
     status: {
       type: 'select',
       label: 'Status',
-      options: ['new', 'contacted', 'qualified', 'converted', 'lost'],
+      options: [...LEAD_STATUS_VALUES],
     },
     score: { type: 'number', label: 'Score Adjustment' },
     notes: { type: 'textarea', label: 'Add Note' },

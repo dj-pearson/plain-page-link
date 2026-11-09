@@ -9,7 +9,17 @@ import {
 } from '@/components/onboarding/OnboardingWizard';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
-import { buildOnboardingProfileUpdate } from '@/lib/onboardingProfile';
+import { useQueryClient } from '@tanstack/react-query';
+import { buildOnboardingProfileUpdate, onboardingTimeZoneToSave } from '@/lib/onboardingProfile';
+import { agentTimeZoneKey } from '@/hooks/useAgentTimeZone';
+import { storeAvatarAppIcons } from '@/lib/storeAvatarAppIcons';
+import { storeAvatarVariant } from '@/lib/storeAvatarVariant';
+import { avatarObjectName } from '@/lib/avatarVariant';
+import {
+  AVATAR_SHRINK,
+  PROFILE_IMAGE_CACHE_CONTROL,
+  shrinkProfileImage,
+} from '@/lib/shrinkProfileImage';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
@@ -23,6 +33,7 @@ export default function OnboardingWizardPage() {
   const navigate = useNavigate();
   const { user, profile, updateProfile } = useAuthStore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -61,18 +72,35 @@ export default function OnboardingWizardPage() {
       // Upload profile photo if provided
       if (wizardData.profileBasics.photo) {
         try {
-          const fileExt = wizardData.profileBasics.photo.name.split('.').pop();
+          const original = wizardData.profileBasics.photo;
+          // US-591: stored downscaled, as a dashboard upload is.
+          const photo = await shrinkProfileImage(original, AVATAR_SHRINK);
+          const fileExt = photo.name.split('.').pop() ?? 'jpg';
           // US-075: the first path segment must be the uploader's id — the
           // storage policies key on it. This used to be `avatars/<uid>-<ts>`,
           // whose first segment was the literal string 'avatars', which an
           // owner-scoped policy rejects.
-          const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+          const stem = `avatar-${Date.now()}`;
+          // US-604: the 256px companion the public page draws, stored first
+          // because the photo's name records whether it exists.
+          const variantName = await storeAvatarVariant(user.id, stem, photo);
+          const objectName = avatarObjectName(stem, fileExt, variantName !== null);
+          const filePath = `${user.id}/${objectName}`;
 
           const { error: uploadError } = await supabase.storage
             .from('avatars')
-            .upload(filePath, wizardData.profileBasics.photo);
+            .upload(filePath, photo, {
+              cacheControl: PROFILE_IMAGE_CACHE_CONTROL,
+              contentType: photo.type || undefined,
+            });
 
           if (uploadError) throw uploadError;
+
+          // US-493: the installed page's home-screen icons, named after the
+          // photo, stored before the profile points at it — the same as a
+          // dashboard upload (US-481). Best effort and never throws: a
+          // browser that cannot draw the photo keeps the photo.
+          await storeAvatarAppIcons('avatars', user.id, objectName, original);
 
           const {
             data: { publicUrl },
@@ -107,6 +135,33 @@ export default function OnboardingWizardPage() {
       // ProtectedRoute's first-run gate immediately sent the agent who had just
       // finished the wizard straight back into it (US-108).
       await updateProfile(profileUpdates);
+
+      // 1b. The time zone (US-446), in its own update so a zone the database
+      // does not recognise costs only the zone, never the profile. Settings
+      // can set it later; the morning email follows UTC until then.
+      const timeZone = onboardingTimeZoneToSave(
+        wizardData.profileBasics.timeZone,
+        profile?.timezone
+      );
+      if (timeZone) {
+        const { error: zoneError } = await supabase
+          .from('profiles')
+          .update({ timezone: timeZone })
+          .eq('id', user.id);
+        if (zoneError) {
+          logger.warn('Onboarding could not save the time zone', {
+            code: zoneError.code,
+            message: zoneError.message,
+          });
+          toast({
+            title: 'Your time zone was not saved',
+            description: 'Everything else is saved. You can choose it later in Settings.',
+            variant: 'destructive',
+          });
+        } else {
+          queryClient.setQueryData(agentTimeZoneKey(user.id), timeZone);
+        }
+      }
 
       // 2. Create first listing if provided.
       //
@@ -178,21 +233,31 @@ export default function OnboardingWizardPage() {
       }
 
       // Send welcome email (non-blocking)
+      // No body. The function reads the address from the caller's JWT and
+      // the name and username from that user's own profile row — it used to
+      // take all three from here, unauthenticated, which made it a branded
+      // relay to any address (US-119).
+      // edgeFunctions.invoke never throws; it returns { error }. The old
+      // try/catch never fired, so a failed send was silent and the toast below
+      // still sent the agent to their inbox (US-616).
+      let welcomeEmailSent = false;
       try {
-        // No body. The function reads the address from the caller's JWT and
-        // the name and username from that user's own profile row — it used to
-        // take all three from here, unauthenticated, which made it a branded
-        // relay to any address (US-119).
-        await edgeFunctions.invoke('send-welcome-email', {});
+        const { error: emailError } = await edgeFunctions.invoke('send-welcome-email', {});
+        if (emailError) {
+          logger.error('Welcome email failed (non-critical)', emailError);
+        } else {
+          welcomeEmailSent = true;
+        }
       } catch (emailError) {
         logger.error('Welcome email failed (non-critical)', emailError as Error);
-        // Don't block navigation if email fails
       }
 
       // Success!
       toast({
-        title: '🎉 Welcome to AgentBio!',
-        description: 'Your profile is ready to share. Check your email for next steps!',
+        title: 'Welcome to AgentBio',
+        description: welcomeEmailSent
+          ? 'Your profile is saved. We emailed you a short list of next steps.'
+          : 'Your profile is saved. Your dashboard shows what to do next.',
       });
       return true;
     } catch (error) {

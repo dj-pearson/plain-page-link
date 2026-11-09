@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, useState } from 'react';
 import {
   Plus,
   Star,
@@ -11,29 +11,56 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { AddTestimonialModal } from '@/components/modals/AddTestimonialModal';
-import {
-  EditTestimonialModal,
-  EditTestimonialFormData,
-} from '@/components/modals/EditTestimonialModal';
+import type { EditTestimonialFormData } from '@/components/modals/EditTestimonialModal';
 import type { TestimonialFormData } from '@/components/modals/AddTestimonialModal';
 import { useToast } from '@/hooks/use-toast';
 import { useTestimonials, type Testimonial } from '@/hooks/useTestimonials';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
-import { UpgradeModal } from '@/components/UpgradeModal';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
-import { RequestTestimonialModal } from '@/components/testimonials/RequestTestimonialModal';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/lib/logger';
 import { todayCalendarDate } from '@/lib/localDate';
 import { Card, CardContent } from '@/components/ui/card';
 
+/*
+ * The add, edit, request and upgrade dialogs load when they are first opened,
+ * not with the page (US-431, the US-412 pattern). The add form put
+ * react-hook-form and zod (form-vendor, 23 KB gzip) on the route of an agent
+ * who came to read or publish reviews. Hovering or focusing Add Testimonial
+ * warms its chunk.
+ */
+const loadAddTestimonialModal = () => import('@/components/modals/AddTestimonialModal');
+const AddTestimonialModal = lazy(() =>
+  loadAddTestimonialModal().then((m) => ({ default: m.AddTestimonialModal }))
+);
+const EditTestimonialModal = lazy(() =>
+  import('@/components/modals/EditTestimonialModal').then((m) => ({
+    default: m.EditTestimonialModal,
+  }))
+);
+const RequestTestimonialModal = lazy(() =>
+  import('@/components/testimonials/RequestTestimonialModal').then((m) => ({
+    default: m.RequestTestimonialModal,
+  }))
+);
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+
+/** A failed prefetch is retried by the click that needs the chunk. */
+const preloadAddTestimonial = () => void loadAddTestimonialModal().catch(() => undefined);
+
 export default function Testimonials() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const addModal = useMountOnFirstOpen(isAddModalOpen);
+  const upgradeModal = useMountOnFirstOpen(showUpgradeModal);
+  const requestModal = useMountOnFirstOpen(showRequestModal);
   const { toast } = useToast();
   const {
     testimonials,
@@ -170,6 +197,8 @@ export default function Testimonials() {
           </button>
           <button
             onClick={handleAddClick}
+            onPointerEnter={preloadAddTestimonial}
+            onFocus={preloadAddTestimonial}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
           >
             <Plus className="h-4 w-4" />
@@ -320,7 +349,13 @@ export default function Testimonials() {
           <p className="text-muted-foreground mb-6">
             Start building social proof by adding client reviews
           </p>
-          <button className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
+          <button
+            type="button"
+            onClick={handleAddClick}
+            onPointerEnter={preloadAddTestimonial}
+            onFocus={preloadAddTestimonial}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+          >
             <Plus className="h-5 w-5" />
             Add Your First Testimonial
           </button>
@@ -338,50 +373,73 @@ export default function Testimonials() {
         </p>
       </div>
 
-      {/* Add Testimonial Modal */}
-      <AddTestimonialModal
-        open={isAddModalOpen}
-        onOpenChange={setIsAddModalOpen}
-        onSave={handleAddTestimonial}
-      />
-
-      {/* Edit Testimonial Modal */}
-      {editingTestimonial && (
-        <EditTestimonialModal
-          // Keyed so a different testimonial mounts a fresh form; the modal no
-          // longer resets its state from initialData (US-257).
-          key={editingTestimonial.id}
-          isOpen={!!editingTestimonial}
-          onClose={() => setEditingTestimonial(null)}
-          onSubmit={handleEditTestimonial}
-          initialData={{
-            client_name: editingTestimonial.client_name,
-            review: editingTestimonial.review,
-            rating: editingTestimonial.rating,
-            client_title: editingTestimonial.client_title ?? undefined,
-            property_type: editingTestimonial.property_type ?? undefined,
-            transaction_type: editingTestimonial.transaction_type ?? undefined,
+      {addModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsAddModalOpen(false);
+            addModal.unmount();
           }}
-        />
+        >
+          <AddTestimonialModal
+            open={isAddModalOpen}
+            onOpenChange={setIsAddModalOpen}
+            onSave={handleAddTestimonial}
+          />
+        </LazyModal>
       )}
 
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        open={showUpgradeModal}
-        onOpenChange={setShowUpgradeModal}
-        feature="testimonials"
-        currentPlan={subscription?.plan_name || 'Free'}
-        requiredPlan="Starter"
-      />
+      {editingTestimonial && (
+        <LazyModal onClose={() => setEditingTestimonial(null)}>
+          <EditTestimonialModal
+            // Keyed so a different testimonial mounts a fresh form; the modal no
+            // longer resets its state from initialData (US-257).
+            key={editingTestimonial.id}
+            isOpen={!!editingTestimonial}
+            onClose={() => setEditingTestimonial(null)}
+            onSubmit={handleEditTestimonial}
+            initialData={{
+              client_name: editingTestimonial.client_name,
+              review: editingTestimonial.review,
+              rating: editingTestimonial.rating,
+              client_title: editingTestimonial.client_title ?? undefined,
+              property_type: editingTestimonial.property_type ?? undefined,
+              transaction_type: editingTestimonial.transaction_type ?? undefined,
+            }}
+          />
+        </LazyModal>
+      )}
 
-      {/* Request Testimonial Modal */}
-      {profile && (
-        <RequestTestimonialModal
-          open={showRequestModal}
-          onOpenChange={setShowRequestModal}
-          username={profile.username || ''}
-          agentName={profile.full_name || ''}
-        />
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowUpgradeModal(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={showUpgradeModal}
+            onOpenChange={setShowUpgradeModal}
+            feature="testimonials"
+            currentPlan={subscription?.plan_name || 'Free'}
+            requiredPlan="Starter"
+          />
+        </LazyModal>
+      )}
+
+      {profile && requestModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowRequestModal(false);
+            requestModal.unmount();
+          }}
+        >
+          <RequestTestimonialModal
+            open={showRequestModal}
+            onOpenChange={setShowRequestModal}
+            username={profile.username || ''}
+            agentName={profile.full_name || ''}
+          />
+        </LazyModal>
       )}
     </div>
   );

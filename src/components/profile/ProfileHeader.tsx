@@ -1,6 +1,8 @@
 import { MapPin, Award, ShieldCheck, Zap, Star, Building2, CheckCircle2 } from 'lucide-react';
 import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
+import { formatServiceCities } from '@/lib/serviceAreas';
+import { AvatarImage } from './AvatarImage';
 
 interface ProfileHeaderProps {
   profile: PublicProfile;
@@ -42,6 +44,9 @@ function TrustBadge({
 }
 
 export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
+  // Every city, in words (US-281). "Austin +2 more" hid the very town a
+  // visitor was checking for.
+  const serviceArea = formatServiceCities(profile.service_cities);
   return (
     <div className="relative bg-white rounded-xl shadow-lg overflow-hidden">
       {/* Background Pattern */}
@@ -61,11 +66,12 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
             {/* Profile Photo */}
             <div className="relative mb-3">
               {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  // Avatars have no resized variants (optimize-image only runs
-                  // on listing photos), so this is still the uploaded file; the
-                  // dimensions at least reserve its box (US-243).
+                <AvatarImage
+                  url={profile.avatar_url}
+                  // The 256px companion when the upload stored one (US-604),
+                  // else the photo: downscaled to 800px since US-591, as
+                  // uploaded before that. The dimensions reserve its box
+                  // (US-243).
                   width={128}
                   height={128}
                   decoding="async"
@@ -115,14 +121,18 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
               {profile.title && (
                 <p className="text-base md:text-lg text-blue-600 font-semibold">{profile.title}</p>
               )}
-              {/* Brokerage */}
-              {profile.brokerage_name && (
+              {/* Brokerage. Either field is enough on its own: the row used to
+                  sit inside `brokerage_name &&`, so an agent who uploaded a
+                  logo but left the name blank had it silently dropped from
+                  their page (US-383). The logo stands in for the name, so its
+                  alt text is the name when there is one. */}
+              {(profile.brokerage_name || profile.brokerage_logo) && (
                 <div className="flex items-center justify-center md:justify-start gap-2 text-gray-600 mt-2">
-                  <Building2 className="h-4 w-4" />
+                  <Building2 className="h-4 w-4" aria-hidden="true" />
                   {profile.brokerage_logo ? (
                     <img
                       src={profile.brokerage_logo}
-                      alt={profile.brokerage_name}
+                      alt={profile.brokerage_name || 'Brokerage logo'}
                       className="h-5 object-contain"
                     />
                   ) : (
@@ -173,15 +183,12 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
 
             {/* Quick Info */}
             <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4 justify-center md:justify-start">
-              {profile.service_cities && profile.service_cities.length > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium">{profile.service_cities[0]}</span>
-                  {profile.service_cities.length > 1 && (
-                    <span className="text-blue-600 font-semibold">
-                      +{profile.service_cities.length - 1} more
-                    </span>
-                  )}
+              {serviceArea && (
+                <div className="flex items-start gap-1.5 max-w-prose">
+                  <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" aria-hidden="true" />
+                  <span>
+                    Serving <span className="font-medium">{serviceArea}</span>
+                  </span>
                 </div>
               )}
               {profile.license_number && profile.license_state && (

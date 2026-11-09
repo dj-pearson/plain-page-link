@@ -15,9 +15,22 @@
  * Failure is a 503, never an empty 200. A sitemap that suddenly lists nothing
  * reads as "every one of these pages is gone"; a 503 reads as "try later", and
  * Google keeps what it had.
+ *
+ * US-372: each agent's listing pages (/:username/listing/:id, US-275) follow
+ * the agent's own URL. They are not prerendered either: their crawler half is
+ * functions/[username]/listing/[listingId].ts, which writes the share card at
+ * request time, the same way profiles are served, so a build-time file could
+ * only go stale. This sitemap is where a crawler learns they exist. Which
+ * listings appear follows selectListingForPage, the rule the page itself
+ * applies: a listing hidden by show_listings, or a sold one hidden by
+ * show_sold_properties, is not found at its own address and is not listed.
+ * The listings and user_settings reads are anon reads, so RLS already drops
+ * unpublished agents, sample rows and drafts (US-308, US-110).
  */
 import { isReservedSegment } from './social-meta';
 import { normalizeUsername } from '../../src/lib/username';
+import { listingPagePath } from '../../src/lib/listingShare';
+import { selectListingForPage } from '../../src/lib/publicListingVisibility';
 
 /** PostgREST's default max-rows on Supabase; one request never returns more. */
 export const PAGE_SIZE = 1000;
@@ -32,7 +45,37 @@ export interface ProfileSitemapEnv {
   VITE_SUPABASE_ANON_KEY?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
+  /** The site's canonical origin (US-595); see site-origin.ts. */
+  VITE_APP_URL?: string;
 }
+
+export interface SitemapEntry {
+  path: string;
+  /** W3C datetime; only when the row carries a real modification time. */
+  lastmod?: string;
+  priority: string;
+}
+
+export interface PublishedProfileRow {
+  id?: unknown;
+  username?: unknown;
+}
+
+export interface PublicListingRow {
+  id?: unknown;
+  user_id?: unknown;
+  status?: unknown;
+  updated_at?: unknown;
+}
+
+export interface VisibilitySettingsRow {
+  user_id?: unknown;
+  show_listings?: unknown;
+  show_sold_properties?: unknown;
+}
+
+const PROFILE_PRIORITY = '0.6';
+const LISTING_PRIORITY = '0.5';
 
 function escapeXml(value: string): string {
   return value
@@ -44,37 +87,117 @@ function escapeXml(value: string): string {
 }
 
 /**
- * The canonical path for each username, in order, de-duplicated.
- *
- * Normalised because [username].ts 301s anything that is not, and a sitemap
- * should list the address a URL ends at. A reserved segment is skipped: that
- * URL belongs to the app, and [username].ts never treats it as a profile.
+ * The address [username].ts serves a username at, or null when it never
+ * serves one there. Normalised because [username].ts 301s anything that is
+ * not, and a sitemap should list the address a URL ends at. A reserved segment
+ * belongs to the app, and [username].ts never treats it as a profile.
  */
+function canonicalUsername(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const username = normalizeUsername(raw);
+  if (!username || isReservedSegment(username)) return null;
+  return username;
+}
+
+/** The canonical path for each username, in order, de-duplicated. */
 export function profilePaths(usernames: readonly unknown[]): string[] {
   const seen = new Set<string>();
   const paths: string[] = [];
   for (const raw of usernames) {
-    if (typeof raw !== 'string') continue;
-    const username = normalizeUsername(raw);
-    if (!username || isReservedSegment(username) || seen.has(username)) continue;
+    const username = canonicalUsername(raw);
+    if (!username || seen.has(username)) continue;
     seen.add(username);
     paths.push(`/${encodeURIComponent(username)}`);
   }
   return paths;
 }
 
-export function buildProfileSitemapXml(paths: readonly string[], origin: string): string {
+/** A PostgREST timestamp as an ISO datetime, or undefined when it is not one. */
+function toLastmod(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  const time = Date.parse(value);
+  return Number.isNaN(time) ? undefined : new Date(time).toISOString();
+}
+
+const asFlag = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
+
+interface VisibleListing {
+  id: string;
+  lastmod?: string;
+}
+
+/**
+ * Every URL the sitemap lists: each published agent's page, followed by the
+ * listing pages a visitor can open from it (US-372).
+ *
+ * An agent with no user_settings row shows everything, the same default the
+ * profile page uses. A listing whose agent is not among `profiles` (or whose
+ * username is reserved) is skipped: its page would not resolve.
+ */
+export function sitemapEntries(
+  profiles: readonly PublishedProfileRow[],
+  listings: readonly PublicListingRow[] = [],
+  settings: readonly VisibilitySettingsRow[] = []
+): SitemapEntry[] {
+  const settingsByUser = new Map<
+    string,
+    { show_listings: boolean | null; show_sold_properties: boolean | null }
+  >();
+  for (const row of settings) {
+    if (typeof row?.user_id !== 'string') continue;
+    settingsByUser.set(row.user_id, {
+      show_listings: asFlag(row.show_listings),
+      show_sold_properties: asFlag(row.show_sold_properties),
+    });
+  }
+
+  const listingsByUser = new Map<string, VisibleListing[]>();
+  for (const row of listings) {
+    if (typeof row?.id !== 'string' || row.id === '' || typeof row.user_id !== 'string') continue;
+    const candidate = { id: row.id, status: typeof row.status === 'string' ? row.status : null };
+    if (!selectListingForPage([candidate], candidate.id, settingsByUser.get(row.user_id))) continue;
+    const forUser = listingsByUser.get(row.user_id) ?? [];
+    forUser.push({ id: row.id, lastmod: toLastmod(row.updated_at) });
+    listingsByUser.set(row.user_id, forUser);
+  }
+
+  const seenUsernames = new Set<string>();
+  const seenUsers = new Set<string>();
+  const entries: SitemapEntry[] = [];
+  for (const profile of profiles) {
+    const username = canonicalUsername(profile?.username);
+    if (!username || seenUsernames.has(username)) continue;
+    seenUsernames.add(username);
+    entries.push({ path: `/${encodeURIComponent(username)}`, priority: PROFILE_PRIORITY });
+
+    const userId = typeof profile.id === 'string' ? profile.id : null;
+    if (!userId || seenUsers.has(userId)) continue;
+    seenUsers.add(userId);
+    for (const listing of listingsByUser.get(userId) ?? []) {
+      entries.push({
+        path: listingPagePath(username, listing.id),
+        lastmod: listing.lastmod,
+        priority: LISTING_PRIORITY,
+      });
+    }
+  }
+  return entries;
+}
+
+export function buildProfileSitemapXml(entries: readonly SitemapEntry[], origin: string): string {
   const base = origin.replace(/\/+$/, '');
-  const urls = paths
-    .map((path) =>
+  const urls = entries
+    .map((entry) =>
       [
         '  <url>',
-        `    <loc>${escapeXml(`${base}${path}`)}</loc>`,
-        // No <lastmod>: profiles.updated_at is not readable with the anon key
-        // (US-235), and a made-up date is worse than none — see
-        // scripts/lib/sitemap.mts for the same choice on static pages.
+        `    <loc>${escapeXml(`${base}${entry.path}`)}</loc>`,
+        // A profile has no <lastmod>: profiles.updated_at is not readable with
+        // the anon key (US-235), and a made-up date is worse than none — see
+        // scripts/lib/sitemap.mts for the same choice on static pages. A
+        // listing carries listings.updated_at, which anon can read.
+        ...(entry.lastmod ? [`    <lastmod>${escapeXml(entry.lastmod)}</lastmod>`] : []),
         '    <changefreq>weekly</changefreq>',
-        '    <priority>0.6</priority>',
+        `    <priority>${entry.priority}</priority>`,
         '  </url>',
       ].join('\n')
     )
@@ -87,11 +210,11 @@ export function buildProfileSitemapXml(paths: readonly string[], origin: string)
   );
 }
 
-async function fetchPage(
+async function fetchPage<T>(
   fetchImpl: FetchLike,
   url: string,
   apiKey: string
-): Promise<Array<{ username?: unknown }> | null> {
+): Promise<T[] | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
   try {
@@ -101,7 +224,7 @@ async function fetchPage(
     });
     if (!response.ok) return null;
     const body: unknown = await response.json();
-    return Array.isArray(body) ? (body as Array<{ username?: unknown }>) : null;
+    return Array.isArray(body) ? (body as T[]) : null;
   } catch {
     return null;
   } finally {
@@ -109,34 +232,92 @@ async function fetchPage(
   }
 }
 
-/**
- * Every published username, paged. Null when any page fails: a partial list
- * would drop real agents from the sitemap as surely as an empty one.
- */
-export async function fetchPublishedUsernames(
-  env: ProfileSitemapEnv,
-  fetchImpl: FetchLike
-): Promise<string[] | null> {
+function restBinding(env: ProfileSitemapEnv): { base: string; apiKey: string } | null {
   const restUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
   const apiKey = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY;
   if (!restUrl || !apiKey) return null;
-  const base = restUrl.replace(/\/$/, '');
+  return { base: restUrl.replace(/\/$/, ''), apiKey };
+}
 
-  const usernames: string[] = [];
+/**
+ * Every row of one PostgREST query, paged by PAGE_SIZE up to MAX_URLS. Null
+ * when the binding is missing or any page fails: a partial list would drop
+ * real pages from the sitemap as surely as an empty one. `query` must order by
+ * a unique column, so pages neither overlap nor skip.
+ */
+async function fetchAllRows<T>(
+  env: ProfileSitemapEnv,
+  fetchImpl: FetchLike,
+  query: string
+): Promise<T[] | null> {
+  const binding = restBinding(env);
+  if (!binding) return null;
+  const rows: T[] = [];
   for (let offset = 0; offset < MAX_URLS; offset += PAGE_SIZE) {
-    // Ordered by the unique username so pages neither overlap nor skip.
-    const rows = await fetchPage(
+    const page = await fetchPage<T>(
       fetchImpl,
-      `${base}/rest/v1/profiles?select=username&is_published=is.true&order=username.asc&limit=${PAGE_SIZE}&offset=${offset}`,
-      apiKey
+      `${binding.base}/rest/v1/${query}&limit=${PAGE_SIZE}&offset=${offset}`,
+      binding.apiKey
     );
-    if (rows === null) return null;
-    for (const row of rows) {
-      if (typeof row?.username === 'string') usernames.push(row.username);
-    }
-    if (rows.length < PAGE_SIZE) break;
+    if (page === null) return null;
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
   }
-  return usernames;
+  return rows;
+}
+
+/** Every published profile's id and username, ordered by the unique username. */
+export function fetchPublishedProfiles(
+  env: ProfileSitemapEnv,
+  fetchImpl: FetchLike
+): Promise<PublishedProfileRow[] | null> {
+  return fetchAllRows<PublishedProfileRow>(
+    env,
+    fetchImpl,
+    'profiles?select=id,username&is_published=is.true&order=username.asc'
+  );
+}
+
+/**
+ * Every listing a visitor may read. The status filter repeats the anon RLS
+ * policy, so a policy that ever widened would not widen the sitemap with it.
+ */
+export function fetchPublicListings(
+  env: ProfileSitemapEnv,
+  fetchImpl: FetchLike
+): Promise<PublicListingRow[] | null> {
+  return fetchAllRows<PublicListingRow>(
+    env,
+    fetchImpl,
+    'listings?select=id,user_id,status,updated_at&status=in.(active,pending,under_contract,sold)&order=id.asc'
+  );
+}
+
+/**
+ * The listing toggles of every published agent who has saved settings. Anon
+ * reads exactly these columns, for published agents only (US-110); user_id is
+ * unique on user_settings, so it orders the pages.
+ */
+export function fetchVisibilitySettings(
+  env: ProfileSitemapEnv,
+  fetchImpl: FetchLike
+): Promise<VisibilitySettingsRow[] | null> {
+  return fetchAllRows<VisibilitySettingsRow>(
+    env,
+    fetchImpl,
+    'user_settings?select=user_id,show_listings,show_sold_properties&order=user_id.asc'
+  );
+}
+
+function unavailable(): Response {
+  return new Response('Profile sitemap temporarily unavailable.\n', {
+    status: 503,
+    headers: {
+      'content-type': 'text/plain; charset=utf-8',
+      'cache-control': 'no-store',
+      'retry-after': '3600',
+    },
+  });
 }
 
 /** The whole response: a sitemap, or a 503 that tells the crawler to come back. */
@@ -145,24 +326,28 @@ export async function profileSitemapResponse(
   origin: string,
   fetchImpl: FetchLike
 ): Promise<Response> {
-  const usernames = await fetchPublishedUsernames(env, fetchImpl);
-  const paths = usernames ? profilePaths(usernames).slice(0, MAX_URLS) : [];
+  if (!restBinding(env)) return unavailable();
 
-  if (paths.length === 0) {
+  const [profiles, listings, settings] = await Promise.all([
+    fetchPublishedProfiles(env, fetchImpl),
+    fetchPublicListings(env, fetchImpl),
+    // Without the toggles, a listing the agent hid would be listed, so a
+    // failed settings read fails the sitemap rather than defaulting to "show".
+    fetchVisibilitySettings(env, fetchImpl),
+  ]);
+  const entries =
+    profiles && listings && settings
+      ? sitemapEntries(profiles, listings, settings).slice(0, MAX_URLS)
+      : [];
+
+  if (entries.length === 0) {
     // An upstream failure, a missing binding, or no published profile at all.
     // The first two are certainly not "the site has no agents", and the third
     // is not worth risking that reading for.
-    return new Response('Profile sitemap temporarily unavailable.\n', {
-      status: 503,
-      headers: {
-        'content-type': 'text/plain; charset=utf-8',
-        'cache-control': 'no-store',
-        'retry-after': '3600',
-      },
-    });
+    return unavailable();
   }
 
-  return new Response(buildProfileSitemapXml(paths, origin), {
+  return new Response(buildProfileSitemapXml(entries, origin), {
     status: 200,
     headers: {
       'content-type': 'application/xml; charset=utf-8',

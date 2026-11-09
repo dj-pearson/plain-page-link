@@ -112,6 +112,17 @@ describe('responsiveImage', () => {
     });
     expect(responsiveImage(null).src).toBe(PLACEHOLDER_PROPERTY_IMAGE);
   });
+
+  it('keeps the placeholder a site asset rather than resolving it into a bucket (US-613)', () => {
+    // getImageUrls puts the placeholder in a photo list that has none, and
+    // ListingDetails passes each entry back through responsiveImage.
+    expect(getImageUrl(PLACEHOLDER_PROPERTY_IMAGE)).toBe(PLACEHOLDER_PROPERTY_IMAGE);
+    expect(responsiveImage(PLACEHOLDER_PROPERTY_IMAGE)).toEqual({
+      src: PLACEHOLDER_PROPERTY_IMAGE,
+      srcSet: undefined,
+      original: PLACEHOLDER_PROPERTY_IMAGE,
+    });
+  });
 });
 
 describe('fallBackToOriginal', () => {

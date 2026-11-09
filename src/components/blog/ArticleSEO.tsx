@@ -1,7 +1,9 @@
 import { Helmet } from 'react-helmet-async';
 import { X_HANDLE } from '@/config/social-profiles';
 import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
+import { publisherOrganization } from '@/config/site-entities';
 import { getBaseUrl } from '@/config/seo.config';
+import type { ArticleAuthor } from '@/lib/articleAuthor';
 
 interface ArticleSEOProps {
   title: string;
@@ -10,8 +12,8 @@ interface ArticleSEOProps {
   imageUrl?: string;
   publishedTime?: string;
   modifiedTime?: string;
-  /** A real person's name, when one is known. Omitted means the organisation. */
-  author?: string;
+  /** The resolved author (src/lib/articleAuthor.ts). Omitted means the organisation. */
+  author?: ArticleAuthor | null;
   tags?: string[];
   category?: string;
   wordCount?: number;
@@ -36,8 +38,9 @@ export function ArticleSEO({
    * in the field where it counts most (US-180).
    *
    * Undefined means the organisation published it, which is true and is what
-   * schema.org's Organization author is for. Pass a real name when there is
-   * one to pass; `articles.author_id` exists and resolving it is US-181.
+   * schema.org's Organization author is for. BlogArticle resolves
+   * `articles.author_id` to the author's published profile and passes it here
+   * (US-181); the Person's url is their public AgentBio page.
    */
   author,
   tags = [],
@@ -52,6 +55,7 @@ export function ArticleSEO({
   // (US-172).
   const siteUrl = getBaseUrl();
   const fullUrl = `${siteUrl}${url}`;
+  const authorName = author?.name ?? siteName;
 
   // Use Cover.png as fallback if no featured image
   const socialImage = imageUrl || `${siteUrl}${DEFAULT_SOCIAL_IMAGE.path}`;
@@ -76,17 +80,13 @@ export function ArticleSEO({
     datePublished: publishedTime,
     dateModified: modifiedTime || publishedTime,
     author: author
-      ? { '@type': 'Person', name: author }
-      : { '@type': 'Organization', name: siteName, url: siteUrl },
-    publisher: {
-      '@type': 'Organization',
-      name: siteName,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${siteUrl}/Cover.png`,
-      },
-      url: siteUrl,
-    },
+      ? { '@type': 'Person', name: author.name, ...(author.url ? { url: author.url } : {}) }
+      : // No named author: AgentBio wrote it, so say which AgentBio, by @id.
+        publisherOrganization(siteUrl),
+    // The same Organization, by the same @id and with the same logo, as the
+    // site-wide Organization node. This gave the 1536x1024 social banner as
+    // the publisher's logo (US-346, US-356).
+    publisher: publisherOrganization(siteUrl),
     mainEntityOfPage: {
       '@type': 'WebPage',
       '@id': fullUrl,
@@ -212,15 +212,15 @@ export function ArticleSEO({
       <meta name="googlebot-news" content="snippet" />
 
       {/* Additional metadata for AI comprehension */}
-      <meta property="article:author" content={author ?? siteName} />
-      <meta name="author" content={author ?? siteName} />
+      <meta property="article:author" content={authorName} />
+      <meta name="author" content={authorName} />
       <meta name="article:content_tier" content="free" />
       <meta name="language" content="English" />
       <meta httpEquiv="content-language" content="en-US" />
 
       {/* Perplexity and AI search hints */}
       <meta name="citation_title" content={title} />
-      <meta name="citation_author" content={author ?? siteName} />
+      <meta name="citation_author" content={authorName} />
       {publishedTime && <meta name="citation_publication_date" content={publishedTime} />}
       <meta name="citation_language" content="en" />
 

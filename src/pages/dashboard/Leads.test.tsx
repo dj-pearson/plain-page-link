@@ -12,6 +12,8 @@
  * for the contact details, so the regression cannot return silently.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
 import { mockLead, mockLeadRow } from '@/test/fixtures/lead';
 import type { LeadRow } from '@/types/lead';
@@ -78,6 +80,7 @@ import Leads from './Leads';
 
 /** A `leads` select that resolves to the given rows, and records the columns asked for. */
 const eqCalls: [string, unknown][] = [];
+const inCalls: [string, unknown][] = [];
 
 const stubLeadsQuery = (
   rows: LeadRow[],
@@ -99,7 +102,11 @@ const stubLeadsQuery = (
   });
   // `range` is what useLeads pages with since US-104; without it the chain
   // returns undefined and the page renders its error card.
-  for (const m of ['order', 'in', 'is', 'limit', 'range', 'ilike', 'or']) {
+  builder.in = vi.fn((col: string, values: unknown) => {
+    inCalls.push([col, values]);
+    return builder;
+  });
+  for (const m of ['order', 'is', 'limit', 'range', 'ilike', 'or']) {
     builder[m] = vi.fn(() => builder);
   }
   builder.then = (resolve: (v: unknown) => unknown) =>
@@ -115,6 +122,8 @@ describe('Leads page', () => {
     selected = [];
     updates = [];
     eqCalls.length = 0;
+    inCalls.length = 0;
+    window.history.replaceState(null, '', '/');
     decrypted.email = undefined;
     fromMock.mockReset();
     rpcMock.mockReset();
@@ -129,6 +138,21 @@ describe('Leads page', () => {
     expect(await screen.findByText(mockLead.name)).toBeInTheDocument();
     expect(screen.getByText(mockLead.email!)).toBeInTheDocument();
     expect(screen.getByText(mockLead.phone!)).toBeInTheDocument();
+  });
+
+  // US-663: the card's status used Badge variants, which gave 'closed' and
+  // 'converted' the same black pill as 'new' and had no dark pair. It now
+  // shares LeadStatusPill's grouped tones with Overview.
+  it('shows the card status in its group tone, with a dark-mode pair', async () => {
+    fromMock.mockImplementation(() =>
+      stubLeadsQuery([{ ...mockLeadRow, status: 'closed' }], selected, updates)
+    );
+    const { container } = renderWithProviders(<Leads />);
+
+    await screen.findByText(mockLead.name);
+    const pill = container.querySelector('[data-tone]');
+    expect(pill).toHaveAttribute('data-tone', 'won');
+    expect(pill?.className).toMatch(/dark:bg-/);
   });
 
   it('links the contact details with mailto: and tel: on the decrypted values', async () => {
@@ -261,15 +285,207 @@ describe('Leads page', () => {
   // US-104: status was not a filter at all, and nothing about the view was
   // reflected in the URL, so a filtered list could not be linked to.
   describe('filters', () => {
+    // US-534: lead_stats counted every lead the owner has, so with an assignee
+    // filter the chips and the Needs-attention badge disagreed with the list.
+    const statsArgs = () =>
+      rpcMock.mock.calls.filter(([fn]) => fn === 'lead_stats').map(([, args]) => args);
+
+    it('counts the chips over the whole book when no assignee filter is set', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() => expect(statsArgs().length).toBeGreaterThan(0));
+      for (const args of statsArgs()) expect(args.p_assignee).toBeUndefined();
+    });
+
+    it('counts the chips over the teammate the list is filtered to', async () => {
+      const teammate = '22222222-2222-2222-2222-222222222222';
+      window.history.replaceState(null, '', `/?assignee=${teammate}`);
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      expect(eqCalls).toContainEqual(['assigned_to', teammate]);
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(expect.objectContaining({ p_assignee: teammate }))
+      );
+    });
+
+    it('counts the chips over unassigned leads when the list shows those', async () => {
+      window.history.replaceState(null, '', '/?assignee=unassigned');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(expect.objectContaining({ p_assignee: 'unassigned' }))
+      );
+    });
+
+    it('counts "Assigned to me" as the assignee filter on my own id', async () => {
+      window.history.replaceState(null, '', '/?assigned=me');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(
+          expect.objectContaining({ p_assignee: mockLeadRow.user_id })
+        )
+      );
+    });
+
+    it('shows the filtered Needs-attention count from lead_stats', async () => {
+      const teammate = '22222222-2222-2222-2222-222222222222';
+      window.history.replaceState(null, '', `/?assignee=${teammate}`);
+      rpcMock.mockImplementation(async (fn: string, args: { p_assignee?: string }) =>
+        fn === 'lead_stats'
+          ? {
+              data: {
+                total: args.p_assignee === teammate ? 3 : 40,
+                by_status: args.p_assignee === teammate ? { new: 3 } : { new: 40 },
+                needs_attention: args.p_assignee === teammate ? 2 : 25,
+              },
+              error: null,
+            }
+          : { data: 'activity-1', error: null }
+      );
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: /needs attention/i })).toHaveAccessibleName(
+          'Needs attention (2)'
+        )
+      );
+    });
+
+    // US-557: the type filter and the name search narrowed the list but not
+    // the chips, so ?type=seller showed three rows under "New 40".
+    it('sends no type or search to lead_stats when neither is set', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await waitFor(() => expect(statsArgs().length).toBeGreaterThan(0));
+      for (const args of statsArgs()) {
+        expect(args.p_lead_type).toBeUndefined();
+        expect(args.p_search).toBeUndefined();
+      }
+    });
+
+    it('counts the chips over the lead type the list is filtered to', async () => {
+      window.history.replaceState(null, '', '/?type=seller');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      expect(eqCalls).toContainEqual(['lead_type', 'seller']);
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(expect.objectContaining({ p_lead_type: 'seller' }))
+      );
+    });
+
+    it('counts the chips over the name search once it settles', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await userEvent.type(screen.getByRole('textbox', { name: /search leads/i }), '  Jane ');
+
+      // Trimmed, as the list's ilike is.
+      await waitFor(() =>
+        expect(statsArgs()).toContainEqual(expect.objectContaining({ p_search: 'Jane' }))
+      );
+    });
+
     it('pushes the status filter into the query rather than filtering in JS', async () => {
       renderWithProviders(<Leads />);
       await screen.findByText(mockLead.name);
       fromMock.mockClear();
       eqCalls.length = 0;
 
-      await userEvent.click(screen.getByRole('button', { name: /contacted/i }));
+      await userEvent.click(screen.getByRole('button', { name: /in progress/i }));
 
-      await waitFor(() => expect(eqCalls).toContainEqual(['status', 'contacted']));
+      // US-439: the chip is a group, so nurturing and qualified leads are in it.
+      await waitFor(() =>
+        expect(inCalls).toContainEqual(['status', ['contacted', 'qualified', 'nurturing']])
+      );
     });
+
+    it('treats closed as won on the Won chip', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+      inCalls.length = 0;
+
+      await userEvent.click(screen.getByRole('button', { name: /won/i }));
+
+      await waitFor(() => expect(inCalls).toContainEqual(['status', ['converted', 'closed']]));
+    });
+
+    it('filters by a single status from a link, including the ones no chip covers', async () => {
+      window.history.replaceState(null, '', '/?status=nurturing');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      expect(eqCalls).toContainEqual(['status', 'nurturing']);
+      expect(screen.getByRole('combobox', { name: /filter by status/i })).toHaveTextContent(
+        'Nurturing'
+      );
+    });
+
+    it('ignores a status the vocabulary does not have, rather than showing nothing', async () => {
+      window.history.replaceState(null, '', '/?status=archived');
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      expect(eqCalls.some(([col]) => col === 'status')).toBe(false);
+      expect(screen.getByRole('combobox', { name: /filter by status/i })).toHaveTextContent(
+        'All statuses'
+      );
+    });
+  });
+
+  // US-439: the chips read byStatus.new/.contacted/.converted only, so
+  // qualified, nurturing and closed leads were in no count on the page.
+  it('counts nurturing as in progress and closed as won', async () => {
+    rpcMock.mockImplementation(async (fn: string) =>
+      fn === 'lead_stats'
+        ? {
+            data: {
+              total: 19,
+              by_status: {
+                new: 1,
+                contacted: 2,
+                qualified: 3,
+                nurturing: 4,
+                converted: 5,
+                closed: 6,
+              },
+              needs_attention: 0,
+            },
+            error: null,
+          }
+        : { data: 'activity-1', error: null }
+    );
+    renderWithProviders(<Leads />);
+
+    const inProgress = await screen.findByRole('button', { name: /in progress/i });
+    await waitFor(() => expect(inProgress).toHaveTextContent('9'));
+    expect(screen.getByRole('button', { name: /won/i })).toHaveTextContent('11');
+  });
+});
+
+describe('Leads route weight (US-476)', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/pages/dashboard/Leads.tsx'), 'utf8');
+
+  it('does not import date-fns, which would put date-vendor on the route', () => {
+    expect(source).not.toMatch(/from 'date-fns'/);
+  });
+
+  it('does not statically import the dialogs or the CSV writer', () => {
+    for (const mod of [
+      '@/components/leads/LeadDetailModal',
+      '@/components/integrations/ZapierIntegrationModal',
+      '@/components/UpgradeModal',
+      '@/lib/exportUtils',
+      '@/lib/leadFormSchema',
+    ]) {
+      expect(source).not.toMatch(new RegExp(`^import [^;]*from '${mod}';`, 'm'));
+    }
   });
 });

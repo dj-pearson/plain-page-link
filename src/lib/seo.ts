@@ -5,11 +5,11 @@
 
 import { PRICING_PLANS } from '@/config/pricing-plans';
 import { SAME_AS } from '@/config/social-profiles';
-import { ORGANIZATION_LOGO } from '@/config/og-image';
+import { organizationId, organizationLogo, publisherOrganization } from '@/config/site-entities';
 import { PageConfig } from '@/types/pageBuilder';
 import type { BlockConfig } from '@/types/pageBuilder';
 import { getSafeOrigin } from '@/lib/utils';
-import { getBaseUrl } from '@/config/seo.config';
+import { getBaseUrl, offerPriceValidUntil } from '@/config/seo.config';
 
 /**
  * Breadcrumb item interface
@@ -176,17 +176,12 @@ export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    '@id': `${baseUrl}/#organization`,
+    '@id': organizationId(baseUrl),
     name: 'AgentBio',
     legalName: 'AgentBio Intelligence',
     url: baseUrl,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${baseUrl}${ORGANIZATION_LOGO.path}`,
-      // Was width '512', height '512' for a 946x436 file (US-178).
-      width: String(ORGANIZATION_LOGO.width),
-      height: String(ORGANIZATION_LOGO.height),
-    },
+    // Was width '512', height '512' for a 946x436 file (US-178).
+    logo: organizationLogo(baseUrl),
     image: `${baseUrl}/Cover.png`,
     description:
       'AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.',
@@ -237,10 +232,7 @@ export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
     description:
       'AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.',
     url: baseUrl,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${baseUrl}/logo.png`,
-    },
+    logo: organizationLogo(baseUrl),
     image: `${baseUrl}/Cover.png`,
     priceRange: '$$$',
     // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
@@ -255,16 +247,14 @@ export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
       name: 'United States',
     },
     serviceType: 'Real Estate Marketing Software',
-    provider: {
-      '@type': 'Organization',
-      name: 'AgentBio',
-    },
+    // The site Organization by @id, not an anonymous one (US-502).
+    provider: publisherOrganization(baseUrl),
     offers: {
       '@type': 'Offer',
       // Was '39', not a plan (US-157).
       price: STARTING_PRICE,
       priceCurrency: 'USD',
-      priceValidUntil: '2026-12-31',
+      priceValidUntil: offerPriceValidUntil(),
       availability: 'https://schema.org/InStock',
       url: `${baseUrl}/pricing`,
     },
@@ -437,178 +427,6 @@ export const optimizeTitle = (title: string): string => {
 };
 
 /**
- * Generate SoftwareApplication Schema
- * Used on product pages, feature pages, and landing pages for AI search engines
- */
-export const generateSoftwareApplicationSchema = (options?: {
-  name?: string;
-  description?: string;
-  url?: string;
-  price?: string;
-  priceCurrency?: string;
-  ratingValue?: string;
-  reviewCount?: string;
-  category?: string;
-  operatingSystem?: string;
-  features?: string[];
-}): Record<string, any> => {
-  // getBaseUrl(), not getSafeOrigin(): this describes AgentBio itself, not a
-  // tenant's page, so it must not read the host the visitor is on (US-172).
-  const baseUrl = getBaseUrl();
-  const opts = {
-    name: 'AgentBio',
-    description:
-      'Purpose-built link-in-bio platform for real estate agents. Showcase properties, capture leads, and book appointments from Instagram.',
-    url: baseUrl,
-    // Was '39' with an invented 4.8/523 rating pair (US-157). The price now
-    // comes from PRICING_PLANS; the rating defaults are gone, and
-    // generateSoftwareApplicationSchema only emits aggregateRating when a
-    // caller supplies real numbers.
-    price: STARTING_PRICE,
-    priceCurrency: 'USD',
-    category: 'BusinessApplication',
-    operatingSystem: 'Web, iOS, Android',
-    features: [],
-    ...options,
-  };
-
-  const schema: Record<string, any> = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: opts.name,
-    description: opts.description,
-    url: opts.url,
-    applicationCategory: opts.category,
-    operatingSystem: opts.operatingSystem,
-    offers: {
-      '@type': 'Offer',
-      price: opts.price,
-      priceCurrency: opts.priceCurrency,
-      priceValidUntil: '2026-12-31',
-      availability: 'https://schema.org/InStock',
-      url: `${baseUrl}/pricing`,
-    },
-    // Conditional: SchemaMarkup calls this without ratings, which previously
-    // emitted an AggregateRating with undefined values. Absent is correct;
-    // invented is not (US-157).
-    ...(opts.ratingValue && opts.reviewCount
-      ? {
-          aggregateRating: {
-            '@type': 'AggregateRating',
-            ratingValue: opts.ratingValue,
-            reviewCount: opts.reviewCount,
-            bestRating: '5',
-            worstRating: '1',
-          },
-        }
-      : {}),
-    publisher: {
-      '@type': 'Organization',
-      name: 'AgentBio',
-      url: baseUrl,
-    },
-  };
-
-  if (opts.features.length > 0) {
-    schema.featureList = opts.features.join(', ');
-  }
-
-  return schema;
-};
-
-/**
- * Generate ItemList Schema for Comparison Pages
- * Used on "vs" pages to help AI engines understand product comparisons
- */
-export const generateComparisonSchema = (
-  items: {
-    name: string;
-    description: string;
-    url: string;
-    image?: string;
-    price?: string;
-    rating?: string;
-  }[]
-): Record<string, any> => {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    itemListElement: items.map((item, index) => ({
-      '@type': 'ListItem',
-      position: index + 1,
-      item: {
-        '@type': 'SoftwareApplication',
-        name: item.name,
-        description: item.description,
-        url: item.url,
-        ...(item.image && { image: item.image }),
-        ...(item.price && {
-          offers: {
-            '@type': 'Offer',
-            price: item.price,
-            priceCurrency: 'USD',
-          },
-        }),
-        ...(item.rating && {
-          aggregateRating: {
-            '@type': 'AggregateRating',
-            ratingValue: item.rating,
-            bestRating: '5',
-          },
-        }),
-      },
-    })),
-  };
-};
-
-/**
- * Generate HowTo Schema for Tutorial/Guide Content
- * Helps AI engines extract step-by-step instructions
- */
-export const generateHowToSchema = (options: {
-  name: string;
-  description: string;
-  totalTime?: string;
-  estimatedCost?: { currency: string; value: string };
-  steps: { name: string; text: string; image?: string; url?: string }[];
-  tools?: string[];
-}): Record<string, any> => {
-  const schema: Record<string, any> = {
-    '@context': 'https://schema.org',
-    '@type': 'HowTo',
-    name: options.name,
-    description: options.description,
-    step: options.steps.map((step, index) => ({
-      '@type': 'HowToStep',
-      position: index + 1,
-      name: step.name,
-      text: step.text,
-      ...(step.image && { image: step.image }),
-      ...(step.url && { url: step.url }),
-    })),
-  };
-
-  if (options.totalTime) {
-    schema.totalTime = options.totalTime;
-  }
-  if (options.estimatedCost) {
-    schema.estimatedCost = {
-      '@type': 'MonetaryAmount',
-      currency: options.estimatedCost.currency,
-      value: options.estimatedCost.value,
-    };
-  }
-  if (options.tools && options.tools.length > 0) {
-    schema.tool = options.tools.map((tool) => ({
-      '@type': 'HowToTool',
-      name: tool,
-    }));
-  }
-
-  return schema;
-};
-
-/**
  * Generate Pricing Schema with multiple tiers
  * Used on pricing pages to display offer details in search results
  */
@@ -644,7 +462,7 @@ export const generatePricingSchema = (
       description: tier.description,
       price: tier.price,
       priceCurrency: tier.priceCurrency || 'USD',
-      priceValidUntil: '2026-12-31',
+      priceValidUntil: offerPriceValidUntil(),
       availability: 'https://schema.org/InStock',
       url: tier.url || `${baseUrl}/pricing`,
       ...(tier.billingPeriod && {

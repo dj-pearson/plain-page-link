@@ -31,11 +31,9 @@
  *   dashboard (1) — reached only behind the mocked session; kept at 0 with the
  *     rest, since the shared components it renders are the ones that changed.
  *
- * US-113 added the listing-modal case. ListingDetailModal was a hand-rolled
- * overlay — no role=dialog, no aria-modal, no focus trap, no focus restore,
- * and unlabelled icon buttons — so the modal state was exactly the state the
- * suite never looked at. It now uses the Radix Dialog the rest of the page
- * uses, and this holds it there.
+ * US-113 added the listing-modal case: the modal state was exactly the state
+ * the suite never looked at. US-275 replaced the modal with a page of its own
+ * (/:username/listing/:id), and the case now opens that page instead.
  *
  * A number above zero here is an accepted defect. Add one only with the
  * argument for it written down.
@@ -47,7 +45,7 @@ const BASELINE: Record<string, number> = {
   register: 0,
   dashboard: 0,
   'public profile': 0,
-  'public profile with a listing modal open': 0,
+  'public profile listing page': 0,
 };
 
 import { test, expect, type Page } from '@playwright/test';
@@ -290,6 +288,8 @@ const PAGES: { name: string; path: string; authenticated?: boolean }[] = [
   { name: 'privacy', path: '/privacy' },
   { name: 'terms', path: '/terms' },
   { name: 'dmca', path: '/dmca' },
+  // US-425: with no parameters it shows the invalid-link state.
+  { name: 'unsubscribe', path: '/unsubscribe' },
   { name: 'acceptable use', path: '/acceptable-use' },
   { name: 'accessibility statement', path: '/accessibility' },
   { name: 'cookies', path: '/cookies' },
@@ -357,22 +357,23 @@ test.describe('Accessibility (axe-core)', () => {
     });
   }
 
-  test('public profile with a listing modal open stays at/below baseline', async ({ page }) => {
-    const name = 'public profile with a listing modal open';
+  test('public profile listing page stays at/below baseline', async ({ page }) => {
+    const name = 'public profile listing page';
     await setupMocks(page);
     await page.goto('/demo', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
     await assertAppRendered(page, '/demo');
 
     // The card's address is the interactive element (US-113 unnested the two
-    // buttons that used to sit inside a role=button container).
+    // buttons that used to sit inside a role=button container), and a real
+    // link to the listing page since US-408.
     await page
-      .getByRole('button', { name: /View listing:/ })
+      .getByRole('link', { name: /View listing:/ })
       .first()
       .click();
-    // The assertion that the overlay is a dialog at all — the hand-rolled one
-    // had no role, so this locator would never have resolved.
-    await expect(page.getByRole('dialog')).toBeVisible();
+    // A listing opens its own page (US-275), with the address as its h1.
+    await expect(page).toHaveURL(/\/demo\/listing\/[^/]+$/);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
     const { blocking, total } = await analyze(page);
     if (blocking.length > 0) {

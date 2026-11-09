@@ -83,7 +83,8 @@ describe('EditListingModal (US-257)', () => {
     await user.clear(city);
     await user.type(city, 'Shelbyville');
     await user.click(screen.getByRole('button', { name: 'Save Changes' }));
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ city: 'Shelbyville' }));
+    // The second argument is the photos uploaded in the dialog (US-461).
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ city: 'Shelbyville' }), []);
   });
 });
 

@@ -9,9 +9,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, userEvent } from '@/test/test-utils';
 
-const { state, reorderMutate } = vi.hoisted(() => ({
+const { state, reorderMutate, views } = vi.hoisted(() => ({
   state: { listings: [] as unknown[], isLoading: false },
   reorderMutate: vi.fn(),
+  views: {
+    isReady: true,
+    stats: {} as Record<
+      string,
+      { views7d: number; views30d: number; visitors30d: number; lastViewedAt: string | null }
+    >,
+  },
+}));
+
+vi.mock('@/hooks/useListingViewStats', () => ({
+  useListingViewStats: () => ({
+    stats: views.stats,
+    isReady: views.isReady,
+    isLoading: false,
+    isError: !views.isReady,
+  }),
 }));
 
 vi.mock('@/hooks/useListings', () => ({
@@ -58,6 +74,8 @@ describe('Listings grid (US-257)', () => {
   beforeEach(() => {
     reorderMutate.mockReset().mockResolvedValue(undefined);
     state.isLoading = false;
+    views.isReady = true;
+    views.stats = {};
     state.listings = [
       listing('a', '1 First St', 0),
       listing('b', '2 Second St', 1),
@@ -119,5 +137,36 @@ describe('Listings grid (US-257)', () => {
       { id: 'c', sort_order: 1 },
       { id: 'b', sort_order: 2 },
     ]);
+  });
+
+  // US-263: listing_view events were recorded and never shown.
+  describe('views per listing', () => {
+    it('shows each card its 30-day views and this week, and says so when there are none', () => {
+      views.stats = {
+        a: { views7d: 4, views30d: 31, visitors30d: 20, lastViewedAt: null },
+      };
+      renderWithProviders(<Listings />);
+      expect(
+        screen.getByText('31 views by 20 visitors in the last 30 days; 4 views in the last 7 days')
+      ).toBeInTheDocument();
+      expect(screen.getByText('31 views · 4 this week')).toBeInTheDocument();
+      // b and c were never opened by a visitor.
+      expect(screen.getAllByText('No views in 30 days')).toHaveLength(2);
+    });
+
+    it('shows no views line at all when the counts could not be loaded', () => {
+      views.isReady = false;
+      renderWithProviders(<Listings />);
+      expect(screen.queryByText('No views in 30 days')).not.toBeInTheDocument();
+    });
+
+    it('adds a Views (30d) column to the list view', async () => {
+      const user = userEvent.setup();
+      views.stats = { b: { views7d: 0, views30d: 1500, visitors30d: 700, lastViewedAt: null } };
+      renderWithProviders(<Listings />);
+      await user.click(screen.getByRole('button', { name: 'List view' }));
+      expect(screen.getByRole('columnheader', { name: 'Views (30d)' })).toBeInTheDocument();
+      expect(screen.getByRole('cell', { name: '1,500' })).toBeInTheDocument();
+    });
   });
 });

@@ -16,8 +16,9 @@
  *   - Changing the username moved the agent's public address with no warning
  *     that every link already shared would break.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
+import { act } from '@testing-library/react';
 
 const { profileMock, subscriptionMock, updateMock, refreshProfileMock } = vi.hoisted(() => ({
   profileMock: vi.fn(),
@@ -64,10 +65,16 @@ vi.mock('@/components/settings/SessionManagement', () => ({ SessionManagement: (
 vi.mock('@/components/settings/LeadNotificationPreferences', () => ({
   LeadNotificationPreferences: () => null,
 }));
-vi.mock('@/components/auth/mfa/NativeMFASettings', () => ({ NativeMFASettings: () => null }));
+vi.mock('@/components/settings/TimeZoneSetting', () => ({ TimeZoneSetting: () => null }));
+vi.mock('@/components/auth/mfa/NativeMFASettings', () => ({
+  NativeMFASettings: () => <p>Two-factor section</p>,
+}));
 vi.mock('@/components/settings/AuditLogViewer', () => ({ AuditLogViewer: () => null }));
-vi.mock('@/components/settings/GDPRSettings', () => ({ GDPRSettings: () => null }));
+vi.mock('@/components/settings/GDPRSettings', () => ({
+  GDPRSettings: () => <p>Data export section</p>,
+}));
 vi.mock('@/components/settings/ProfileURLCard', () => ({ ProfileURLCard: () => null }));
+vi.mock('@/components/settings/PublishProfileCard', () => ({ PublishProfileCard: () => null }));
 
 import Settings from './Settings';
 
@@ -209,5 +216,56 @@ describe('Settings username change', () => {
 
     await waitFor(() => expect(updateMock).toHaveBeenCalled());
     expect(screen.queryByText(/change your public address\?/i)).toBeNull();
+  });
+});
+
+describe('Settings security sections (US-516)', () => {
+  // The global setup's IntersectionObserver never reports anything; this one
+  // lets the test say when the reader has scrolled near.
+  let reportIntersecting: (() => void) | null = null;
+  const original = global.IntersectionObserver;
+
+  beforeEach(() => {
+    profileMock.mockReturnValue({ profile: PROFILE, isLoading: false });
+    subscriptionMock.mockReturnValue({ subscription: null, isLoading: false });
+    reportIntersecting = null;
+    global.IntersectionObserver = vi
+      .fn()
+      // A function, not an arrow: it is called with `new`.
+      .mockImplementation(function (callback: IntersectionObserverCallback) {
+        const observer = {
+          observe: vi.fn(() => {
+            reportIntersecting = () =>
+              callback([{ isIntersecting: true } as IntersectionObserverEntry], observer as never);
+          }),
+          unobserve: vi.fn(),
+          disconnect: vi.fn(),
+        };
+        return observer;
+      }) as unknown as typeof IntersectionObserver;
+  });
+
+  afterEach(() => {
+    global.IntersectionObserver = original;
+  });
+
+  it('does not mount the below-the-fold sections with the page', async () => {
+    renderWithProviders(<Settings />);
+
+    expect(await screen.findByText('Free')).toBeInTheDocument();
+    expect(screen.getByText('Security & Privacy')).toBeInTheDocument();
+    expect(screen.queryByText('Two-factor section')).toBeNull();
+    expect(screen.queryByText('Data export section')).toBeNull();
+  });
+
+  it('loads them once the reader scrolls near', async () => {
+    renderWithProviders(<Settings />);
+    await screen.findByText('Free');
+    await waitFor(() => expect(reportIntersecting).not.toBeNull());
+
+    act(() => reportIntersecting!());
+
+    expect(await screen.findByText('Two-factor section')).toBeInTheDocument();
+    expect(screen.getByText('Data export section')).toBeInTheDocument();
   });
 });

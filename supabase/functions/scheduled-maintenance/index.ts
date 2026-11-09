@@ -1,14 +1,33 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail } from '../_shared/email.ts';
-import { getAgentContact } from '../_shared/agent-contact.ts';
+import { getAgentContacts } from '../_shared/agent-contact.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getSiteUrl } from '../_shared/env.ts';
-import { runDigests } from './digests.ts';
+import { digestSchedule, runDigests, summarizeDigestReport } from './digests.ts';
+import { isMissingColumn, supabaseDigestStore } from './digest-store.ts';
+import {
+  chaseOverdueLeads,
+  summarizeOverdueReport,
+  OVERDUE_NOTIFICATION_TYPE,
+  type OverdueStore,
+} from './overdue.ts';
 import { processDueDeletions, supabaseDeletionStore } from '../_shared/account-deletion.ts';
 import { createSubscriptionApi } from '../_shared/stripe-subscriptions.ts';
+import { decryptSecret } from '../_shared/encryption.ts';
+import {
+  hashContactBacklog,
+  summarizeContactHashReport,
+  supabaseContactHashStore,
+} from '../_shared/contact-lookup-hashes.ts';
+import {
+  processExportQueue,
+  purgeExpiredExports,
+  summarizeExportQueueReport,
+  supabaseExportQueueStore,
+} from '../_shared/gdpr-export-queue.ts';
 
 /**
  * Scheduled maintenance.
@@ -29,11 +48,134 @@ import { createSubscriptionApi } from '../_shared/stripe-subscriptions.ts';
  * others, so each is caught and reported in the response rather than thrown.
  */
 
-/** How long a new lead may sit unanswered before the agent is chased. */
-const DEFAULT_SLA_HOURS = 2;
+/** The overdue-lead chaser's reads and writes, over the service-role client. */
+function overdueStore(supabase: SupabaseClient): OverdueStore {
+  // Until migration 20261107000433 is applied there is no profiles.timezone:
+  // every agent is emailed at once, as before, rather than the task failing.
+  let hasTimezone = true;
 
-/** Never chase the same lead twice, however often this runs. */
-const OVERDUE_NOTIFICATION_TYPE = 'lead_overdue';
+  async function readTimeZones(userIds: string[]): Promise<Map<string, string | null>> {
+    const zones = new Map<string, string | null>();
+    if (!hasTimezone || userIds.length === 0) return zones;
+    const { data, error } = await supabase.from('profiles').select('id, timezone').in('id', userIds);
+    if (error && isMissingColumn(error)) {
+      hasTimezone = false;
+      return zones;
+    }
+    if (error) throw new Error(`reading agent time zones: ${error.message}`);
+    for (const row of (data ?? []) as { id: string; timezone: string | null }[]) {
+      zones.set(row.id, row.timezone ?? null);
+    }
+    return zones;
+  }
+
+  return {
+    async listCandidates(from, to, offset, limit) {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('id, user_id, name, created_at, lead_type')
+        .eq('status', 'new')
+        .is('first_responded_at', null)
+        .gte('created_at', from)
+        .lt('created_at', to)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(offset, offset + limit - 1);
+      if (error) throw new Error(`reading overdue leads: ${error.message}`);
+      return data ?? [];
+    },
+    async listChasedLeadIds(userIds, since) {
+      const ids = new Set<string>();
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('id, data')
+          .eq('type', OVERDUE_NOTIFICATION_TYPE)
+          .in('user_id', userIds)
+          .gte('created_at', since)
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw new Error(`reading chased leads: ${error.message}`);
+        for (const row of data ?? []) {
+          const leadId = (row.data as { lead_id?: unknown } | null)?.lead_id;
+          if (typeof leadId === 'string') ids.add(leadId);
+        }
+        if ((data ?? []).length < pageSize) break;
+      }
+      return ids;
+    },
+    async getAgents(userIds) {
+      const agents = new Map<
+        string,
+        { email: string | null; preferences: Record<string, unknown> | null; timeZone: string | null }
+      >();
+      // A failed zone read fails the chunk: emailing at 3am because the zone
+      // could not be read is the thing quiet hours exist to prevent.
+      const zones = await readTimeZones(userIds);
+      for (const [id, c] of await getAgentContacts(supabase, userIds)) {
+        agents.set(id, { email: c.email, preferences: c.notificationPreferences, timeZone: zones.get(id) ?? null });
+      }
+      return agents;
+    },
+    async listHeldChases(since) {
+      const held: Awaited<ReturnType<OverdueStore['listHeldChases']>> = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('id, user_id, data')
+          .eq('type', OVERDUE_NOTIFICATION_TYPE)
+          .eq('data->>email_pending', 'true')
+          .gte('created_at', since)
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw new Error(`reading held chases: ${error.message}`);
+        for (const row of (data ?? []) as { id: string; user_id: string; data: unknown }[]) {
+          const payload = row.data as Record<string, unknown> | null;
+          if (payload && typeof payload.lead_id === 'string') {
+            held.push({ notificationId: row.id, user_id: row.user_id, lead_id: payload.lead_id, data: payload });
+          }
+        }
+        if ((data ?? []).length < pageSize) break;
+      }
+      return held;
+    },
+    async listStillWaiting(leadIds) {
+      if (leadIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('leads')
+        .select('id, user_id, name, created_at, lead_type')
+        .in('id', leadIds)
+        .eq('status', 'new')
+        .is('first_responded_at', null);
+      if (error) throw new Error(`reading held leads: ${error.message}`);
+      return data ?? [];
+    },
+    async releaseHeld(held) {
+      const rest = { ...held.data };
+      delete rest.email_pending;
+      // Conditional on email_pending still being set: two overlapping runs
+      // cannot both own the email.
+      const { data, error } = await supabase
+        .from('notifications')
+        .update({ data: rest })
+        .eq('id', held.notificationId)
+        .eq('data->>email_pending', 'true')
+        .select('id');
+      if (error) throw new Error(error.message);
+      return (data ?? []).length > 0;
+    },
+    async claim(notification) {
+      const { error } = await supabase.from('notifications').insert(notification);
+      if (!error) return 'claimed';
+      // idx_notifications_lead_overdue_once: someone already chased this lead.
+      if (error.code === '23505') return 'duplicate';
+      throw new Error(error.message);
+    },
+    sendEmail: (email) => sendEmail(email),
+  };
+}
 
 interface TaskResult {
   task: string;
@@ -71,104 +213,22 @@ serve(async (req) => {
     const results: TaskResult[] = [];
 
     // ---------------------------------------------------------------------
-    // 1. Chase leads that have gone unanswered past the agent's own SLA.
+    // 1. Chase leads that have gone unanswered past the agent's own SLA
+    //    (overdue.ts: at most once per lead, missed runs made up within a week).
     // ---------------------------------------------------------------------
     results.push(
       await run('overdue_leads', async () => {
-        // Cast the net at the SHORTEST configurable window and check each
-        // lead against its own agent's setting below. Filtering at the longest
-        // window here would silently exclude every agent who chose a tighter
-        // one, which is the setting that matters most.
-        const cutoff = new Date(Date.now() - DEFAULT_SLA_HOURS * 3_600_000).toISOString();
-
-        const { data: leads, error } = await supabase
-          .from('leads')
-          .select('id, user_id, name, created_at, lead_type')
-          .eq('status', 'new')
-          .is('first_responded_at', null)
-          .lt('created_at', cutoff)
-          .order('created_at', { ascending: true })
-          .limit(500);
-        if (error) throw error;
-        if (!leads?.length) return 'no overdue leads';
-
-        // Group by agent so each agent's SLA is read once, not per lead.
-        const byAgent = new Map<string, typeof leads>();
-        for (const lead of leads) {
-          const list = byAgent.get(lead.user_id) ?? [];
-          list.push(lead);
-          byAgent.set(lead.user_id, list);
+        const report = await chaseOverdueLeads(overdueStore(supabase), {
+          now: new Date(),
+          siteUrl: getSiteUrl(),
+        });
+        const summary = summarizeOverdueReport(report);
+        // Unclaimed leads are retried next run; the task is reported failed so
+        // the 207 shows that some agent was not chased.
+        if (report.errors.length > 0) {
+          throw new Error(`${summary}: ${report.errors.join('; ').slice(0, 500)}`);
         }
-
-        let notified = 0;
-        let skipped = 0;
-
-        for (const [agentId, agentLeads] of byAgent) {
-          const contact = await getAgentContact(supabase, agentId);
-          const prefs = (contact?.notificationPreferences ?? {}) as {
-            leads?: string;
-            sla_hours?: number;
-          };
-          if (prefs.leads === 'off') {
-            skipped += agentLeads.length;
-            continue;
-          }
-          const slaMs = (prefs.sla_hours ?? DEFAULT_SLA_HOURS) * 3_600_000;
-
-          for (const lead of agentLeads) {
-            const age = Date.now() - new Date(lead.created_at).getTime();
-            if (age < slaMs) {
-              skipped++;
-              continue;
-            }
-
-            // At most once per lead, ever. A notifications row is the record —
-            // cheaper than a dedicated table and visible to the agent either
-            // way.
-            const { data: already } = await supabase
-              .from('notifications')
-              .select('id')
-              .eq('user_id', agentId)
-              .eq('type', OVERDUE_NOTIFICATION_TYPE)
-              .contains('data', { lead_id: lead.id })
-              .maybeSingle();
-            if (already) {
-              skipped++;
-              continue;
-            }
-
-            const hours = Math.floor(age / 3_600_000);
-            const { error: notifyError } = await supabase.from('notifications').insert({
-              user_id: agentId,
-              type: OVERDUE_NOTIFICATION_TYPE,
-              title: `${lead.name} is still waiting`,
-              message: `This ${lead.lead_type ?? 'lead'} has had no response for ${hours}h.`,
-              data: { lead_id: lead.id, hours_waiting: hours },
-            });
-            if (notifyError) {
-              console.error(
-                `[scheduled-maintenance] could not notify for lead ${lead.id}: ${notifyError.message}`
-              );
-              continue;
-            }
-
-            if (contact?.email) {
-              const siteUrl = getSiteUrl();
-              await sendEmail({
-                to: contact.email,
-                subject: `${lead.name} has been waiting ${hours}h`,
-                body:
-                  `${lead.name} sent you a ${lead.lead_type ?? 'lead'} ${hours} hours ago and ` +
-                  `has not heard back.\n\n` +
-                  `Open the lead: ${siteUrl}/dashboard/leads?lead=${lead.id}\n\n` +
-                  `You can change how long to wait, or turn these off, in Settings.`,
-              });
-            }
-            notified++;
-          }
-        }
-
-        return `notified ${notified}, skipped ${skipped}`;
+        return summary;
       })
     );
 
@@ -198,6 +258,69 @@ serve(async (req) => {
     );
 
     // ---------------------------------------------------------------------
+    // 2b. Queued data exports (US-397). gdpr-export's POST queued a request
+    //     that nothing processed. Each is built into the private gdpr-exports
+    //     bucket and the subject emailed a link that expires; expired files
+    //     are deleted.
+    // ---------------------------------------------------------------------
+    results.push(
+      await run('data_exports', async () => {
+        const store = supabaseExportQueueStore(supabase, {
+          decrypt: (value) => decryptSecret(value),
+          sendEmail: (email) => sendEmail(email),
+        });
+        const report = await processExportQueue(store, { now: new Date(), siteUrl: getSiteUrl() });
+        const purged = await purgeExpiredExports(store, new Date()).catch((error) => {
+          report.errors.push(`purging expired exports: ${error instanceof Error ? error.message : String(error)}`);
+          return 0;
+        });
+        const summary = summarizeExportQueueReport(report, purged);
+        // Retried requests run again next hour; reported failed so the 207
+        // says some subject is still waiting for their data.
+        if (report.errors.length > 0) {
+          throw new Error(`${summary}: ${report.errors.join('; ').slice(0, 500)}`);
+        }
+        return summary;
+      })
+    );
+
+    // ---------------------------------------------------------------------
+    // 2c. Contact lookup fingerprints (US-640). The duplicate-client check
+    //     compares contacts.email_hash/phone_hash, which only code holding
+    //     PII_ENCRYPTION_KEY can compute. New and edited contacts are hashed
+    //     by pii-crypto when the dashboard saves them; this works through
+    //     every contact that is still unhashed (existing ones, saves whose
+    //     follow-up call failed), a bounded number per run.
+    // ---------------------------------------------------------------------
+    results.push(
+      await run('contact_lookup_hashes', async () => {
+        const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY');
+        if (!hashSecret) return 'skipped: PII_ENCRYPTION_KEY is not set';
+        const report = await hashContactBacklog({
+          hashSecret,
+          decrypt: async (value) => {
+            if (!value) return null;
+            try {
+              const plain = (await decryptSecret(value)) ?? null;
+              // Unopenable (corrupt, rotated key): nothing to fingerprint.
+              return plain && !plain.startsWith('enc:v1:') ? plain : null;
+            } catch {
+              return null;
+            }
+          },
+          ...supabaseContactHashStore(supabase),
+        });
+        const summary = summarizeContactHashReport(report);
+        // Unsaved rows stay unhashed and are retried next run; reported
+        // failed so the 207 shows it.
+        if (report.failed > 0) {
+          throw new Error(`${summary}: ${report.errors.slice(0, 10).join('; ').slice(0, 500)}`);
+        }
+        return summary;
+      })
+    );
+
+    // ---------------------------------------------------------------------
     // 3. The cleanup_* functions, none of which had ever been executed.
     //    cleanup_rate_limits in particular was also pointed at the wrong table
     //    until US-098, so rate_limit_entries only ever grew.
@@ -220,11 +343,46 @@ serve(async (req) => {
 
     // ---------------------------------------------------------------------
     // 4. The morning email (US-230): new leads, follow-ups due today and
-    //    clients' upcoming dates, once a day in DIGEST_HOUR_UTC. POST
-    //    {"force_digest": true} runs it now (still once per agent per day).
+    //    clients' upcoming dates, once a day from DIGEST_HOUR_UTC. Runs up to
+    //    DIGEST_CATCHUP_HOURS later make up a missed run (US-331); digest_log
+    //    keeps it to one per agent per day. POST {"force_digest": true} runs
+    //    it now (still once per agent per day). US-433: an agent with a time
+    //    zone gets it at DIGEST_LOCAL_HOUR on their own clock instead, so some
+    //    agent's edition is due in most hours and every run pages through
+    //    the profiles. US-518: an agent may choose that hour (5 to 10) in
+    //    notification_preferences.digest_hour.
     // ---------------------------------------------------------------------
     const body = (await req.json().catch(() => ({}))) as { force_digest?: boolean };
-    results.push(await run('digests', () => runDigests(supabase, { force: body.force_digest === true })));
+    results.push(
+      await run('digests', async () => {
+        const now = new Date();
+        const force = body.force_digest === true;
+        const catchUpHours = Number.parseInt(Deno.env.get('DIGEST_CATCHUP_HOURS') ?? '', 10);
+        const localHour = Number.parseInt(Deno.env.get('DIGEST_LOCAL_HOUR') ?? '', 10);
+        const schedule = digestSchedule(now, {
+          hour: Number.parseInt(Deno.env.get('DIGEST_HOUR_UTC') ?? '', 10),
+          catchUpHours,
+          force,
+        });
+        // Editions an earlier clean pass completed today are skipped without
+        // reading their agents' leads (digest_runs, US-354); a forced run
+        // always does a full pass.
+        const report = await runDigests(supabaseDigestStore(supabase), {
+          schedule,
+          scheduleFor: (timeZone, hour) =>
+            digestSchedule(now, { hour: hour ?? localHour, catchUpHours, force, timeZone }),
+          siteUrl: getSiteUrl(),
+          useRunMarker: body.force_digest !== true,
+        });
+        const summary = summarizeDigestReport(report);
+        // Agents still owed today's edition are retried by the next run in
+        // the window, but the task is reported failed so the 207 says so.
+        if (report.errors.length > 0) {
+          throw new Error(`${summary}: ${report.errors.slice(0, 10).join('; ').slice(0, 500)}`);
+        }
+        return summary;
+      })
+    );
 
     const failed = results.filter((r) => !r.ok);
     console.log(

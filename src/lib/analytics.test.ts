@@ -124,6 +124,23 @@ describe('AnalyticsEngine', () => {
 
       expect(generator).toHaveBeenCalledTimes(3);
     });
+
+    // US-558: the date-fns calls became native; the output must not move.
+    it('labels and counts days exactly as date-fns did', async () => {
+      const { eachDayOfInterval, format } = await import('date-fns');
+      const ranges: Array<[Date, Date]> = [
+        [new Date(2026, 2, 5, 13, 30), new Date(2026, 3, 2, 8, 0)], // across a DST change
+        [new Date(2025, 11, 28), new Date(2026, 0, 4, 23, 59)], // across a year end
+        [new Date(2026, 5, 10, 9), new Date(2026, 5, 3, 9)], // reversed
+        [new Date(2026, 1, 27), new Date(2026, 1, 27, 22)], // one day
+      ];
+      for (const [start, end] of ranges) {
+        const expected = eachDayOfInterval({ start, end }).map((d) => format(d, 'MMM d'));
+        expect(
+          AnalyticsEngine.generateTimeSeries(start, end, () => 0).map((point) => point.date)
+        ).toEqual(expected);
+      }
+    });
   });
 
   describe('calculateFunnel', () => {

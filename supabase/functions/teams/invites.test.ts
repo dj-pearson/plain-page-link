@@ -8,6 +8,7 @@ import {
   MAX_TEAMS_PER_OWNER,
   MAX_TEAM_NAME_LENGTH,
   isInvitableEmail,
+  leaveTeamRefusal,
   normaliseTeamName,
   teamNameForEmail,
 } from './invites.ts';
@@ -77,5 +78,26 @@ describe('team invite abuse limits (US-259)', () => {
     for (const [input] of cases) {
       expect(teamNameForEmail(input)).not.toMatch(/https?:|www\.|\.(com|example|ly)\b|:\/\//i);
     }
+  });
+});
+
+describe('leaveTeamRefusal (US-430)', () => {
+  it('lets a member whose row was removed leave', () => {
+    expect(leaveTeamRefusal({ teamExists: true, isOwner: false, rowsRemoved: 1 })).toBeNull();
+  });
+
+  it('refuses the owner with a conflict', () => {
+    expect(leaveTeamRefusal({ teamExists: true, isOwner: true, rowsRemoved: 0 })).toMatchObject({
+      code: 'OWNER_CANNOT_LEAVE',
+      status: 409,
+    });
+  });
+
+  it('answers 404 for a missing team or a caller with no accepted row', () => {
+    expect(leaveTeamRefusal({ teamExists: false, isOwner: false, rowsRemoved: 0 })?.status).toBe(404);
+    expect(leaveTeamRefusal({ teamExists: true, isOwner: false, rowsRemoved: 0 })).toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    });
   });
 });

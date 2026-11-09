@@ -14,21 +14,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders, screen, userEvent, waitFor, fireEvent } from '@/test/test-utils';
 import { mockProfile } from '@/test/fixtures/profile';
 
-const { profileMock, mutateAsync, uploadAvatar } = vi.hoisted(() => ({
+const { profileMock, mutateAsync, uploadAvatar, uploadLogo } = vi.hoisted(() => ({
   profileMock: vi.fn(),
   mutateAsync: vi.fn(),
   uploadAvatar: vi.fn(),
+  uploadLogo: vi.fn(),
 }));
 
 vi.mock('@/hooks/useProfile', () => ({ useProfile: () => profileMock() }));
 vi.mock('@/hooks/useAvatarUpload', () => ({
   useAvatarUpload: () => ({ uploadAvatar, uploading: false }),
 }));
+vi.mock('@/hooks/useBrokerageLogoUpload', () => ({
+  useBrokerageLogoUpload: () => ({ uploadLogo, uploading: false }),
+}));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 import Profile from './Profile';
 
 const NEW_AVATAR = 'https://example.com/avatars/new.jpg';
+const NEW_LOGO = 'https://example.com/brokerage-logos/u1/logo-1.png';
 
 function hookState(profile: Record<string, unknown>) {
   return {
@@ -48,6 +53,7 @@ describe('Profile editor', () => {
   beforeEach(() => {
     mutateAsync.mockReset().mockResolvedValue({ id: mockProfile.id });
     uploadAvatar.mockReset().mockResolvedValue(NEW_AVATAR);
+    uploadLogo.mockReset().mockResolvedValue(NEW_LOGO);
     profileMock.mockReturnValue(hookState({ ...mockProfile, phoneUnavailable: false }));
   });
 
@@ -102,6 +108,72 @@ describe('Profile editor', () => {
     });
   });
 
+  describe('brokerage logo (US-374)', () => {
+    async function openProfessionalTab() {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('tab', { name: 'Professional' }));
+      return user;
+    }
+
+    it('offers an upload, not a free-text URL field', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      await openProfessionalTab();
+
+      expect(container.querySelector('input[name="brokerage_logo"]')).toBeNull();
+      expect(screen.queryByText(/Brokerage Logo URL/)).toBeNull();
+      expect(screen.getByRole('button', { name: 'Upload Logo' })).toBeInTheDocument();
+    });
+
+    it('shows the uploaded logo and does not count it as an unsaved change', async () => {
+      renderWithProviders(<Profile />);
+      const user = await openProfessionalTab();
+
+      await user.upload(
+        screen.getByTestId('brokerage-logo-input'),
+        new File(['x'], 'logo.png', { type: 'image/png' })
+      );
+
+      expect(uploadLogo).toHaveBeenCalledTimes(1);
+      await waitFor(() =>
+        expect(screen.getByAltText(`${mockProfile.brokerage_name} logo`).getAttribute('src')).toBe(
+          NEW_LOGO
+        )
+      );
+      expect(screen.getByRole('button', { name: 'Replace Logo' })).toBeInTheDocument();
+      expect(screen.getAllByText('All changes saved').length).toBeGreaterThan(0);
+    });
+
+    it('keeps the previous state when the upload is rejected', async () => {
+      uploadLogo.mockResolvedValue(null);
+      renderWithProviders(<Profile />);
+      const user = await openProfessionalTab();
+
+      await user.upload(
+        screen.getByTestId('brokerage-logo-input'),
+        new File(['x'], 'logo.png', { type: 'image/png' })
+      );
+
+      await waitFor(() => expect(uploadLogo).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole('button', { name: 'Upload Logo' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+    });
+
+    it('removing the logo is saved with the form', async () => {
+      profileMock.mockReturnValue(
+        hookState({ ...mockProfile, brokerage_logo: NEW_LOGO, phoneUnavailable: false })
+      );
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openProfessionalTab();
+
+      await user.click(screen.getByRole('button', { name: 'Remove' }));
+      expect(screen.getByRole('button', { name: 'Upload Logo' })).toBeInTheDocument();
+
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+      expect(mutateAsync.mock.calls[0][0]).toMatchObject({ brokerage_logo: '' });
+    });
+  });
+
   describe('a phone that could not be decrypted', () => {
     it('is left out of the save when the agent did not type a new one', async () => {
       profileMock.mockReturnValue(
@@ -144,6 +216,22 @@ describe('Profile editor', () => {
       );
     });
 
+    it('names the field when the database refuses a URL (US-456)', async () => {
+      mutateAsync.mockRejectedValue({
+        code: '23514',
+        message:
+          'new row for relation "profiles" violates check constraint "profiles_calendly_url_scheme"',
+      });
+      const { container } = renderWithProviders(<Profile />);
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(
+        'Your profile was not saved: Your Calendly link must be a full web address starting with https://.'
+      );
+      expect(alert).not.toHaveTextContent('check constraint');
+    });
+
     it('shows the real reason for any other failure', async () => {
       mutateAsync.mockRejectedValue({ message: 'value too long for type character varying(160)' });
       const { container } = renderWithProviders(<Profile />);
@@ -160,6 +248,70 @@ describe('Profile editor', () => {
     // One in the header (md and up), one in the bar (below md).
     expect(screen.getAllByRole('button', { name: /save changes/i })).toHaveLength(2);
     expect(screen.getByText('All changes saved')).toBeInTheDocument();
+  });
+
+  describe('link fields (US-290)', () => {
+    async function openSocialTab() {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('tab', { name: 'Social Media' }));
+      return user;
+    }
+
+    it('refuses javascript: next to the field and does not save', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openSocialTab();
+      await user.type(screen.getByLabelText('Instagram URL'), 'javascript:alert(1)');
+
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+      const message = 'Your Instagram link must be a full web address starting with https://.';
+      const field = await screen.findByLabelText('Instagram URL');
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      expect(field).toHaveAccessibleDescription(message);
+      expect(screen.getByRole('alert')).toHaveTextContent(message);
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('brings the tab with the refused field forward', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openSocialTab();
+      await user.type(screen.getByLabelText('YouTube URL'), 'not a link');
+      await user.click(screen.getByRole('tab', { name: 'Basic Info' }));
+      expect(screen.queryByLabelText('YouTube URL')).toBeNull();
+
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+      expect(await screen.findByLabelText('YouTube URL')).toHaveAttribute('aria-invalid', 'true');
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('saves a bare host with https:// in front and shows what was stored', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openSocialTab();
+      await user.type(screen.getByLabelText('Zillow Profile URL'), 'zillow.com/profile/jane');
+
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+      expect(mutateAsync.mock.calls[0][0]).toMatchObject({
+        zillow_url: 'https://zillow.com/profile/jane',
+      });
+      expect(screen.getByLabelText('Zillow Profile URL')).toHaveValue(
+        'https://zillow.com/profile/jane'
+      );
+    });
+
+    it('clears the error once the agent edits the field', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openSocialTab();
+      const field = screen.getByLabelText('TikTok URL');
+      await user.type(field, 'javascript:x');
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+      await waitFor(() => expect(field).toHaveAttribute('aria-invalid', 'true'));
+
+      await user.clear(field);
+      expect(field).not.toHaveAttribute('aria-invalid');
+    });
   });
 
   describe('leaving with unsaved changes', () => {
@@ -195,6 +347,30 @@ describe('Profile editor', () => {
       } finally {
         link.remove();
       }
+    });
+  });
+
+  describe('opens the tab a checklist step links to (US-487)', () => {
+    afterEach(() => {
+      window.history.replaceState({}, '', '/');
+    });
+
+    it('?tab=service opens Service Areas', () => {
+      window.history.replaceState({}, '', '/dashboard/profile?tab=service');
+      renderWithProviders(<Profile />);
+      expect(screen.getByRole('tab', { name: 'Service Areas' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+    });
+
+    it('an unknown tab falls back to Basic Info', () => {
+      window.history.replaceState({}, '', '/dashboard/profile?tab=bogus');
+      renderWithProviders(<Profile />);
+      expect(screen.getByRole('tab', { name: 'Basic Info' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
     });
   });
 });

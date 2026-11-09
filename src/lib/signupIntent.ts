@@ -61,14 +61,19 @@ export function capturePlanIntent(search: string): PlanIntent | null {
   const params = new URLSearchParams(search);
   const plan = params.get('plan')?.toLowerCase() ?? '';
   if (!PLAN_RE.test(plan) || plan === 'free') return readPlanIntent();
-  const intent: PlanIntent = { plan, interval: params.get('interval') === 'year' ? 'year' : 'month' };
+  const intent: PlanIntent = {
+    plan,
+    interval: params.get('interval') === 'year' ? 'year' : 'month',
+  };
   write(PLAN_KEY, intent);
   return intent;
 }
 
 export function readPlanIntent(): PlanIntent | null {
   const stored = read<PlanIntent>(PLAN_KEY, PLAN_TTL_MS);
-  return stored && PLAN_RE.test(stored.plan) ? { plan: stored.plan, interval: stored.interval === 'year' ? 'year' : 'month' } : null;
+  return stored && PLAN_RE.test(stored.plan)
+    ? { plan: stored.plan, interval: stored.interval === 'year' ? 'year' : 'month' }
+    : null;
 }
 
 export function clearPlanIntent(): void {
@@ -97,7 +102,9 @@ export function captureReferral(search: string): Referral | null {
 
 export function readReferral(): Referral | null {
   const stored = read<Referral>(REF_KEY, REF_TTL_MS);
-  return stored && REF_RE.test(stored.ref) ? { ref: stored.ref, ...(stored.source ? { source: stored.source } : {}) } : null;
+  return stored && REF_RE.test(stored.ref)
+    ? { ref: stored.ref, ...(stored.source ? { source: stored.source } : {}) }
+    : null;
 }
 
 /** The "Powered by" link on a free profile, attributed to its owner. */
@@ -105,6 +112,35 @@ export function poweredByUrl(username: string | null | undefined): string {
   const url = new URL('https://agentbio.net/');
   url.searchParams.set('utm_source', 'profile_badge');
   url.searchParams.set('utm_medium', 'referral');
-  if (username && REF_RE.test(username.toLowerCase())) url.searchParams.set('ref', username.toLowerCase());
+  if (username && REF_RE.test(username.toLowerCase()))
+    url.searchParams.set('ref', username.toLowerCase());
+  return url.toString();
+}
+
+/**
+ * The oauth-proxy authorize URL for Google/Apple sign-in (US-594).
+ *
+ * Carries the referral and first-touch source the same way the email signUp
+ * does, so an account created by social sign-in is attributed too: the proxy
+ * signs them into its state and puts them on the new user's metadata, where
+ * handle_new_user records them. They are ignored for an existing account.
+ */
+export function oauthAuthorizeUrl(
+  functionsUrl: string,
+  provider: 'google' | 'apple',
+  redirectTo: string,
+  referral: Referral | null,
+  fallbackSource?: string | null
+): string {
+  // Kept as `${functionsBase}/oauth-proxy`: edge-function-routing.test.ts reads
+  // call sites in that shape to check the router serves them.
+  const functionsBase = functionsUrl.replace(/\/+$/, '');
+  const url = new URL(`${functionsBase}/oauth-proxy`);
+  url.searchParams.set('action', 'authorize');
+  url.searchParams.set('provider', provider);
+  url.searchParams.set('redirect_to', redirectTo);
+  if (referral && REF_RE.test(referral.ref)) url.searchParams.set('ref', referral.ref);
+  const source = (referral?.source ?? fallbackSource ?? '').trim().slice(0, 100);
+  if (source) url.searchParams.set('signup_source', source);
   return url.toString();
 }

@@ -75,7 +75,7 @@ AgentBio Intelligence is an AI-powered real estate platform that transforms agen
 - **Hosting**: Cloudflare Pages
 - **Edge Functions**: Supabase Edge Functions
 - **Analytics**: Google Analytics
-- **Push Notifications**: client-side FCM token registration only — there is no server-side sender yet
+- **Push Notifications**: none. Push was removed (owner decision 2026-11-07); do not add FCM back without asking
 - **CDN**: Cloudflare
 
 ### Development Tools
@@ -139,7 +139,6 @@ plain-page-link/
 │   │   ├── useSubscription.ts  # Subscription management
 │   │   ├── useArticles.ts      # Blog article management
 │   │   ├── useTestimonials.ts  # Testimonials management
-│   │   ├── useOfflineStorage.ts # PWA offline support
 │   │   ├── useAutoSave.ts      # Auto-save functionality
 │   │   └── use*.ts             # Other domain-specific hooks
 │   │
@@ -154,15 +153,12 @@ plain-page-link/
 │   │
 │   ├── lib/                # Utility libraries & helpers
 │   │   ├── errorHandler.ts         # Centralized error handling
-│   │   ├── offline-storage.ts      # IndexedDB for offline PWA
-│   │   ├── push-notifications.ts   # FCM push notifications
 │   │   ├── analytics.ts            # Analytics utilities
 │   │   ├── lead-scoring.ts         # Lead scoring algorithms
 │   │   ├── seo.ts                  # SEO utilities
 │   │   ├── image-seo.ts            # Image SEO optimization
 │   │   ├── pageBuilder.ts          # Page builder utilities
 │   │   ├── themes.ts               # Theme definitions
-│   │   ├── sync-manager.ts         # Offline sync management
 │   │   ├── instagram-bio-analyzer/ # Instagram bio tool
 │   │   └── listing-description-generator/ # Listing generator tool
 │   │
@@ -284,8 +280,6 @@ plain-page-link/
    - `VITE_SUPABASE_ANON_KEY` - Your Supabase anon/public key
    - `VITE_APP_URL` - Your app URL (e.g., https://agentbio.net)
 
-   Optional (for push notifications):
-   - `VITE_FIREBASE_*` - Firebase config for FCM
 
 4. **Start Development Server:**
    ```bash
@@ -717,6 +711,11 @@ the free tools (`instagram_bio_*`, `listing_*`).
 - A policy meant for the backend must say `TO service_role` explicitly.
 - `verify:schema` fails on any unconditional policy reaching
   `anon`/`authenticated` that is not declared in `PUBLIC_BY_DESIGN`.
+- A visitor policy on content that belongs to an agent's page (listings, links,
+  testimonials) also requires the owning profile to be published
+  (`EXISTS … p.is_published IS TRUE`), and a SECURITY DEFINER function serving
+  such content applies the same check, with the owner exempt (US-308). A new
+  public table or RPC for the page must do the same.
 
 **SECURITY DEFINER functions:**
 - Must pin `SET search_path = public, extensions, pg_temp`. Without it the
@@ -1077,8 +1076,6 @@ logger.authEvent('login_success', user.id);
 
 **PWA Features:**
 - `usePullToRefresh` hook for mobile refresh patterns
-- Offline storage with IndexedDB (`src/lib/offline-storage.ts`)
-- Sync manager for offline data synchronization
 - 44px minimum touch targets for iOS compliance
 
 **Mobile Components (`src/components/mobile/`):**
@@ -1147,8 +1144,6 @@ try {
 ### Mobile & PWA
 
 - `src/hooks/usePullToRefresh.ts` - Pull-to-refresh functionality
-- `src/lib/offline-storage.ts` - IndexedDB offline storage
-- `src/lib/sync-manager.ts` - Offline sync management
 - `src/components/mobile/MobileNav.tsx` - Mobile navigation
 
 ---

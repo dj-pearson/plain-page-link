@@ -9,6 +9,7 @@ import { validateFileType } from '../_shared/fileValidation.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { parseOptimizeTarget, variantPath } from './target.ts';
 
 /**
  * Optimize Image
@@ -23,8 +24,9 @@ import { successResponse, errorResponse, handleUnexpectedError } from '../_share
  * supports WebP encoding + high-quality resizing.
  *
  * Request body: { bucket: string, path: string }
- *   - bucket: storage bucket holding the original (e.g. "listings")
- *   - path:   object path of the original within the bucket
+ *   - bucket: storage bucket holding the original ("listing-photos" only)
+ *   - path:   object path of the original within the bucket, under the
+ *             caller's own `<user id>/` folder (validated in target.ts)
  */
 
 const THUMBNAIL_WIDTHS = [200, 400, 800] as const;
@@ -36,13 +38,6 @@ async function ensureMagick() {
     await initialize();
     magickInitialized = true;
   }
-}
-
-/** Derive a variant object path: photo.jpg -> photo-400.webp */
-function variantPath(originalPath: string, width: number): string {
-  const dot = originalPath.lastIndexOf('.');
-  const stem = dot === -1 ? originalPath : originalPath.slice(0, dot);
-  return `${stem}-${width}.webp`;
 }
 
 serve(async (req) => {
@@ -66,16 +61,14 @@ serve(async (req) => {
     // Authenticate the caller (validates their JWT).
     const user = await requireAuth(req, supabase);
 
-    const { bucket, path } = await req.json();
-    if (!bucket || !path) {
-      return errorResponse('bucket and path are required', 'REQUEST_VALIDATION_FAILED', req);
+    // Authorization: only listing-photos, and only a plain path whose first
+    // segment is the caller's id. A prefix check alone let `<me>/../<them>/`
+    // read and overwrite another agent's objects (US-633, target.ts).
+    const target = parseOptimizeTarget(await req.json().catch(() => null), user.id);
+    if (!target.ok) {
+      return errorResponse(target.message, target.code, req, target.status);
     }
-
-    // Authorization: callers may only optimize objects under their own prefix
-    // (the upload flow stores objects as `${user.id}/...`).
-    if (!String(path).startsWith(`${user.id}/`)) {
-      return errorResponse('Forbidden: cannot optimize this object', 'FORBIDDEN', req, 403);
-    }
+    const { bucket, path } = target;
 
     // Download the original.
     const { data: original, error: downloadError } = await supabase.storage

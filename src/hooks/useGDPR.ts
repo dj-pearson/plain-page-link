@@ -6,8 +6,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callEdgeFunction, edgeFunctions } from '@/lib/edgeFunctions';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
+import {
+  EXPORT_REQUEST_COLUMNS,
+  EXPORT_REQUEST_LIST_LIMIT,
+  IMMEDIATE_EXPORT_TIMEOUT_MS,
+  describeQueueError,
+  describeResendError,
+  hasExportInFlight,
+  shouldOfferQueuedExport,
+  type ExportRequestRow,
+} from '@/lib/dataExportRequests';
 
 interface DeletionStatus {
   scheduled: boolean;
@@ -35,6 +47,97 @@ export function useGDPR() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isExporting, setIsExporting] = useState(false);
+  // Set when the immediate download failed in a way the emailed link would
+  // fix (server could not finish, timed out, connection dropped).
+  const [offerQueuedExport, setOfferQueuedExport] = useState(false);
+
+  // The subject's own export requests (US-403). RLS: "Users can view own
+  // GDPR requests". file_url is never selected — the link exists only in the
+  // email.
+  const {
+    data: exportRequests = [],
+    isLoading: isExportRequestsLoading,
+    error: exportRequestsError,
+  } = useQuery({
+    queryKey: ['exportRequests', user?.id],
+    queryFn: async (): Promise<ExportRequestRow[]> => {
+      const { data, error } = await supabase
+        .from('gdpr_data_requests')
+        .select(EXPORT_REQUEST_COLUMNS)
+        .eq('user_id', user!.id)
+        .eq('request_type', 'export')
+        .order('created_at', { ascending: false })
+        .limit(EXPORT_REQUEST_LIST_LIMIT);
+      if (error) {
+        logger.error('Could not load data export requests', error);
+        throw error;
+      }
+      return (data ?? []) as ExportRequestRow[];
+    },
+    enabled: !!user?.id,
+    staleTime: 30_000,
+    // While one is queued, check back now and then so the status moves on
+    // without a reload.
+    refetchInterval: (query) =>
+      hasExportInFlight((query.state.data as ExportRequestRow[] | undefined) ?? [])
+        ? 60_000
+        : false,
+  });
+
+  // Queue an export to be built in the background and emailed (US-403).
+  const queueExportMutation = useMutation({
+    mutationFn: async (): Promise<{ requestId?: string; message?: string }> => {
+      return await callEdgeFunction<{ requestId?: string; message?: string }>('gdpr-export', {
+        method: 'POST',
+        auth: true,
+      });
+    },
+    onSuccess: () => {
+      setOfferQueuedExport(false);
+      queryClient.invalidateQueries({ queryKey: ['exportRequests'] });
+      toast({
+        title: 'Export requested',
+        description: 'We will email you a download link when it is ready, usually within the hour.',
+      });
+    },
+    onError: (error: unknown) => {
+      // A 409 means one is already on its way: show it in the list.
+      queryClient.invalidateQueries({ queryKey: ['exportRequests'] });
+      toast({
+        title: 'Could not request export',
+        description: describeQueueError(error),
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Email a fresh link to a completed export that has not expired (US-404).
+  // The server sends it; the link never comes back to the browser.
+  const resendExportLinkMutation = useMutation({
+    mutationFn: async (requestId: string): Promise<{ expiresAt?: string }> => {
+      return await callEdgeFunction<{ expiresAt?: string }>('gdpr-export', {
+        method: 'POST',
+        auth: true,
+        body: { action: 'resend_link', requestId },
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Link sent',
+        description:
+          'We have emailed you a fresh download link. Check your spam folder if it does not arrive.',
+      });
+    },
+    onError: (error: unknown) => {
+      // A 410 means the file is gone: refresh so the row reads Expired.
+      queryClient.invalidateQueries({ queryKey: ['exportRequests'] });
+      toast({
+        title: 'Could not send the link',
+        description: describeResendError(error),
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Fetch deletion status
   const {
@@ -58,12 +161,19 @@ export function useGDPR() {
   const exportDataMutation = useMutation({
     mutationFn: async (): Promise<Blob> => {
       setIsExporting(true);
+      setOfferQueuedExport(false);
+
+      // A large account can take longer than anyone will wait; past this the
+      // screen offers the emailed link instead.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), IMMEDIATE_EXPORT_TIMEOUT_MS);
 
       try {
         // Request export and get data directly
         const data = await callEdgeFunction('gdpr-export', {
           method: 'GET',
           auth: true,
+          signal: controller.signal,
         });
 
         // Convert to blob for download
@@ -73,6 +183,7 @@ export function useGDPR() {
 
         return blob;
       } finally {
+        clearTimeout(timer);
         setIsExporting(false);
       }
     },
@@ -91,8 +202,19 @@ export function useGDPR() {
         title: 'Data Export Complete',
         description: 'Your data has been downloaded successfully.',
       });
+      // The GET leaves any queued request as it was (US-424), so the list of
+      // requests is unchanged and needs no refetch.
     },
     onError: (error: Error) => {
+      if (shouldOfferQueuedExport(error)) {
+        setOfferQueuedExport(true);
+        toast({
+          title: 'The download did not finish',
+          description: 'We can build it in the background and email you a download link instead.',
+          variant: 'destructive',
+        });
+        return;
+      }
       toast({
         title: 'Export Failed',
         description: error.message || 'Failed to export your data. Please try again.',
@@ -186,6 +308,20 @@ export function useGDPR() {
     // Export functions
     exportData: exportDataMutation.mutate,
     isExporting: isExporting || exportDataMutation.isPending,
+
+    // Queued (emailed) export
+    queueExport: queueExportMutation.mutate,
+    isQueueingExport: queueExportMutation.isPending,
+    offerQueuedExport,
+    exportRequests,
+    isExportRequestsLoading,
+    exportRequestsError: exportRequestsError ? 'Could not load your export requests.' : undefined,
+    hasExportInFlight: hasExportInFlight(exportRequests),
+    resendExportLink: resendExportLinkMutation.mutate,
+    /** The request whose link is being re-sent, if any. */
+    resendingExportId: resendExportLinkMutation.isPending
+      ? (resendExportLinkMutation.variables ?? null)
+      : null,
 
     // Deletion status
     deletionStatus,

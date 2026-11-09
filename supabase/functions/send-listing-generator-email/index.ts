@@ -9,7 +9,16 @@ import { getClientIP } from '../_shared/client-ip.ts';
 import { safeHtmlText, safeNumber } from '../_shared/public-email.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
-import { getSiteUrl } from '../_shared/env.ts';
+import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts';
+import {
+  isSuppressed,
+  unsubscribeFooterHtml,
+  unsubscribeHeaders,
+  unsubscribeLinks,
+  unsubscribeSecret,
+  type UnsubscribeLinks,
+} from '../_shared/marketing-unsubscribe.ts';
+import { LISTING_UNSUBSCRIBE_REASON } from '../_shared/listing-drip.ts';
 
 import { HttpError, errorStatus } from '../_shared/http-error.ts';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
@@ -48,6 +57,13 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // US-425: no marketing email without a working opt-out.
+    const secret = unsubscribeSecret();
+    if (!secret) {
+      console.error('[send-listing-generator-email] PII_ENCRYPTION_KEY is not set; refusing to send without an unsubscribe link');
+      return json(503, { error: 'Email is temporarily unavailable.' });
+    }
 
     const rateLimitResult = await checkRateLimitDb(
       supabase,
@@ -88,6 +104,13 @@ serve(async (req) => {
       return json(429, { error: 'This address has received enough email today.' });
     }
 
+    if (await isSuppressed(supabase, String(capture.email), secret)) {
+      // They opted out before (from either tool's emails). End this capture's
+      // sequence and send nothing; the visitor still has the results on screen.
+      await supabase.from('listing_email_captures').update({ email_sequence_completed: true }).eq('id', captureId);
+      return json(200, { success: true, sent: false });
+    }
+
     const { data: listing, error: listingError } = await supabase
       .from('listing_descriptions')
       .select('property_details, descriptions')
@@ -96,8 +119,14 @@ serve(async (req) => {
     if (listingError) throw listingError;
     if (!listing) throw new HttpError('Nothing to send for this capture', 404, 'NOT_FOUND');
 
+    const unsubscribe = await unsubscribeLinks('listing', captureId, secret, {
+      siteUrl: SITE_URL,
+      functionsUrl: getFunctionsUrl(),
+    });
+
     const emailSent = await sendWelcomeEmail({
       email: capture.email as string,
+      unsubscribe,
       ...safeTemplateData(capture.first_name, listing.property_details, listing.descriptions),
     });
 
@@ -146,6 +175,7 @@ function safeTemplateData(firstName: unknown, propertyDetails: unknown, descript
 
 async function sendWelcomeEmail(data: {
   email: string;
+  unsubscribe: UnsubscribeLinks;
   firstName: string;
   propertyDetails: any;
   descriptions: any[];
@@ -162,6 +192,7 @@ async function sendWelcomeEmail(data: {
         to: [data.email],
         subject: `${data.firstName}, Your 3 Professional Listing Descriptions Are Ready! 🏡`,
         html: getWelcomeEmailHTML(data),
+        headers: unsubscribeHeaders(data.unsubscribe),
       }),
     });
 
@@ -178,6 +209,7 @@ async function sendWelcomeEmail(data: {
 }
 
 function getWelcomeEmailHTML(data: {
+  unsubscribe: UnsubscribeLinks;
   firstName: string;
   propertyDetails: any;
   descriptions: any[];
@@ -198,8 +230,9 @@ function getWelcomeEmailHTML(data: {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
 
   <!-- Header -->
-  <div style="text-align: center; padding: 30px 0; background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); border-radius: 12px; margin-bottom: 30px;">
-    <h1 style="color: white; margin: 0; font-size: 28px;">🏡 Your Listing Descriptions Are Ready!</h1>
+  <div style="padding: 8px 0 20px; border-bottom: 1px solid #e5e7eb; margin-bottom: 30px;">
+    <p style="margin: 0 0 6px; font-size: 14px; font-weight: 600; color: #6d28d9;">AgentBio</p>
+    <h1 style="color: #1f2937; margin: 0; font-size: 28px; line-height: 1.25;">Your listing descriptions are ready</h1>
   </div>
 
   <!-- Greeting -->
@@ -210,8 +243,8 @@ function getWelcomeEmailHTML(data: {
   </p>
 
   <!-- Property Summary -->
-  <div style="background: #f9fafb; border-left: 4px solid #9333ea; padding: 20px; margin: 30px 0; border-radius: 8px;">
-    <h3 style="margin-top: 0; color: #9333ea;">Property Summary</h3>
+  <div style="background: #f5f3ff; border: 1px solid #ddd6fe; padding: 20px; margin: 30px 0; border-radius: 12px;">
+    <h3 style="margin-top: 0; color: #4c1d95;">Property Summary</h3>
     <p style="margin: 5px 0;"><strong>Location:</strong> ${propertyDetails.city}, ${propertyDetails.state}</p>
     <p style="margin: 5px 0;"><strong>Price:</strong> $${propertyDetails.price.toLocaleString()}</p>
     <p style="margin: 5px 0;"><strong>Bedrooms:</strong> ${propertyDetails.bedrooms} | <strong>Bathrooms:</strong> ${propertyDetails.bathrooms}</p>
@@ -297,32 +330,26 @@ function getWelcomeEmailHTML(data: {
   </div>
 
   <!-- CTA -->
-  <div style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); border-radius: 12px; margin: 30px 0;">
-    <h2 style="color: white; margin-top: 0;">Want AI-Powered Marketing for EVERY Listing?</h2>
-    <p style="color: white; margin-bottom: 25px;">
-      AgentBio creates your entire marketing presence - Instagram optimization, link-in-bio pages, content calendars, and automated follow-up.
+  <div style="text-align: center; padding: 32px 20px; background: #f5f3ff; border-radius: 12px; margin: 30px 0;">
+    <h2 style="color: #1f2937; margin-top: 0;">Put every listing where buyers can act on it</h2>
+    <p style="color: #4c1d95; margin-bottom: 25px;">
+      AgentBio gives you a link-in-bio page with your listings, a lead form beside each one, and analytics on what visitors click.
     </p>
-    <a href="${SITE_URL}/register?utm_source=listing-generator&utm_medium=email&utm_campaign=welcome"
-       style="display: inline-block; background: white; color: #9333ea; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-      Create Your Free Page →
+    <a href="${SITE_URL}/auth/register?utm_source=listing-generator&amp;utm_medium=email&amp;utm_campaign=welcome"
+       style="display: inline-block; background: #6d28d9; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">
+      Create Your Free Page
     </a>
-    <p style="color: white; font-size: 12px; margin-top: 15px; margin-bottom: 0;">
-      No credit card required • Cancel anytime • 4,200+ agents trust AgentBio
+    <p style="color: #4c1d95; font-size: 12px; margin-top: 15px; margin-bottom: 0;">
+      Free plan, no credit card required
     </p>
   </div>
 
   <!-- Footer -->
-  <div style="text-align: center; padding: 20px 0; border-top: 1px solid #e5e7eb; margin-top: 40px;">
-    <p style="font-size: 14px; color: #6b7280; margin: 5px 0;">
+  <div style="padding: 20px 0 0; margin-top: 40px;">
+    <p style="font-size: 14px; color: #52606d; margin: 5px 0;">
       Over the next 7 days, we'll send you advanced listing marketing strategies to help you sell faster.
     </p>
-    <p style="font-size: 12px; color: #9ca3af; margin: 15px 0 5px;">
-      You're receiving this because you generated a listing description at AgentBio.net
-    </p>
-    <p style="font-size: 12px; color: #9ca3af; margin: 0;">
-      <a href="${SITE_URL}" style="color: #9333ea; text-decoration: none;">AgentBio</a> •
-      <a href="${SITE_URL}/unsubscribe" style="color: #9ca3af; text-decoration: none;">Unsubscribe</a>
-    </p>
+    ${unsubscribeFooterHtml(data.unsubscribe, LISTING_UNSUBSCRIBE_REASON)}
   </div>
 
 </body>

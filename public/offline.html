@@ -60,7 +60,10 @@
         AgentBio can't reach the network right now. Previously visited pages
         may still work. Check your connection and try again.
       </p>
-      <button onclick="location.reload()">Retry</button>
+      <!-- A form, not onclick: the CSP has no 'unsafe-inline' in script-src,
+           so an inline handler never ran and Retry did nothing (US-272).
+           A GET form with no action re-requests this URL as a navigation. -->
+      <form method="get"><button type="submit">Retry</button></form>
     </div>
   </body>
 </html>

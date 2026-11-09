@@ -1,12 +1,26 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Plus, Loader2 } from "lucide-react";
-import { AIModel } from "@/hooks/useAIConfiguration";
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Loader2 } from 'lucide-react';
+import { AIModel } from '@/hooks/useAIConfiguration';
 
 interface AddModelDialogProps {
   onAdd: (model: Omit<AIModel, 'id'>) => void;
@@ -57,7 +71,7 @@ export function AddModelDialog({ onAdd, isAdding }: AddModelDialogProps) {
           Add New Model
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Add New AI Model</DialogTitle>
@@ -65,7 +79,7 @@ export function AddModelDialog({ onAdd, isAdding }: AddModelDialogProps) {
               Configure a new AI model with authentication and endpoint details
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             {/* Provider */}
             <div className="space-y-2">
@@ -101,7 +115,9 @@ export function AddModelDialog({ onAdd, isAdding }: AddModelDialogProps) {
                 onChange={(e) => setFormData({ ...formData, model_id: e.target.value })}
                 required
               />
-              <p className="text-xs text-muted-foreground">The exact model identifier for API calls</p>
+              <p className="text-xs text-muted-foreground">
+                The exact model identifier for API calls
+              </p>
             </div>
 
             {/* Description */}
@@ -120,7 +136,7 @@ export function AddModelDialog({ onAdd, isAdding }: AddModelDialogProps) {
               <Label htmlFor="auth_type">Authentication Type *</Label>
               <Select
                 value={formData.auth_type}
-                onValueChange={(value: 'bearer' | 'x-api-key') => 
+                onValueChange={(value: 'bearer' | 'x-api-key') =>
                   setFormData({ ...formData, auth_type: value })
                 }
               >
@@ -172,7 +188,9 @@ export function AddModelDialog({ onAdd, isAdding }: AddModelDialogProps) {
                   id="context_window"
                   type="number"
                   value={formData.context_window}
-                  onChange={(e) => setFormData({ ...formData, context_window: parseInt(e.target.value) })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, context_window: parseInt(e.target.value) })
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -181,7 +199,9 @@ export function AddModelDialog({ onAdd, isAdding }: AddModelDialogProps) {
                   id="max_output_tokens"
                   type="number"
                   value={formData.max_output_tokens}
-                  onChange={(e) => setFormData({ ...formData, max_output_tokens: parseInt(e.target.value) })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, max_output_tokens: parseInt(e.target.value) })
+                  }
                 />
               </div>
             </div>
@@ -192,7 +212,9 @@ export function AddModelDialog({ onAdd, isAdding }: AddModelDialogProps) {
               <Switch
                 id="supports_vision"
                 checked={formData.supports_vision}
-                onCheckedChange={(checked) => setFormData({ ...formData, supports_vision: checked })}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, supports_vision: checked })
+                }
               />
             </div>
 

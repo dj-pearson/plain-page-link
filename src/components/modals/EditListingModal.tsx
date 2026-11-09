@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import {
 import { parseSquareFeet } from '@/lib/format';
 import { LISTING_STATUSES } from '@/lib/listingStatus';
 import { ListingPhotoManager } from '@/components/listings/ListingPhotoManager';
+import { normalizeVirtualTourUrl } from '@/lib/listingUrls';
 
 export interface EditListingFormData {
   address: string;
@@ -43,7 +44,18 @@ export interface EditListingFormData {
 interface EditListingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: EditListingFormData) => void;
+  /**
+   * `uploaded` is every photo URL uploaded while the dialog was open, so the
+   * caller can remove the ones the save did not keep (US-461). Resolves true
+   * once the save landed: the caller then owns those uploads, and the dialog
+   * no longer discards them when it unmounts (US-512).
+   */
+  onSubmit: (data: EditListingFormData, uploaded: string[]) => Promise<boolean> | boolean;
+  /**
+   * Called with photos uploaded in this dialog that are not on the saved
+   * listing, when the dialog closes without saving (US-461).
+   */
+  onDiscardUploads?: (urls: string[]) => void;
   initialData: EditListingFormData;
   /** Used to group newly uploaded photos under the listing's own folder. */
   listingId?: string;
@@ -55,6 +67,7 @@ export function EditListingModal({
   onSubmit,
   initialData,
   listingId,
+  onDiscardUploads,
 }: EditListingModalProps) {
   // Seeded once. There used to be an effect that reset this whenever
   // initialData changed — and the caller builds initialData inline, so every
@@ -62,14 +75,113 @@ export function EditListingModal({
   // The caller keys this component by listing id, so a different listing
   // still mounts a fresh form.
   const [formData, setFormData] = useState<EditListingFormData>(initialData);
+  // US-517: shown under the virtual tour field when its value cannot be saved.
+  const [tourError, setTourError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Photos uploaded while this dialog is open (US-461). ListingPhotoManager
+  // uploads the moment files are picked, so a cancel used to leave them
+  // public in the bucket with no row pointing at them.
+  const uploadedRef = useRef<string[]>([]);
+  // Set once this session's uploads are accounted for: discarded on a close,
+  // or handed to the caller by a save that landed.
+  const closedRef = useRef(false);
+  const savingRef = useRef(false);
+  // Mirrors savingRef for rendering: Cancel and Save are disabled while a save
+  // is in flight (US-554).
+  const [saving, setSaving] = useState(false);
+  const unmountedRef = useRef(false);
+  // The unmount cleanup runs with the first render's closure; read the latest
+  // props through refs.
+  const onDiscardRef = useRef(onDiscardUploads);
+  onDiscardRef.current = onDiscardUploads;
+  const savedPhotosRef = useRef(initialData.photos);
+  savedPhotosRef.current = initialData.photos;
+
+  /** Discard this session's uploads that are not on the saved listing, once. */
+  const discardSession = () => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    // Only this session's uploads: a photo already on the saved listing is
+    // never a candidate, whatever the agent did to it in the form.
+    const saved = new Set(savedPhotosRef.current);
+    const unsaved = uploadedRef.current.filter((url) => !saved.has(url));
+    uploadedRef.current = [];
+    if (unsaved.length > 0) onDiscardRef.current?.(unsaved);
+  };
+
+  const handleUploaded = (urls: string[]) => {
+    // An upload that finishes after the dialog closed can never be saved.
+    if (closedRef.current) {
+      onDiscardRef.current?.(urls);
+      return;
+    }
+    uploadedRef.current = [...uploadedRef.current, ...urls];
+  };
+
+  // US-512: leaving the Listings page with the dialog open, or the lazy-modal
+  // error boundary replacing it, unmounts the dialog without onOpenChange or
+  // Cancel, so that session's uploads were never discarded. A save still in
+  // flight is left to finish: handleSubmit discards if it fails.
+  const discardOnUnmountRef = useRef(discardSession);
+  discardOnUnmountRef.current = discardSession;
+  useEffect(
+    () => () => {
+      unmountedRef.current = true;
+      if (!savingRef.current) discardOnUnmountRef.current();
+    },
+    []
+  );
+
+  const handleClose = () => {
+    // US-554: a close during an in-flight save used to discard this session's
+    // uploads at once, and the save then landed with photos pointing at
+    // objects already removed from storage: broken images on the live
+    // listing, and an edit the agent believed cancelled saved anyway. The
+    // dialog stays open until the save settles; a save that fails re-enables
+    // Cancel, which then discards as usual.
+    if (savingRef.current) return;
+    discardSession();
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    // The database refuses a virtual tour that is not an http(s) address
+    // (listings_virtual_tour_url_scheme, US-456). Check it here so the agent
+    // learns which field and why, and so a bare host is saved with https://.
+    const tour = normalizeVirtualTourUrl(formData.virtual_tour_url);
+    if ('error' in tour) {
+      setTourError(tour.error);
+      document.getElementById('virtual_tour_url')?.focus();
+      return;
+    }
+    setTourError(null);
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    let saved = false;
+    try {
+      saved = await onSubmit({ ...formData, virtual_tour_url: tour.value }, [
+        ...uploadedRef.current,
+      ]);
+    } catch {
+      // Treated as not saved; the caller reports the error.
+    } finally {
+      savingRef.current = false;
+      if (!unmountedRef.current) setSaving(false);
+    }
+    if (saved) {
+      // The caller removed what the save did not keep (US-461).
+      closedRef.current = true;
+      uploadedRef.current = [];
+    } else if (unmountedRef.current) {
+      // The dialog went away while the save was failing; nothing can retry it.
+      discardSession();
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         aria-describedby={undefined}
         className="max-w-2xl gap-0 border-border bg-card p-0 text-card-foreground"
@@ -78,7 +190,7 @@ export function EditListingModal({
           <DialogTitle className="text-xl text-foreground">Edit Property Listing</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} aria-busy={saving} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <Label htmlFor="address">Street Address *</Label>
@@ -224,6 +336,7 @@ export function EditListingModal({
                 photos={formData.photos}
                 onChange={(photos) => setFormData({ ...formData, photos })}
                 listingId={listingId}
+                onUploaded={handleUploaded}
               />
             </div>
 
@@ -266,13 +379,33 @@ export function EditListingModal({
 
             <div className="col-span-2">
               <Label htmlFor="virtual_tour_url">Virtual Tour URL</Label>
+              {/* type="text" with inputMode="url", as on the Profile page: the
+                  browser's url check accepts "javascript:x" and refuses
+                  "my.matterport.com/show?m=1", the reverse of what the save
+                  allows (US-517). handleSubmit does the real check. */}
               <Input
                 id="virtual_tour_url"
-                type="url"
+                name="virtual_tour_url"
+                type="text"
+                inputMode="url"
+                autoComplete="url"
+                autoCapitalize="none"
+                spellCheck={false}
                 placeholder="https://..."
                 value={formData.virtual_tour_url || ''}
-                onChange={(e) => setFormData({ ...formData, virtual_tour_url: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, virtual_tour_url: e.target.value });
+                  if (tourError) setTourError(null);
+                }}
+                aria-invalid={tourError ? true : undefined}
+                aria-describedby={tourError ? 'virtual_tour_url-error' : undefined}
+                className={tourError ? 'border-destructive' : undefined}
               />
+              {tourError && (
+                <p id="virtual_tour_url-error" className="mt-1 text-sm text-destructive">
+                  {tourError}
+                </p>
+              )}
             </div>
 
             <div className="col-span-2">
@@ -303,11 +436,17 @@ export function EditListingModal({
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={saving}
+              className="flex-1"
+            >
               Cancel
             </Button>
-            <Button type="submit" className="flex-1">
-              Save Changes
+            <Button type="submit" disabled={saving} className="flex-1">
+              {saving ? 'Saving…' : 'Save Changes'}
             </Button>
           </div>
         </form>

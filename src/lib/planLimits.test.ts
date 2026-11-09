@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PRICING_PLANS } from '@/config/pricing-plans';
 import {
+  LIMIT_META,
+  METERED_KEYS,
   describeLimit,
+  limitShips,
   limitStatus,
   nextPlanFor,
   planLimitKeyFromError,
@@ -160,4 +163,37 @@ describe('the quota migration matches the pricing config', () => {
       }
     });
   }
+});
+
+/**
+ * US-297: the dashboard must not meter, nudge about or list on a downgrade a
+ * quota whose feature does not exist. The Free plan's 0 automated emails read
+ * as "upgrade to get automated emails", which no plan delivers.
+ */
+describe('unshipped quotas stay off the dashboard', () => {
+  const allKeys = Object.keys(LIMIT_META) as (keyof typeof LIMIT_META)[];
+  const unshipped = [
+    'emails_per_month',
+    'sms_per_month',
+    'market_reports_per_month',
+    'cma_reports_per_month',
+    'virtual_staging_photos_per_month',
+    'video_tours_per_month',
+  ];
+
+  it('marks exactly the unbuilt features as not shipping', () => {
+    expect(allKeys.filter((k) => !limitShips(k)).sort()).toEqual([...unshipped].sort());
+  });
+
+  it('meters only limits whose feature ships', () => {
+    for (const key of METERED_KEYS) {
+      expect(limitShips(key), key).toBe(true);
+    }
+    expect(METERED_KEYS).not.toContain('emails_per_month');
+  });
+
+  it('meters every shipped limit except the analytics window', () => {
+    const shipped = allKeys.filter((k) => limitShips(k) && k !== 'analytics_days');
+    expect([...METERED_KEYS].sort()).toEqual(shipped.sort());
+  });
 });

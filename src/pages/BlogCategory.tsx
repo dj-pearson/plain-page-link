@@ -17,9 +17,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Search, Calendar, Eye, ArrowLeft } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { useArticleAuthors } from '@/hooks/useArticleAuthors';
+import { ArticleCardByline } from '@/components/blog/ArticleCardByline';
 
 /**
  * The editorial copy behind each category page.
@@ -371,6 +375,9 @@ export default function BlogCategory() {
     enabled: !!category,
   });
 
+  // Card bylines: one batched profiles lookup for the whole list (US-399).
+  const authors = useArticleAuthors(articles);
+
   const filteredArticles = useMemo(() => {
     if (!searchQuery) return articles;
 
@@ -400,12 +407,12 @@ export default function BlogCategory() {
     '@graph': [
       {
         '@type': 'CollectionPage',
-        '@id': `https://agentbio.net/blog/category/${category}#webpage`,
-        url: `https://agentbio.net/blog/category/${category}`,
+        '@id': `${getCanonicalUrl(`/blog/category/${category}`)}#webpage`,
+        url: getCanonicalUrl(`/blog/category/${category}`),
         name: content.title,
         description: content.description,
         isPartOf: {
-          '@id': 'https://agentbio.net/#website',
+          '@id': websiteId(getBaseUrl()),
         },
         about: {
           '@type': 'Thing',
@@ -419,19 +426,19 @@ export default function BlogCategory() {
             '@type': 'ListItem',
             position: 1,
             name: 'Home',
-            item: 'https://agentbio.net',
+            item: getBaseUrl(),
           },
           {
             '@type': 'ListItem',
             position: 2,
             name: 'Blog',
-            item: 'https://agentbio.net/blog',
+            item: getCanonicalUrl('/blog'),
           },
           {
             '@type': 'ListItem',
             position: 3,
             name: content.title,
-            item: `https://agentbio.net/blog/category/${category}`,
+            item: getCanonicalUrl(`/blog/category/${category}`),
           },
         ],
       },
@@ -455,7 +462,7 @@ export default function BlogCategory() {
         title={`${content.title} | AgentBio Blog`}
         description={content.metaDescription}
         keywords={content.keywords}
-        canonicalUrl={`https://agentbio.net/blog/category/${category}`}
+        canonicalUrl={getCanonicalUrl(`/blog/category/${category}`)}
         schema={schema}
       />
 
@@ -547,6 +554,9 @@ export default function BlogCategory() {
                       </div>
                       <CardTitle className="line-clamp-2">{article.title}</CardTitle>
                       <CardDescription className="line-clamp-3">{article.excerpt}</CardDescription>
+                      <ArticleCardByline
+                        author={article.author_id ? authors.get(article.author_id) : undefined}
+                      />
                     </CardHeader>
                     <CardFooter className="mt-auto flex items-center justify-between">
                       <span className="text-sm text-muted-foreground flex items-center gap-1">

@@ -15,6 +15,7 @@ import {
   INVITE_LIMITS,
   MAX_TEAMS_PER_OWNER,
   isInvitableEmail,
+  leaveTeamRefusal,
   normaliseTeamName,
   teamNameForEmail,
 } from './invites.ts';
@@ -25,10 +26,11 @@ import {
  *   POST { action: 'invite', teamId, email, role? }
  *   POST { action: 'accept', teamId, token }   (token from the emailed link, US-226)
  *   POST { action: 'remove', teamId, memberId }
+ *   POST { action: 'leave', teamId }           (caller removes their own row, US-430)
  *   POST { action: 'updateRole', teamId, memberId, role }
  *
  * Authorization is enforced with the is_team_admin RPC (owner/admin only for
- * mutations beyond create/accept).
+ * mutations beyond create/accept/leave).
  */
 
 serve(async (req) => {
@@ -206,6 +208,40 @@ serve(async (req) => {
         .neq('role', 'owner'); // never remove the owner
       if (error) throw error;
       return successResponse({ removed: true }, req);
+    }
+
+    if (action === 'leave') {
+      // US-430 (US-419): 'remove' is admin-only, so a member could not leave.
+      // This deletes only the caller's own accepted row (a pending invite has
+      // user_id null, so it never matches), and never the owner's.
+      const { teamId } = body;
+      if (!teamId || typeof teamId !== 'string') {
+        return errorResponse('teamId is required', 'REQUEST_VALIDATION_FAILED', req);
+      }
+      const { data: teamRow, error: teamError } = await service
+        .from('teams')
+        .select('owner_id')
+        .eq('id', teamId)
+        .maybeSingle();
+      if (teamError) throw teamError;
+      const isOwner = teamRow?.owner_id === user.id;
+
+      let rowsRemoved = 0;
+      if (teamRow && !isOwner) {
+        const { data: left, error } = await service
+          .from('team_members')
+          .delete()
+          .eq('team_id', teamId)
+          .eq('user_id', user.id)
+          .neq('role', 'owner')
+          .select('id');
+        if (error) throw error;
+        rowsRemoved = left?.length ?? 0;
+      }
+
+      const refusal = leaveTeamRefusal({ teamExists: !!teamRow, isOwner, rowsRemoved });
+      if (refusal) return errorResponse(refusal.message, refusal.code, req, refusal.status);
+      return successResponse({ left: true }, req);
     }
 
     if (action === 'updateRole') {

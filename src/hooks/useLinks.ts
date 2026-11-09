@@ -3,6 +3,26 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from './use-toast';
 import type { LinkFormData } from '@/components/modals/AddLinkModal';
+import { urlSchemeErrorFrom } from '@/lib/urlSchemeErrors';
+
+/**
+ * The toast text for a failed link write. A URL the database refuses
+ * (links_url_scheme, US-456) is explained; anything else shows its message.
+ */
+export function describeLinkError(error: unknown): string {
+  const urlError = urlSchemeErrorFrom(error);
+  if (urlError) return urlError.message;
+  if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
+  }
+  return 'An error occurred';
+}
 
 export interface Link {
   id: string;
@@ -77,7 +97,7 @@ export function useLinks() {
     onError: (error) => {
       toast({
         title: 'Failed to Add Link',
-        description: error instanceof Error ? error.message : 'An error occurred',
+        description: describeLinkError(error),
         variant: 'destructive',
       });
     },
@@ -108,7 +128,7 @@ export function useLinks() {
     onError: (error) => {
       toast({
         title: 'Failed to Update Link',
-        description: error instanceof Error ? error.message : 'An error occurred',
+        description: describeLinkError(error),
         variant: 'destructive',
       });
     },
@@ -132,7 +152,7 @@ export function useLinks() {
     onError: (error) => {
       toast({
         title: 'Failed to Delete Link',
-        description: error instanceof Error ? error.message : 'An error occurred',
+        description: describeLinkError(error),
         variant: 'destructive',
       });
     },

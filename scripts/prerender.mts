@@ -37,7 +37,10 @@ import {
   outputPathForRoute,
   type PrerenderRoute,
 } from '../src/config/prerender-routes';
+import { legalPageLastmod } from '../src/config/legal-dates';
 import {
+  answerAuthorLookup,
+  authorsById,
   categorySlugs,
   loadArticles,
   loadFixtureArticles,
@@ -369,6 +372,44 @@ async function interceptArticles(context: BrowserContext, articles: Article[]): 
   });
 }
 
+/**
+ * Answer the article-author lookups from the rows resolved at build time
+ * (US-181, US-399).
+ *
+ * BlogArticle asks `profiles?select=id,full_name,username&id=eq.<author_id>
+ * &is_published=eq.true`; the /blog and /blog/category/* cards ask the same
+ * with `id=in.(...)`. Both expect an array. Only those shapes are answered
+ * (see answerAuthorLookup); any other profiles query — the landing page's demo
+ * showcase, say — falls through to whatever it reached before, so this
+ * intercept cannot change a page it was not written for.
+ *
+ * Without it the lookup would go to the build's VITE_SUPABASE_URL — often a
+ * placeholder — and every prerendered article would carry the organisation as
+ * its author while the live page showed a person: the snapshot and the page
+ * disagreeing about who wrote it.
+ */
+async function interceptArticleAuthors(
+  context: BrowserContext,
+  articles: Article[]
+): Promise<void> {
+  const authors = authorsById(articles);
+  await context.route('**/rest/v1/profiles*', async (route) => {
+    const request = route.request();
+    const rows = answerAuthorLookup(
+      request.method(),
+      new URL(request.url()).searchParams,
+      authors
+    );
+    if (!rows) return route.fallback();
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(rows),
+    });
+  });
+}
+
 /** Render `routes` with at most `CONCURRENCY` pages open at once. */
 async function renderAll(
   browser: Browser,
@@ -396,6 +437,7 @@ async function renderAll(
   await context.route('https://www.googletagmanager.com/**', (r) => r.abort());
   await context.route('https://www.google-analytics.com/**', (r) => r.abort());
   await interceptArticles(context, articles);
+  await interceptArticleAuthors(context, articles);
   // BlogArticle counts a view on mount through this RPC (US-262). A build is
   // not a reader, and must not count as one against the live database.
   await context.route('**/rest/v1/rpc/increment_article_view*', (r) =>
@@ -556,7 +598,10 @@ async function writeSitemap(results: Rendered[], articles: Article[]): Promise<v
       const slug = r.route.kind === 'article' ? r.route.path.replace('/blog/', '') : null;
       return {
         path: r.route.path,
-        lastmod: slug ? (updatedBySlug.get(slug) ?? null) : null,
+        // Articles carry articles.updated_at; the legal pages carry the date
+        // their text last changed (src/config/legal-dates.ts). Every other
+        // static route has no truthful date, so it gets none.
+        lastmod: slug ? (updatedBySlug.get(slug) ?? null) : legalPageLastmod(r.route.path),
         ...weightFor(r.route.kind, r.route.path),
       };
     })

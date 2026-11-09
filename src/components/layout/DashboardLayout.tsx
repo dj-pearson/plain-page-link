@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { logger } from '@/lib/logger';
 import { PRIMARY_NAV } from '@/config/dashboard-nav';
+import { useAvatarAppIconBackfill } from '@/hooks/useAvatarAppIconBackfill';
 
 export default function DashboardLayout() {
   const location = useLocation();
@@ -19,6 +20,8 @@ export default function DashboardLayout() {
   const role = useAuthStore((s) => s.role);
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  // Pre-US-481 photos get their home-screen icons on the first visit (US-492).
+  useAvatarAppIconBackfill(profile?.id, profile?.avatar_url);
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -211,10 +214,16 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        {/* Page Content - Enhanced mobile spacing and safe areas */}
+        {/* Page Content. Below md the fixed MobileNav (h-16 plus the home
+            indicator inset) sits over the bottom of the page, so the bottom
+            padding clears both in one declaration. This used to be
+            `pb-24 safe-area-inset-bottom`: the custom utility is emitted after
+            Tailwind's core ones, so it replaced pb-24 with the bare inset -
+            0px on Android and on iPhones without a home indicator - and the
+            last 64px of every dashboard page sat under the nav (US-596). */}
         <main
           id="main-content"
-          className="p-4 sm:p-5 md:p-6 pb-24 sm:pb-24 md:pb-6 safe-area-inset-bottom"
+          className="p-4 sm:px-5 sm:pt-5 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6"
           tabIndex={-1}
         >
           <Outlet />

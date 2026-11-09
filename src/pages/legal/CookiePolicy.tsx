@@ -1,22 +1,26 @@
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
+import { LEGAL_PAGE_DATES, formatLegalDate } from '@/config/legal-dates';
 import { SkipNavContent } from '@/components/ui/skip-nav';
 
 export default function CookiePolicy() {
-  const lastUpdated = 'May 17, 2026';
+  const dates = LEGAL_PAGE_DATES.cookies;
+  const lastUpdated = formatLegalDate(dates.modified);
 
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    '@id': 'https://agentbio.net/cookies#webpage',
-    url: 'https://agentbio.net/cookies',
+    '@id': `${getCanonicalUrl('/cookies')}#webpage`,
+    url: getCanonicalUrl('/cookies'),
     name: 'Cookie Policy - AgentBio',
     description:
       'How AgentBio uses cookies: strictly necessary, analytics, and preference cookies, and how to manage your consent.',
-    isPartOf: { '@id': 'https://agentbio.net/#website' },
-    datePublished: '2026-05-17',
-    dateModified: lastUpdated,
+    isPartOf: { '@id': websiteId(getBaseUrl()) },
+    datePublished: dates.published,
+    dateModified: dates.modified,
     inLanguage: 'en-US',
   };
 
@@ -26,7 +30,7 @@ export default function CookiePolicy() {
         title="Cookie Policy - AgentBio"
         description="Learn which cookies AgentBio uses (strictly necessary, analytics, preferences) and how to manage or withdraw your consent at any time."
         keywords={['cookie policy', 'cookies', 'GDPR cookies', 'ePrivacy', 'cookie consent']}
-        canonicalUrl="https://agentbio.net/cookies"
+        canonicalUrl={getCanonicalUrl('/cookies')}
         schema={schema}
       />
       <PublicHeader />
@@ -36,7 +40,9 @@ export default function CookiePolicy() {
             <h1 className="text-4xl font-bold mb-8">Cookie Policy</h1>
 
             <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
-              <p className="text-muted-foreground mb-6">Last updated: {lastUpdated}</p>
+              <p className="text-muted-foreground mb-6">
+                Last updated: <time dateTime={dates.modified}>{lastUpdated}</time>
+              </p>
 
               <section aria-labelledby="what-heading">
                 <h2 id="what-heading" className="text-2xl font-semibold mb-4">

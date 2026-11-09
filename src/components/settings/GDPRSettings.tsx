@@ -4,8 +4,10 @@
  */
 
 import { useState } from 'react';
-import { Download, Trash2, AlertTriangle, Clock, XCircle, CheckCircle } from 'lucide-react';
+import { Download, Trash2, AlertTriangle, Clock, XCircle, CheckCircle, Mail } from 'lucide-react';
 import { useGDPR } from '@/hooks/useGDPR';
+import { describeExportRequest, type ExportRequestTone } from '@/lib/dataExportRequests';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,10 +23,25 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
+const TONE_CLASS: Record<ExportRequestTone, string> = {
+  progress: 'text-foreground',
+  done: 'text-green-700 dark:text-green-400',
+  failed: 'text-red-700 dark:text-red-400',
+  neutral: 'text-muted-foreground',
+};
+
 export function GDPRSettings() {
   const {
     exportData,
     isExporting,
+    queueExport,
+    isQueueingExport,
+    offerQueuedExport,
+    exportRequests,
+    exportRequestsError,
+    hasExportInFlight,
+    resendExportLink,
+    resendingExportId,
     isDeletionStatusLoading,
     isAccountDeletionScheduled,
     daysUntilDeletion,
@@ -76,10 +93,85 @@ export function GDPRSettings() {
               Your data export will include your profile, listings, leads, testimonials, links, blog
               posts, analytics, and security activity logs.
             </p>
-            <Button onClick={() => setShowExportDialog(true)} disabled={isExporting}>
-              <Download className="h-4 w-4 mr-2" />
-              {isExporting ? 'Preparing Export...' : 'Export My Data'}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button onClick={() => setShowExportDialog(true)} disabled={isExporting}>
+                <Download className="h-4 w-4 mr-2" />
+                {isExporting ? 'Preparing Export...' : 'Download now'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => queueExport()}
+                disabled={isQueueingExport || hasExportInFlight}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                {isQueueingExport ? 'Requesting...' : 'Email me a download link'}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              For a large account, the emailed link is more reliable: we build the file in the
+              background and send you a link that works for 7 days.
+            </p>
+
+            {offerQueuedExport && (
+              <div
+                role="alert"
+                className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/20 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  The download did not finish. We can build your export in the background and email
+                  you a link instead.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => queueExport()}
+                  disabled={isQueueingExport || hasExportInFlight}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Email it to me
+                </Button>
+              </div>
+            )}
+
+            {exportRequestsError ? (
+              <p className="text-sm text-muted-foreground">{exportRequestsError}</p>
+            ) : exportRequests.length > 0 ? (
+              <section aria-labelledby="export-requests-heading" className="pt-2">
+                <h4 id="export-requests-heading" className="text-sm font-medium">
+                  Your export requests
+                </h4>
+                <ul className="mt-2 divide-y rounded-lg border">
+                  {exportRequests.map((row) => {
+                    const view = describeExportRequest(row);
+                    return (
+                      <li key={view.id} className="p-3 text-sm">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                          <span className={cn('font-medium', TONE_CLASS[view.tone])}>
+                            {view.label}
+                          </span>
+                          {view.requestedAt && (
+                            <span className="text-muted-foreground">
+                              Requested {new Date(view.requestedAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                        {view.detail && <p className="mt-1 text-muted-foreground">{view.detail}</p>}
+                        {view.canResend && (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="mt-1 h-auto min-h-[44px] px-0 sm:min-h-0"
+                            onClick={() => resendExportLink(view.id)}
+                            disabled={resendingExportId !== null}
+                          >
+                            {resendingExportId === view.id ? 'Sending...' : 'Email the link again'}
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -206,9 +298,9 @@ export function GDPRSettings() {
             <AlertDialogDescription asChild>
               <div className="space-y-4">
                 <p>
-                  This will schedule your account for permanent deletion. You'll have 30 days to
-                  cancel this request if you change your mind. Your subscription will not renew, and
-                  it is cancelled when the account is deleted.
+                  This will schedule your account for permanent deletion. You&apos;ll have 30 days
+                  to cancel this request if you change your mind. Your subscription will not renew,
+                  and it is cancelled when the account is deleted.
                 </p>
                 <div>
                   <Label htmlFor="reason" className="text-sm font-medium">

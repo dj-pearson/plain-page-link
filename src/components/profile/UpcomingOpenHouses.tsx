@@ -11,10 +11,16 @@
  * variables and this section has to follow that theme.
  */
 import { useEffect, useId, useRef, useState } from 'react';
-import { format, isSameYear } from 'date-fns';
+import { Link } from 'react-router-dom';
 import { CalendarPlus, ChevronDown, MapPin } from 'lucide-react';
 import { formatOpenHouseAddress, usePublicOpenHouses } from '@/hooks/useOpenHouses';
 import { downloadIcs, googleCalendarUrl, type CalendarEvent } from '@/lib/openHouseCalendar';
+import {
+  formatOpenHouseWhen,
+  needsZoneLabel,
+  openHouseLocalDate,
+  visitorOpenHouseTimeZone,
+} from '@/lib/openHouseSchedule';
 import { fallBackToOriginal, sizedImage, type SizedImage } from '@/lib/images';
 import { formatPrice, parsePrice } from '@/lib/format';
 import { toStringList } from '@/types/profile';
@@ -23,7 +29,14 @@ interface UpcomingOpenHousesProps {
   agentId: string;
   agentName?: string | null;
   profileUrl?: string;
-  onViewListing?(listingId: string): void;
+  /**
+   * The page for an open house's listing, or null when it has none to show
+   * (US-408). "View home" is a real link to it; it was a <button> that
+   * navigated in an onClick handler.
+   */
+  listingHref?(listingId: string): string | null;
+  /** Only this listing's open houses — the listing page (US-275). */
+  listingId?: string;
 }
 
 interface UpcomingOpenHouse {
@@ -31,6 +44,8 @@ interface UpcomingOpenHouse {
   listingId: string | null;
   startsAt: Date;
   endsAt: Date;
+  /** The agent's zone (US-669), else the visitor's: what the times are shown in. */
+  timeZone: string;
   publicNotes: string | null;
   address: string;
   fullAddress: string;
@@ -53,6 +68,7 @@ function toUpcoming(row: Record<string, unknown>): UpcomingOpenHouse | null {
     listingId: str(row.listing_id),
     startsAt: new Date(starts),
     endsAt: new Date(ends),
+    timeZone: visitorOpenHouseTimeZone(row.time_zone),
     publicNotes: str(row.public_notes),
     address,
     fullAddress: formatOpenHouseAddress({
@@ -68,13 +84,19 @@ function toUpcoming(row: Record<string, unknown>): UpcomingOpenHouse | null {
   };
 }
 
-function formatWhen(start: Date, end: Date): string {
-  const day = format(start, isSameYear(start, new Date()) ? 'EEE, MMM d' : 'EEE, MMM d, yyyy');
-  const time =
-    format(start, 'a') === format(end, 'a')
-      ? `${format(start, 'h:mm')}–${format(end, 'h:mm a')}`
-      : `${format(start, 'h:mm a')}–${format(end, 'h:mm a')}`;
-  return `${day} · ${time}`;
+/**
+ * The time at the property, in the agent's zone (US-669). It was formatted in
+ * the visitor's zone, so someone in Denver read a Chicago 1–3 PM open house as
+ * 12–2. A visitor whose clock differs also gets the zone's name ("CST").
+ */
+function formatWhen(oh: UpcomingOpenHouse): string {
+  return formatOpenHouseWhen(
+    oh.startsAt.toISOString(),
+    oh.endsAt.toISOString(),
+    oh.timeZone,
+    new Date(),
+    { zoneLabel: needsZoneLabel(oh.timeZone, oh.startsAt) }
+  );
 }
 
 const actionClass =
@@ -173,12 +195,14 @@ export function UpcomingOpenHouses({
   agentId,
   agentName,
   profileUrl,
-  onViewListing,
+  listingHref,
+  listingId,
 }: UpcomingOpenHousesProps) {
   const { data } = usePublicOpenHouses(agentId);
   const openHouses = (data ?? [])
     .map(toUpcoming)
     .filter((oh): oh is UpcomingOpenHouse => oh !== null)
+    .filter((oh) => !listingId || oh.listingId === listingId)
     .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 
   if (openHouses.length === 0) return null;
@@ -195,6 +219,9 @@ export function UpcomingOpenHouses({
     url: profileUrl,
   });
 
+  const homeHref = (oh: UpcomingOpenHouse): string | null =>
+    (oh.listingId && listingHref?.(oh.listingId)) || null;
+
   return (
     <section
       id="open-houses"
@@ -205,7 +232,9 @@ export function UpcomingOpenHouses({
         Open houses
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Come see a home in person — no appointment needed.
+        {listingId
+          ? 'Come see this home in person — no appointment needed.'
+          : 'Come see a home in person — no appointment needed.'}
       </p>
 
       <ul className="mt-4 space-y-4">
@@ -225,9 +254,7 @@ export function UpcomingOpenHouses({
             <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 sm:p-5">
               <div>
                 <p className="text-base font-semibold text-foreground">
-                  <time dateTime={oh.startsAt.toISOString()}>
-                    {formatWhen(oh.startsAt, oh.endsAt)}
-                  </time>
+                  <time dateTime={oh.startsAt.toISOString()}>{formatWhen(oh)}</time>
                 </p>
                 <p className="mt-1 text-foreground">{oh.fullAddress}</p>
                 {oh.price && <p className="mt-0.5 font-medium text-foreground">{oh.price}</p>}
@@ -241,7 +268,7 @@ export function UpcomingOpenHouses({
               <div className="mt-auto flex flex-wrap gap-2">
                 <AddToCalendar
                   event={calendarEvent(oh)}
-                  filename={`open-house-${oh.startsAt.toISOString().slice(0, 10)}.ics`}
+                  filename={`open-house-${openHouseLocalDate(oh.startsAt.toISOString(), oh.timeZone)}.ics`}
                 />
 
                 <a
@@ -254,14 +281,14 @@ export function UpcomingOpenHouses({
                   Get directions
                 </a>
 
-                {onViewListing && oh.listingId && (
-                  <button
-                    type="button"
-                    onClick={() => oh.listingId && onViewListing(oh.listingId)}
+                {homeHref(oh) && (
+                  <Link
+                    to={homeHref(oh)!}
                     className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     View home
-                  </button>
+                    <span className="sr-only">: {oh.address}</span>
+                  </Link>
                 )}
               </div>
             </div>

@@ -18,9 +18,11 @@ import {
   derivePkceVerifier,
   isOAuthProvider,
   newNonce,
+  newSocialUserMetadata,
   pkceChallenge,
   resolveStateSecret,
   safeRedirectPath,
+  sanitizeSignupAttribution,
   signState,
   tokenErrorForLog,
   verifyState,
@@ -78,11 +80,17 @@ export default async function handler(req: Request): Promise<Response> {
       // derived from its nonce on both legs (see oauth.ts).
       const nonce = newNonce();
       const codeChallenge = await pkceChallenge(await derivePkceVerifier(STATE_SECRET!, nonce));
+      // US-594: referral and first-touch source for a new account (oauth.ts).
+      const attribution = sanitizeSignupAttribution(
+        url.searchParams.get('ref'),
+        url.searchParams.get('signup_source'),
+      );
       const stateData = await signState(STATE_SECRET!, {
         provider,
         redirectTo,
         nonce,
         exp: Math.floor(Date.now() / 1000) + STATE_TTL_SECONDS,
+        ...attribution,
       });
 
       let authUrl: URL;
@@ -142,7 +150,13 @@ export default async function handler(req: Request): Promise<Response> {
       const checked = await verifyState(STATE_SECRET!, state, Math.floor(Date.now() / 1000));
       if (!checked.ok) return jsonError(checked.error, checked.status);
 
-      const { nonce, redirectTo: finalRedirect, provider: stateProvider } = checked.value;
+      const {
+        nonce,
+        redirectTo: finalRedirect,
+        provider: stateProvider,
+        ref: stateRef,
+        source: stateSource,
+      } = checked.value;
       const verifier = await derivePkceVerifier(STATE_SECRET!, nonce);
       let tokenData: Record<string, unknown> = {};
 
@@ -215,11 +229,7 @@ export default async function handler(req: Request): Promise<Response> {
         const { error: createError } = await supabase.auth.admin.createUser({
           email: payload.email,
           email_confirm: true,
-          user_metadata: {
-            full_name: payload.name,
-            avatar_url: payload.picture,
-            provider: stateProvider,
-          },
+          user_metadata: newSocialUserMetadata(payload, stateProvider, { ref: stateRef, source: stateSource }),
           app_metadata: {
             provider: stateProvider,
             providers: [stateProvider],

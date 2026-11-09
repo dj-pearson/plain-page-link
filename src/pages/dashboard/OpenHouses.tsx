@@ -6,9 +6,8 @@
  * on the day: the sign-in kiosk link for the tablet, a QR code for a printed
  * sign-in sheet, and the visitors who have signed in so far.
  */
-import { useMemo, useState } from 'react';
+import { lazy, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { format, isSameYear } from 'date-fns';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import {
@@ -49,33 +48,45 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { OpenHouseFormDialog } from '@/components/openHouses/OpenHouseFormDialog';
-import { OpenHouseVisitorsDialog } from '@/components/openHouses/OpenHouseVisitorsDialog';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
-import { UpgradeModal } from '@/components/UpgradeModal';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { formatOpenHouseAddress, useOpenHouses, type OpenHouse } from '@/hooks/useOpenHouses';
+import { useAgentTimeZone } from '@/hooks/useAgentTimeZone';
+import { formatOpenHouseWhen } from '@/lib/openHouseSchedule';
 import { useListings } from '@/hooks/useListings';
 import { fallBackToOriginal, sizedImage, type SizedImage } from '@/lib/images';
 import { toStringList } from '@/types/profile';
 import { cn } from '@/lib/utils';
 
+/*
+ * The schedule form, the visitors list and the upgrade prompt load when they
+ * are first opened, not with the page (US-431, the US-412 pattern). The form
+ * put react-hook-form and zod (form-vendor, 23 KB gzip) on the route of an
+ * agent who came to check what is scheduled. Hovering or focusing a Schedule
+ * button warms the form's chunk.
+ */
+const loadOpenHouseFormDialog = () => import('@/components/openHouses/OpenHouseFormDialog');
+const OpenHouseFormDialog = lazy(() =>
+  loadOpenHouseFormDialog().then((m) => ({ default: m.OpenHouseFormDialog }))
+);
+const OpenHouseVisitorsDialog = lazy(() =>
+  import('@/components/openHouses/OpenHouseVisitorsDialog').then((m) => ({
+    default: m.OpenHouseVisitorsDialog,
+  }))
+);
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+
+/** A failed prefetch is retried by the click that needs the chunk. */
+const preloadOpenHouseForm = () => void loadOpenHouseFormDialog().catch(() => undefined);
+
 type Confirm = { kind: 'cancel' | 'delete'; openHouse: OpenHouse } | null;
 
 function kioskUrl(id: string): string {
   return `${window.location.origin}/open-house/${id}`;
-}
-
-/** "Sat, Oct 4 · 1:00–3:00 PM" — with the year when it is not this year. */
-function formatWhen(startsAt: string, endsAt: string): string {
-  const s = new Date(startsAt);
-  const e = new Date(endsAt);
-  const day = format(s, isSameYear(s, new Date()) ? 'EEE, MMM d' : 'EEE, MMM d, yyyy');
-  const time =
-    format(s, 'a') === format(e, 'a')
-      ? `${format(s, 'h:mm')}–${format(e, 'h:mm a')}`
-      : `${format(s, 'h:mm a')}–${format(e, 'h:mm a')}`;
-  return `${day} · ${time}`;
 }
 
 /** A 96x72 thumbnail: the 200px variant, not the original upload (US-260). */
@@ -91,6 +102,8 @@ function addressOf(oh: OpenHouse): string {
 interface RowProps {
   openHouse: OpenHouse;
   variant: 'upcoming' | 'past' | 'cancelled';
+  /** The agent's zone, the one the schedule form saved the times in (US-628). */
+  timeZone: string;
   onShowQr(): void;
   onVisitors(): void;
   onEdit(): void;
@@ -102,6 +115,7 @@ interface RowProps {
 function OpenHouseRow({
   openHouse: oh,
   variant,
+  timeZone,
   onShowQr,
   onVisitors,
   onEdit,
@@ -127,7 +141,9 @@ function OpenHouseRow({
         />
         <div className="min-w-0">
           <p className="font-semibold text-foreground">
-            <time dateTime={oh.starts_at}>{formatWhen(oh.starts_at, oh.ends_at)}</time>
+            <time dateTime={oh.starts_at}>
+              {formatOpenHouseWhen(oh.starts_at, oh.ends_at, timeZone)}
+            </time>
           </p>
           <p className="truncate text-sm text-foreground">{addressOf(oh)}</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
@@ -234,6 +250,11 @@ export default function OpenHouses() {
   const [showCancelled, setShowCancelled] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { status, planName } = usePlanUsage();
+  const { timeZone: savedZone, detected } = useAgentTimeZone();
+  const timeZone = savedZone ?? detected ?? 'UTC';
+  const form = useMountOnFirstOpen(formOpen);
+  const upgradeModal = useMountOnFirstOpen(upgradeOpen);
+  const visitorsDialog = useMountOnFirstOpen(visitorsFor !== null);
 
   const { upcoming, past, cancelled } = useMemo(() => {
     const now = Date.now();
@@ -316,6 +337,7 @@ export default function OpenHouses() {
   };
 
   const rowHandlers = (oh: OpenHouse) => ({
+    timeZone,
     onShowQr: () => setQrFor(oh),
     onVisitors: () => setVisitorsFor(oh),
     onEdit: () => openEdit(oh),
@@ -340,6 +362,8 @@ export default function OpenHouses() {
           type="button"
           className="gap-2 sm:shrink-0"
           onClick={openCreate}
+          onPointerEnter={preloadOpenHouseForm}
+          onFocus={preloadOpenHouseForm}
           disabled={!listingsLoading && !hasListings}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -410,7 +434,12 @@ export default function OpenHouses() {
                   at the door, and every sign-in lands in your Leads.
                 </li>
               </ol>
-              <Button className="mt-6 gap-2" onClick={openCreate}>
+              <Button
+                className="mt-6 gap-2"
+                onClick={openCreate}
+                onPointerEnter={preloadOpenHouseForm}
+                onFocus={preloadOpenHouseForm}
+              >
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Schedule your first open house
               </Button>
@@ -498,18 +527,45 @@ export default function OpenHouses() {
         </>
       )}
 
-      <OpenHouseFormDialog open={formOpen} onOpenChange={setFormOpen} openHouse={editing} />
-      <UpgradeModal
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
-        feature="open_houses_per_month"
-        currentPlan={planName}
-      />
+      {form.mounted && (
+        <LazyModal
+          onClose={() => {
+            setFormOpen(false);
+            form.unmount();
+          }}
+        >
+          <OpenHouseFormDialog open={formOpen} onOpenChange={setFormOpen} openHouse={editing} />
+        </LazyModal>
+      )}
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setUpgradeOpen(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={upgradeOpen}
+            onOpenChange={setUpgradeOpen}
+            feature="open_houses_per_month"
+            currentPlan={planName}
+          />
+        </LazyModal>
+      )}
 
-      <OpenHouseVisitorsDialog
-        openHouse={visitorsFor}
-        onOpenChange={(open) => !open && setVisitorsFor(null)}
-      />
+      {visitorsDialog.mounted && (
+        <LazyModal
+          onClose={() => {
+            setVisitorsFor(null);
+            visitorsDialog.unmount();
+          }}
+        >
+          <OpenHouseVisitorsDialog
+            openHouse={visitorsFor}
+            onOpenChange={(open) => !open && setVisitorsFor(null)}
+          />
+        </LazyModal>
+      )}
 
       <Dialog open={!!qrFor} onOpenChange={(open) => !open && setQrFor(null)}>
         <DialogContent className="sm:max-w-md">
