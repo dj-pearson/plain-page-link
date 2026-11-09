@@ -6503,3 +6503,50 @@ Other findings:
 - [seo] functions/_lib/*.ts are ignored by the eslint config ('File ignored because no matching configuration'), so lint never sees Pages Functions code.
 - [mobile] src/components/profile/StickyActionBar.tsx quick-actions panel has no max-height. On a phone in landscape (about 320-375px tall), a 2x2 grid sitting at 6rem plus the inset from the bottom can run past the top of the viewport. A max-h-[calc(100dvh-...)] with overflow-y-auto would cover that case.
 - [mobile] CLAUDE.md still lists the deleted src/hooks/useOfflineStorage.ts and src/lib/offline-storage.ts (carried over from US-618). Not edited.
+
+---
+
+## Continuous improvement loop — round 20 — 2026-11-09 (US-669 to US-678 done) — LOOP PAUSED
+
+The weekly usage limit stopped 7 independent reviews and 1 fix-up. The integrator reviewed those 7 diffs by hand (security migration read line by line; mobile's 27 files are prettier reformatting plus 90vh -> dynamic viewport units) and fixed the leads reviewer's blocking defect itself. Closed US-552, US-641, US-643, US-650, US-663, US-667; slice 1 of US-639.
+Final: tsc clean (app + node config), 3491 unit tests pass, verify:migrations OK (95 files), verify:schema 59/59 against a fresh Postgres, vite build OK, eslint 527 warnings (CI ratchet 528 -> 527).
+Paused by the owner. 82 lane stories remain open in prd.json. Nothing on this branch is deployed; docs/improvement-loops/DEPLOY.md is the runbook.
+
+- US-669 [listings] Open-house times on the public profile and kiosk showed the visitor's clock, not the time at the property
+- US-670 [leads] Adding a client by hand now warns when another client already has that email or phone
+- US-671 [profile] Page builder lost recent edits on leaving the editor, and a failed publish still read Published
+- US-672 [uiux] Badges glare or disappear on the dark dashboard, and the Leads card status gives closed leads the same pill as new ones
+- US-673 [performance] Small agent headshots outside the public profile still loaded the full-size photo (up to 800px)
+- US-674 [security] An unpublished agent's page-builder page and paid-plan status were still readable by anyone
+- US-675 [enterprise] Admins could not tell events the browser reported from events the server recorded in the audit log
+- US-676 [marketing] Free-tool drip emails had no CAN-SPAM postal address and still used gradient headers and thick side-stripe callouts (US-447 code half)
+- US-677 [seo] Legacy ?listing= links to hidden homes gave crawlers only a heading, not the agent's profile body (US-552)
+- US-678 [mobile] Dialogs ran past the visible screen in iOS Safari's browser tab, hiding their top edge and close button (US-650)
+
+Owner actions:
+- US-669: Apply migration supabase/migrations/20261108000669_open_house_agent_time_zone.sql. It drops and recreates list_public_open_houses and get_public_open_house; grants are restated. Migration 20261107000433 (profiles.timezone) must already be applied.
+- US-669: Redeploy Cloudflare Pages (frontend). Until the migration is applied, time_zone is absent and the page falls back to the visitor's zone, as before. No edge function and no secret is involved.
+- US-669: verify:schema in CI will still fail on the pre-existing 'zip routing … departed member … audit row' check (progress.txt:6476). That is unrelated to this change.
+- US-670: Redeploy the edge-functions server (functions.agentbio.net, Coolify, root Dockerfile) so pii-crypto has the match_contacts_for_details op. Until then the client form's check errors and it saves without warning, the same as today.
+- US-670: Requires migration 20261108000629_contact_lookup_hashes.sql (US-629) to be applied; without it the op fails, and the form again saves without warning.
+- US-671: None beyond a normal Cloudflare Pages deploy. This is a frontend-only change: no migration, no edge function, no secret.
+- US-674: Apply migration supabase/migrations/20261108000674_unpublished_page_builder_and_plan_private.sql to production. No edge function redeploy and no frontend deploy are needed.
+- US-675: Deploy Cloudflare Pages: frontend-only change. No migration, edge function or secret. The marker only shows on rows written after the US-657 audit-log function redeploy, which is still a pending owner action.
+- US-676: Set COMPANY_POSTAL_ADDRESS (a street address or a registered PO box / private mailbox; newlines become commas) on the edge-functions deployment (functions.agentbio.net, Coolify). Until it is set, the drip footers have no address line, the same as today.
+- US-676: Redeploy the edge-functions Coolify app so the four drip senders (send-listing-generator-email, send-scheduled-listing-emails, send-bio-analyzer-email, send-scheduled-bio-emails) pick up the new footer and templates. No migration, and no frontend deploy.
+- US-677: Redeploy Cloudflare Pages (functions/_lib/profile-route.ts changed); no migration or secrets
+
+Opened:
+- US-679 [listings] US-639 slice 2: open-house times in the agent's zone on the listing page and in crawler/structured-data output
+- US-680 [leads] Warn about duplicates when a contact is created outside the client form (CSV/vCard import, if added)
+- US-681 [leads] Merge two client records
+- US-682 [profile] Page builder: hold browser back/forward and tab close until pending edits are flushed
+- US-683 [profile] Page builder: make savePage race-safe for a page not yet stored
+- US-684 [uiux] Dark-mode pass on Badge className overrides across the dashboard
+- US-685 [performance] Testimonial author photos: decide whether they get a small variant
+- US-686 [performance] Brokerage logo small variant
+- US-687 [security] get_public_open_house ignores is_public
+- US-688 [enterprise] Audit log exports and the GDPR export carry the source
+- US-689 [marketing] Welcome email footer uses the same postal address
+- US-690 [marketing] Listing drips send through _shared/email.ts
+- US-691 [mobile] Cap the public profile quick-actions panel to the visible viewport on landscape phones

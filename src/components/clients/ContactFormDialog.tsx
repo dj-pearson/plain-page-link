@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -306,10 +306,17 @@ function ContactForm({ contact, initial, onSaved, onClose }: ContactFormProps) {
     return () => subscription.unsubscribe();
   }, [watch]);
 
+  // "Save anyway" re-validates and saves what is in the form NOW. It used to
+  // save the copy taken when the warning appeared, so edits made while the
+  // warning showed (a corrected name, notes, a key date) were silently lost.
+  const skipDuplicateCheck = useRef(false);
+
   const onSubmit = async (values: FormValues) => {
     const input = toInput(values, leadId);
     setDuplicates(null);
-    if (needsDuplicateCheck(input, contact)) {
+    const skipCheck = skipDuplicateCheck.current;
+    skipDuplicateCheck.current = false;
+    if (!skipCheck && needsDuplicateCheck(input, contact)) {
       setChecking(true);
       let found: ContactMatchForDetails[] = [];
       try {
@@ -687,7 +694,10 @@ function ContactForm({ contact, initial, onSaved, onClose }: ContactFormProps) {
               type="button"
               size="sm"
               className="min-h-[44px] sm:min-h-0"
-              onClick={() => void save(duplicates.input)}
+              onClick={() => {
+                skipDuplicateCheck.current = true;
+                void handleSubmit(onSubmit)();
+              }}
               disabled={saving}
             >
               {saving ? 'Saving…' : 'Save anyway'}

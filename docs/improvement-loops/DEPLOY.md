@@ -22,6 +22,8 @@ migration, an edge-function change or a setting.
    - Storage allows files of at least 500 MB, for data exports.
    - On the Cloudflare Pages project, `VITE_APP_URL` (if set) is
      `https://agentbio.net`. Pages Functions now read it for canonical URLs.
+   - `COMPANY_POSTAL_ADDRESS` is set (a street address or registered PO box).
+     The free-tool drip emails must carry it (CAN-SPAM).
    - Optional: `DIGEST_LOCAL_HOUR` (default 7) and `DIGEST_CATCHUP_HOURS`
      (default 6).
 3. **Optional check before migration `20261108000456`.** It blanks agent URLs
@@ -111,6 +113,8 @@ app and the frontend depend on each other in both directions:
 20261108000615_past_due_grace_from_paid_period.sql
 20261108000629_contact_lookup_hashes.sql
 20261108000651_open_house_start_not_in_past.sql
+20261108000669_open_house_agent_time_zone.sql
+20261108000674_unpublished_page_builder_and_plan_private.sql
 ```
 
 ## What changes for users the moment it ships

@@ -69,6 +69,13 @@ apply, functions to redeploy, secrets to set).
 order, and the list of migrations not yet in production. The integrator
 updates it every round.
 
+## Status
+
+Paused by the owner after round 20 (2026-11-09). Twenty rounds shipped about
+200 stories (US-263 to US-678); open follow-ups are the `passes: false`
+stories with a `lane` in `prd.json`. The branch has not been deployed yet: see
+`DEPLOY.md`.
+
 ## Running another round
 
 Ask Claude in this repo: "run another improvement loop round". Each round

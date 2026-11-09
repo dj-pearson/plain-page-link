@@ -116,6 +116,20 @@ describe('ContactFormDialog duplicate warning (US-670)', () => {
     });
   });
 
+  it('"Save anyway" saves the edits made while the warning showed, without checking again', async () => {
+    findMatches.mockResolvedValue([dana]);
+    renderAdd();
+    const user = await fillAndSubmit('dana@example.com');
+    await screen.findByRole('alert');
+
+    await user.type(screen.getByLabelText('First name'), 'h');
+    await user.click(screen.getByRole('button', { name: 'Save anyway' }));
+
+    await waitFor(() => expect(createContact.mutateAsync).toHaveBeenCalledTimes(1));
+    expect(createContact.mutateAsync.mock.calls[0][0]).toMatchObject({ first_name: 'Danah' });
+    expect(findMatches).toHaveBeenCalledTimes(1);
+  });
+
   it('drops the warning once the agent changes the email', async () => {
     findMatches.mockResolvedValue([dana]);
     renderAdd();
