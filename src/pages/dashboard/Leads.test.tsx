@@ -140,6 +140,21 @@ describe('Leads page', () => {
     expect(screen.getByText(mockLead.phone!)).toBeInTheDocument();
   });
 
+  // US-663: the card's status used Badge variants, which gave 'closed' and
+  // 'converted' the same black pill as 'new' and had no dark pair. It now
+  // shares LeadStatusPill's grouped tones with Overview.
+  it('shows the card status in its group tone, with a dark-mode pair', async () => {
+    fromMock.mockImplementation(() =>
+      stubLeadsQuery([{ ...mockLeadRow, status: 'closed' }], selected, updates)
+    );
+    const { container } = renderWithProviders(<Leads />);
+
+    await screen.findByText(mockLead.name);
+    const pill = container.querySelector('[data-tone]');
+    expect(pill).toHaveAttribute('data-tone', 'won');
+    expect(pill?.className).toMatch(/dark:bg-/);
+  });
+
   it('links the contact details with mailto: and tel: on the decrypted values', async () => {
     renderWithProviders(<Leads />);
 

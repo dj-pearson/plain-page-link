@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderWithProviders, screen } from '@/test/test-utils';
-import { Badge } from './badge';
+import { Badge, badgeVariants } from './badge';
 
 describe('Badge', () => {
   it('renders its content', () => {
@@ -34,7 +34,11 @@ describe('Badge', () => {
       white: '#ffffff',
       'gray-50': '#f9fafb',
       'gray-100': '#f3f4f6',
+      'gray-800': '#1f2937',
       'gray-900': '#111827',
+      // The dark theme's --background / --card, hsl(222.2 84% 4.9%), and the
+      // light theme's white page: the surfaces an outline badge sits on.
+      'dark-surface': '#020817',
       'red-600': '#dc2626',
       'green-700': '#15803d',
       'amber-700': '#b45309',
@@ -61,9 +65,36 @@ describe('Badge', () => {
       ['destructive', 'white', 'red-600'],
       ['success', 'white', 'green-700'],
       ['warning', 'white', 'amber-700'],
+      ['outline', 'gray-900', 'white'],
     ])('%s clears WCAG AA for normal text', (_variant, fg, bg) => {
       expect(ratio(TAILWIND[fg], TAILWIND[bg])).toBeGreaterThanOrEqual(4.5);
     });
+
+    // US-663: the dark-mode pairs, read off the class string itself so a
+    // shade changed in badge.tsx is checked rather than assumed.
+    const darkPair = (className: string, fallbackBg: string) => {
+      const bg = /(?:^|\s)dark:bg-([a-z]+-\d+)(?:\s|$)/.exec(className)?.[1] ?? fallbackBg;
+      const fg = /(?:^|\s)dark:text-([a-z]+-\d+)(?:\s|$)/.exec(className)?.[1];
+      return { fg, bg };
+    };
+
+    it.each(['default', 'secondary', 'outline'] as const)(
+      '%s has a dark-mode pair that clears WCAG AA',
+      (variant) => {
+        const { fg, bg } = darkPair(badgeVariants({ variant }), 'dark-surface');
+        expect(fg, `${variant} has no dark:text- class`).toBeDefined();
+        expect(TAILWIND[fg as string], `add ${fg} to the table`).toBeDefined();
+        expect(TAILWIND[bg], `add ${bg} to the table`).toBeDefined();
+        expect(ratio(TAILWIND[fg as string], TAILWIND[bg])).toBeGreaterThanOrEqual(4.5);
+      }
+    );
+
+    it.each(['destructive', 'success', 'warning'] as const)(
+      '%s keeps its own fill in dark mode, so its light pair holds',
+      (variant) => {
+        expect(badgeVariants({ variant })).not.toMatch(/dark:/);
+      }
+    );
   });
 
   it('merges custom className', () => {

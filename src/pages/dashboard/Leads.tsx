@@ -36,7 +36,6 @@ import {
   leadStatusLabel,
   normalizeStatusFilter,
   summarizeLeadStatuses,
-  type LeadStatus,
 } from '@/lib/leadStatus';
 import { cn } from '@/lib/utils';
 import { useLeadContactAction } from '@/hooks/useLeadContactAction';
@@ -51,6 +50,7 @@ import { leadAddressLabel } from '@/lib/leadAddressLabel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { LeadStatusPill } from '@/components/leads/LeadStatusPill';
 import {
   Select,
   SelectContent,
@@ -631,20 +631,6 @@ export default function Leads() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<LeadStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      new: 'default',
-      contacted: 'secondary',
-      qualified: 'outline',
-      nurturing: 'secondary',
-      converted: 'default',
-      closed: 'default',
-      lost: 'outline',
-    };
-    const variant = variants[status as LeadStatus] ?? 'outline';
-    return <Badge variant={variant}>{leadStatusLabel(status)}</Badge>;
-  };
-
   const getLeadTypeIcon = (type: string) => {
     switch (type) {
       case 'buyer':
@@ -1177,7 +1163,10 @@ export default function Leads() {
                           {lead.name}
                         </h3>
                         {getScoreBadge(lead.id)}
-                        {getStatusBadge(lead.status ?? 'new')}
+                        {/* US-663: the same grouped tones as Overview (new / in progress /
+                            won / lost), with dark pairs. The Badge mapping here
+                            gave 'closed' the same black pill as 'new'. */}
+                        <LeadStatusPill status={lead.status} />
                         <Badge variant="outline" className="capitalize text-xs">
                           {lead.lead_type}
                         </Badge>
