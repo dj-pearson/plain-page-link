@@ -1733,11 +1733,12 @@ check('client sphere is per-agent and open houses hide private notes', () => {
 //      The profile row has been gated on is_published since 20260808000002,
 //      but the visitor policies on listings, links and testimonials looked
 //      only at the row itself, so an unpublished agent's listings, links and
-//      reviews stayed readable by user id. Each table, the two open house
-//      RPCs and the response-time aggregate are asserted for a visitor, for
+//      reviews stayed readable by user id. Each table (custom_pages since
+//      US-674), the two open house RPCs, the response-time aggregate and
+//      profile_shows_branding (a read of the plan, US-674) are asserted for a visitor, for
 //      another signed-in agent, and for the owner, then again once published.
 // ---------------------------------------------------------------------------
-check("an unpublished agent's listings, links, reviews and open houses are hidden from visitors", () => {
+check("an unpublished agent's listings, links, reviews, open houses, custom page and plan are hidden from visitors", () => {
   const out = [];
   const agent = '00000000-dead-beef-0000-000000030801';
   const other = '00000000-dead-beef-0000-000000030802';
@@ -1754,12 +1755,15 @@ check("an unpublished agent's listings, links, reviews and open houses are hidde
            || '|' || (SELECT count(*) FROM public.testimonials WHERE user_id = '${agent}')
            || '|' || (SELECT count(*) FROM public.list_public_open_houses('${agent}'))
            || '|' || (SELECT count(*) FROM public.get_public_open_house('${oh}'))
-           || '|' || coalesce(public.public_agent_response_hours('${agent}')::text, 'null');`
+           || '|' || coalesce(public.public_agent_response_hours('${agent}')::text, 'null')
+           || '|' || (SELECT count(*) FROM public.custom_pages WHERE user_id = '${agent}')
+           || '|' || coalesce(public.profile_shows_branding('${agent}')::text, 'null');`
     );
     return row;
   };
-  const NONE = '0|0|0|0|0|null';
-  const ALL = '1|1|1|1|1|2.0';
+  // US-674 added the page-builder page and the branding flag (a read of the plan).
+  const NONE = '0|0|0|0|0|null|0|null';
+  const ALL = '1|1|1|1|1|2.0|1|true';
   try {
     q(`INSERT INTO auth.users (id, email) VALUES
          ('${agent}', 'us308agent@example.test'), ('${other}', 'us308other@example.test')
@@ -1779,11 +1783,13 @@ check("an unpublished agent's listings, links, reviews and open houses are hidde
                  now() + interval '1 day 2 hours', true, 'lockbox 0308');
        INSERT INTO public.leads (user_id, lead_type, name, created_at, first_responded_at)
          SELECT '${agent}', 'buyer', 'Lead ' || g, now() - interval '3 hours', now() - interval '1 hour'
-           FROM generate_series(1, 5) g;`);
+           FROM generate_series(1, 5) g;
+       INSERT INTO public.custom_pages (user_id, slug, title, published, is_active)
+         VALUES ('${agent}', 'us308agent', 'My page', true, true);`);
 
     const anonSees = visible('anon', null);
     if (anonSees !== NONE)
-      out.push(`unpublished: a visitor sees "${anonSees}" (listings|links|reviews|open houses|kiosk|response hours); expected "${NONE}"`);
+      out.push(`unpublished: a visitor sees "${anonSees}" (listings|links|reviews|open houses|kiosk|response hours|custom page|branding); expected "${NONE}"`);
     const otherSees = visible('authenticated', other);
     if (otherSees !== NONE)
       out.push(`unpublished: another signed-in agent sees "${otherSees}"; expected "${NONE}"`);
@@ -1806,6 +1812,7 @@ check("an unpublished agent's listings, links, reviews and open houses are hidde
     try {
       q(`RESET ROLE;
          DELETE FROM public.open_houses WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.custom_pages WHERE user_id IN ('${agent}', '${other}');
          DELETE FROM public.leads WHERE user_id IN ('${agent}', '${other}');
          DELETE FROM public.testimonials WHERE user_id IN ('${agent}', '${other}');
          DELETE FROM public.links WHERE user_id IN ('${agent}', '${other}');
