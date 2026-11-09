@@ -516,6 +516,71 @@ describe("the agent's page body for crawlers (US-539)", () => {
     expect(await profileHtml()).not.toContain('makesOffer');
   });
 
+  describe('the legacy ?listing= link when its home is not shown (US-552)', () => {
+    const SERVICE_AREAS = '<section><h2>Service areas</h2>';
+
+    it('serves the profile body, naming only the homes the page shows', async () => {
+      serve({ settings: [{ show_listings: true, show_sold_properties: false }] });
+      const response = await call({ path: '/jane?listing=sold-1' }).promise;
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('profile');
+      const html = await response.text();
+      expect(html).toContain(SERVICE_AREAS);
+      expect(html).toContain('<li>License #UT-12345 (UT)</li>');
+      expect(html).toContain(
+        '<a href="https://agentbio.net/jane/listing/abc-123">412 Maple Avenue, Salt Lake City, UT</a>'
+      );
+      expect(html).toContain('"makesOffer"');
+      expect(html).toContain('<link rel="canonical" href="https://agentbio.net/jane" />');
+      // The hidden home is named nowhere: not in the body, the JSON-LD or the card.
+      expect(html).not.toContain('sold-1');
+      expect(html).not.toContain('9 Birch Court');
+    });
+
+    it('serves the profile body for a listing id that does not exist', async () => {
+      serve({});
+      const response = await call({ path: '/jane?listing=gone' }).promise;
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('profile');
+      const html = await response.text();
+      expect(html).toContain(SERVICE_AREAS);
+      expect(html).toContain('"makesOffer"');
+    });
+
+    it('names no home when the agent hides every listing', async () => {
+      serve({ settings: [{ show_listings: false, show_sold_properties: false }] });
+      const html = await (await call({ path: '/jane?listing=abc-123' }).promise).text();
+      expect(html).toContain(SERVICE_AREAS);
+      expect(html).not.toContain('412 Maple Avenue');
+      expect(html).not.toContain('makesOffer');
+    });
+
+    it('still describes a home the page shows', async () => {
+      serve({});
+      const response = await call({ path: '/jane?listing=abc-123' }).promise;
+      expect(response.headers.get('x-agentbio-prerender')).toBe('listing');
+      const html = await response.text();
+      expect(html).toContain('412 Maple Avenue, Salt Lake City, UT — $525,000');
+      expect(html).not.toContain(SERVICE_AREAS);
+    });
+
+    it("leaves the listing's own address a 404 with the agent card, not the profile body", async () => {
+      serve({ settings: [{ show_listings: true, show_sold_properties: false }] });
+      const response = await onListingRequestGet({
+        request: new Request('https://agentbio.net/jane/listing/sold-1', {
+          headers: { 'user-agent': CRAWLER },
+        }),
+        env: ENV as never,
+        params: { username: 'jane', listingId: 'sold-1' },
+        next: async () => indexResponse(),
+      });
+      expect(response.status).toBe(404);
+      const html = await response.text();
+      expect(html).not.toContain(SERVICE_AREAS);
+      expect(html).not.toContain('9 Birch Court');
+    });
+  });
+
   it('reads the listings and the toggles scoped to the agent, without photos', async () => {
     serve({});
     await profileHtml();
@@ -755,7 +820,8 @@ describe('/:username/listing/:listingId (US-275)', () => {
       serve(LISTING_ROW, [{ show_listings: false, show_sold_properties: true }]);
       const response = await call({ path: '/jane?listing=abc-123' }).promise;
       expect(response.status).toBe(200);
-      expect(response.headers.get('x-agentbio-prerender')).toBe('listing');
+      // The profile, so the profile's body (US-552).
+      expect(response.headers.get('x-agentbio-prerender')).toBe('profile');
       const html = await response.text();
       expect(html).toContain(AGENT_TITLE);
       expect(html).not.toContain('412 Maple Avenue');
