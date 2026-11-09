@@ -1703,6 +1703,21 @@ check('client sphere is per-agent and open houses hide private notes', () => {
     const [direct] = q(`SET ROLE anon; SELECT count(*) FROM public.open_houses;`);
     if (direct !== '0') out.push(`anon can select ${direct} open_houses rows directly, private_notes included`);
 
+    // US-669: visitors format the times in the agent's zone, so every visitor
+    // read of the open house carries it — including the one-round-trip page.
+    // (The username is read back: the auth.users trigger may have made the
+    // profile first, so the INSERT above can have been skipped.)
+    q(`UPDATE public.profiles SET timezone = 'America/Chicago' WHERE id = '${a}';`);
+    const [zones] = q(`
+      SET ROLE anon;
+      SELECT coalesce((SELECT string_agg(time_zone, ',') FROM public.list_public_open_houses('${a}')), '-')
+        || '|' || coalesce((SELECT time_zone FROM public.get_public_open_house('${oh}')), '-')
+        || '|' || coalesce(public.get_public_profile_page((SELECT username FROM public.profiles WHERE id = '${a}')) -> 'openHouses' -> 0 ->> 'time_zone', '-');
+    `);
+    if (zones !== 'America/Chicago|America/Chicago|America/Chicago') {
+      out.push(`open-house time_zone for visitors (list|kiosk|page) was "${zones}"; expected the agent's America/Chicago in all three`);
+    }
+
     q(`UPDATE public.open_houses SET status = 'cancelled' WHERE id = '${oh}';`);
     const [cancelled] = q(`SET ROLE anon; SELECT count(*) FROM public.get_public_open_house('${oh}');`);
     if (cancelled !== '0') out.push('get_public_open_house still serves a cancelled open house');

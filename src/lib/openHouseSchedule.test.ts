@@ -6,8 +6,11 @@ import {
   defaultOpenHouseDate,
   formatOpenHouseWhen,
   isoToWallTime,
+  needsZoneLabel,
+  openHouseLocalDate,
   openHouseSaveErrorMessage,
   pastStartError,
+  visitorOpenHouseTimeZone,
   wallTimeToIso,
 } from './openHouseSchedule';
 
@@ -185,6 +188,52 @@ describe('formatOpenHouseWhen', () => {
     expect(
       formatOpenHouseWhen('2027-01-09T19:00:00Z', '2027-01-09T21:00:00Z', 'America/Chicago', now)
     ).toBe('Sat, Jan 9, 2027 · 1:00–3:00 PM');
+  });
+});
+
+// US-669: visitors see the time at the property, in the agent's zone.
+describe('visitor-facing open-house times (US-669)', () => {
+  const now = new Date('2026-11-08T12:00:00Z');
+  const start = '2026-11-14T19:00:00Z';
+  const end = '2026-11-14T21:00:00Z';
+
+  it('spells the day out for the kiosk', () => {
+    expect(formatOpenHouseWhen(start, end, 'America/Chicago', now, { long: true })).toBe(
+      'Saturday, November 14 · 1:00–3:00 PM'
+    );
+  });
+
+  it("names the zone when asked, using the zone's abbreviation for that date", () => {
+    expect(formatOpenHouseWhen(start, end, 'America/Chicago', now, { zoneLabel: true })).toBe(
+      'Sat, Nov 14 · 1:00–3:00 PM CST'
+    );
+    expect(
+      formatOpenHouseWhen('2026-07-11T18:00:00Z', '2026-07-11T20:00:00Z', 'America/Chicago', now, {
+        zoneLabel: true,
+      })
+    ).toBe('Sat, Jul 11 · 1:00–3:00 PM CDT');
+  });
+
+  it('labels the zone only when the visitor reads a different clock', () => {
+    const at = new Date(start);
+    expect(needsZoneLabel('America/Chicago', at, 'America/Denver')).toBe(true);
+    expect(needsZoneLabel('America/Chicago', at, 'America/Chicago')).toBe(false);
+    // Same offset under another name reads the same clock.
+    expect(needsZoneLabel('America/Chicago', at, 'US/Central')).toBe(false);
+    expect(needsZoneLabel('America/Chicago', at, null)).toBe(false);
+  });
+
+  it("uses the agent's zone, falling back to the visitor's when it is missing or invalid", () => {
+    expect(visitorOpenHouseTimeZone('America/Chicago')).toBe('America/Chicago');
+    const fallback = visitorOpenHouseTimeZone(null);
+    expect(visitorOpenHouseTimeZone('Not/AZone')).toBe(fallback);
+    expect(visitorOpenHouseTimeZone(42)).toBe(fallback);
+    expect(fallback.length).toBeGreaterThan(0);
+  });
+
+  it('dates the calendar file where the open house happens, not in UTC', () => {
+    // 7 PM Friday in Los Angeles is already Saturday in UTC.
+    expect(openHouseLocalDate('2026-11-14T03:00:00Z', 'America/Los_Angeles')).toBe('2026-11-13');
   });
 });
 
