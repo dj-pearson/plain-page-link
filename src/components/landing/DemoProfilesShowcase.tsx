@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import { AvatarImage } from '@/components/profile/AvatarImage';
 
 interface FeaturedProfile {
   id: string;
@@ -112,8 +113,8 @@ export function DemoProfilesShowcase() {
                 {/* Avatar */}
                 <div className="relative mb-4">
                   {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
+                    <AvatarImage
+                      url={profile.avatar_url}
                       alt={profile.full_name || 'Agent'}
                       width={96}
                       height={96}
