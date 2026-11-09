@@ -134,7 +134,7 @@ export function GalleryBlock({ config, isEditing = false }: GalleryBlockProps) {
           }}
         >
           <DialogContent
-            className="max-w-none w-screen h-[100dvh] max-h-none sm:w-screen rounded-none sm:rounded-none border-0 bg-black/95 p-0 sm:p-0 flex items-center justify-center"
+            className="max-w-none w-screen h-[100dvh] max-h-none supports-[height:100dvh]:max-h-none sm:w-screen rounded-none sm:rounded-none border-0 bg-black/95 p-0 sm:p-0 flex items-center justify-center"
             onCloseAutoFocus={(e) => {
               e.preventDefault();
               openerRef.current?.focus();
@@ -178,7 +178,7 @@ export function GalleryBlock({ config, isEditing = false }: GalleryBlockProps) {
                 <img
                   src={current.url}
                   alt={current.alt}
-                  className="max-w-[90vw] max-h-[85vh] object-contain"
+                  className="max-w-[90vw] max-h-[85vh] supports-[height:100dvh]:max-h-[85dvh] object-contain"
                 />
                 {current.caption && (
                   <DialogDescription className="absolute bottom-8 left-0 right-0 text-white text-sm sm:text-base text-center px-8">

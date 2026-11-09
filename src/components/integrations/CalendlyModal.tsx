@@ -120,7 +120,7 @@ export function CalendlyModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+      <DialogContent className="max-w-4xl overflow-hidden p-0">
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="text-2xl font-semibold mb-1">{title}</DialogTitle>
           <DialogDescription>

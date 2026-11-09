@@ -290,7 +290,7 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-3xl overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="text-xl">Add New Property Listing</DialogTitle>
           <DialogDescription>Fill in the details for your property listing</DialogDescription>

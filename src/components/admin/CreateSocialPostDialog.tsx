@@ -103,7 +103,7 @@ export function CreateSocialPostDialog() {
           Create Post
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Social Media Post</DialogTitle>
           <DialogDescription>
